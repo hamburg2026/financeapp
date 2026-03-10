@@ -5,24 +5,24 @@ const TEAMS = {
         bundesliga_top6: [
             { name: 'FC Bayern München', division: 'BL Top 6', diceMax: 6 },
             { name: 'Borussia Dortmund', division: 'BL Top 6', diceMax: 6 },
+            { name: 'TSG Hoffenheim', division: 'BL Top 6', diceMax: 6 },
+            { name: 'VfB Stuttgart', division: 'BL Top 6', diceMax: 6 },
             { name: 'RB Leipzig', division: 'BL Top 6', diceMax: 6 },
-            { name: 'Bayer Leverkusen', division: 'BL Top 6', diceMax: 6 },
-            { name: 'Eintracht Frankfurt', division: 'BL Top 6', diceMax: 6 },
-            { name: 'SC Freiburg', division: 'BL Top 6', diceMax: 6 }
+            { name: 'Bayer Leverkusen', division: 'BL Top 6', diceMax: 6 }
         ],
         bundesliga_rest: [
-            { name: 'VfL Wolfsburg', division: 'BL', diceMax: 5 },
-            { name: 'TSG Hoffenheim', division: 'BL', diceMax: 5 },
+            { name: 'Eintracht Frankfurt', division: 'BL', diceMax: 5 },
+            { name: 'SC Freiburg', division: 'BL', diceMax: 5 },
             { name: 'FC Augsburg', division: 'BL', diceMax: 5 },
-            { name: 'VfB Stuttgart', division: 'BL', diceMax: 5 },
+            { name: 'Hamburger SV', division: 'BL', diceMax: 5 },
             { name: 'Union Berlin', division: 'BL', diceMax: 5 },
             { name: 'Borussia Mönchengladbach', division: 'BL', diceMax: 5 },
-            { name: '1. FC Köln', division: 'BL', diceMax: 5 },
             { name: 'SV Werder Bremen', division: 'BL', diceMax: 5 },
-            { name: '1. FC Heidenheim', division: 'BL', diceMax: 5 },
-            { name: 'VfL Bochum', division: 'BL', diceMax: 5 },
-            { name: 'FC Schalke 04', division: 'BL', diceMax: 5 },
-            { name: 'SV Darmstadt 98', division: 'BL', diceMax: 5 }
+            { name: '1. FC Köln', division: 'BL', diceMax: 5 },
+            { name: '1. FSV Mainz 05', division: 'BL', diceMax: 5 },
+            { name: 'FC St. Pauli', division: 'BL', diceMax: 5 },
+            { name: 'VfL Wolfsburg', division: 'BL', diceMax: 5 },
+            { name: '1. FC Heidenheim', division: 'BL', diceMax: 5 }
         ],
         zweite_liga_top14: [
             { name: 'Hamburger SV', division: '2.BL', diceMax: 4 },
