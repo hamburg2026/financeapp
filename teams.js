@@ -25,20 +25,20 @@ const TEAMS = {
             { name: '1. FC Heidenheim', division: 'BL', diceMax: 5 }
         ],
         zweite_liga_top14: [
-            { name: 'Hamburger SV', division: '2.BL', diceMax: 4 },
+            { name: 'FC Schalke 04', division: '2.BL', diceMax: 4 },
+            { name: 'SV Darmstadt 98', division: '2.BL', diceMax: 4 },
+            { name: 'SV Elversberg', division: '2.BL', diceMax: 4 },
+            { name: 'SC Paderborn 07', division: '2.BL', diceMax: 4 },
+            { name: 'Hannover 96', division: '2.BL', diceMax: 4 },
             { name: 'Hertha BSC', division: '2.BL', diceMax: 4 },
-            { name: 'VfL Osnabrück', division: '2.BL', diceMax: 4 },
-            { name: 'Holstein Kiel', division: '2.BL', diceMax: 4 },
-            { name: '1. FC Magdeburg', division: '2.BL', diceMax: 4 },
-            { name: 'Hansa Rostock', division: '2.BL', diceMax: 4 },
-            { name: 'Dynamo Dresden', division: '2.BL', diceMax: 4 },
             { name: '1. FC Kaiserslautern', division: '2.BL', diceMax: 4 },
             { name: 'Karlsruher SC', division: '2.BL', diceMax: 4 },
-            { name: 'FC St. Pauli', division: '2.BL', diceMax: 4 },
-            { name: 'SV Sandhausen', division: '2.BL', diceMax: 4 },
-            { name: 'FC Ingolstadt', division: '2.BL', diceMax: 4 },
-            { name: 'VfL Osnabrück II', division: '2.BL', diceMax: 4 },
-            { name: '1. FC Saarbrücken', division: '2.BL', diceMax: 4 }
+            { name: 'VfL Bochum', division: '2.BL', diceMax: 4 },
+            { name: 'Fortuna Düsseldorf', division: '2.BL', diceMax: 4 },
+            { name: '1. FC Nürnberg', division: '2.BL', diceMax: 4 },
+            { name: 'Arminia Bielefeld', division: '2.BL', diceMax: 4 },
+            { name: 'Dynamo Dresden', division: '2.BL', diceMax: 4 },
+            { name: 'Preußen Münster', division: '2.BL', diceMax: 4 }
         ]
     },
     amateur: {
