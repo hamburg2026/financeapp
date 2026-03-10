@@ -43,10 +43,10 @@ const TEAMS = {
     },
     amateur: {
         zweite_liga_last4: [
-            { name: 'SV Elversberg', division: '2.BL', diceMax: 4 },
-            { name: 'SC Paderborn', division: '2.BL', diceMax: 4 },
-            { name: 'FC Ingolstadt 04', division: '2.BL', diceMax: 4 },
-            { name: '1. FC Kaiserslautern II', division: '2.BL', diceMax: 4 }
+            { name: 'Eintracht Braunschweig', division: '2.BL', diceMax: 4 },
+            { name: 'SpVgg Greuther Fürth', division: '2.BL', diceMax: 4 },
+            { name: 'Holstein Kiel', division: '2.BL', diceMax: 4 },
+            { name: '1. FC Magdeburg', division: '2.BL', diceMax: 4 }
         ],
         dritte_liga_top5: [
             { name: '1. FC Saarbrücken', division: '3.Liga', diceMax: 3 },
