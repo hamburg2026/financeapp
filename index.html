@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DFB-Pokal Würfelspiel</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>⚽ DFB-Pokal Würfelspiel</h1>
+        <p>64 Teams kämpfen um den Pokal</p>
+    </header>
+    
+    <nav class="nav-tabs">
+        <button class="nav-btn active" data-section="setup">Setup</button>
+        <button class="nav-btn" data-section="matches">Spiele</button>
+        <button class="nav-btn" data-section="results">Ergebnisse</button>
+        <button class="nav-btn" data-section="stats">Statistik</button>
+    </nav>
+
+    <main id="main-content">
+        <!-- Setup Section -->
+        <section id="setup" class="section active">
+            <h2>Turnier Setup</h2>
+            <div class="setup-container">
+                <h3>Teams verwalten</h3>
+                <div class="teams-overview">
+                    <div class="team-group">
+                        <h4>Profi-Topf (32 Teams)</h4>
+                        <div id="profi-teams" class="team-list"></div>
+                    </div>
+                    <div class="team-group">
+                        <h4>Amateur-Topf (32 Teams)</h4>
+                        <div id="amateur-teams" class="team-list"></div>
+                    </div>
+                </div>
+                <button id="start-tournament" class="btn-primary">Turnier starten</button>
+            </div>
+        </section>
+
+        <!-- Matches Section -->
+        <section id="matches" class="section">
+            <h2>Spiele</h2>
+            <div id="match-round-info" class="round-info"></div>
+            <div id="matches-container" class="matches-container"></div>
+        </section>
+
+        <!-- Results Section -->
+        <section id="results" class="section">
+            <h2>Ergebnisse</h2>
+            <div id="results-container" class="results-container"></div>
+        </section>
+
+        <!-- Stats Section -->
+        <section id="stats" class="section">
+            <h2>Statistik</h2>
+            <div id="stats-container" class="stats-container"></div>
+        </section>
+    </main>
+
+    <script src="teams.js"></script>
+    <script src="dice.js"></script>
+    <script src="tournament.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
