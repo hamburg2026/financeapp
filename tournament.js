@@ -54,33 +54,48 @@ class Tournament {
         this.matches = [];
         this.currentRound++;
 
-        // Für weitere Runden: Nur noch 3. Liga oder tiefer im Amateur-Topf
-        let amateurWinners = winners.filter(w => w.type === 'amateur');
-        let proWinners = winners.filter(w => w.type === 'pro');
+        // Für weitere Runden: nur Amateure aus 3. Liga oder tiefer behalten
+        let amateurWinners = winners
+            .filter(w => w.type === 'amateur' && !w.division.startsWith('2.BL'));
+        let proWinners = winners.filter(w => w.type === 'pro' || w.division.startsWith('2.BL'));
+
+        // Falls ursprünglich 2.BL-Amateur gewonnen hat, wandere er in Pro-Winners.
+        // Damit zählt er nicht mehr für Heimrecht-Rundenzuordnung.
 
         // Wenn weniger als 16 Amateure, füllen mit Profis
         while (amateurWinners.length < Math.min(16, winners.length / 2)) {
             amateurWinners.push(proWinners.shift());
         }
 
-        // Paarungen mischen
-        const shuffled = this.shuffleArray([...amateurWinners, ...proWinners]);
-        
+        // Jetzt paaren: Amateur immer Heimrecht wenn gegen Profi
+        const pool = [...amateurWinners, ...proWinners];
+        const shuffled = this.shuffleArray(pool);
+
         for (let i = 0; i < shuffled.length; i += 2) {
             if (i + 1 < shuffled.length) {
-                const team1 = shuffled[i];
-                const team2 = shuffled[i + 1];
+                const t1 = shuffled[i];
+                const t2 = shuffled[i + 1];
                 
-                // Zufälliges Heimrecht
-                const isHome = Math.random() > 0.5;
+                let home = t1;
+                let away = t2;
+                let homeType = t1.type;
+                let awayType = t2.type;
+
+                // Amateur hat Heimrecht falls vorhanden
+                if (t2.type === 'amateur' && t1.type !== 'amateur') {
+                    home = t2;
+                    away = t1;
+                    homeType = t2.type;
+                    awayType = t1.type;
+                }
                 
                 this.matches.push({
                     id: i / 2,
                     round: this.currentRound,
-                    home: isHome ? team1 : team2,
-                    away: isHome ? team2 : team1,
-                    homeType: isHome ? team1.type : team2.type,
-                    awayType: isHome ? team2.type : team1.type,
+                    home,
+                    away,
+                    homeType,
+                    awayType,
                     result: null,
                     diceResult: null
                 });
