@@ -23,9 +23,33 @@ export function parseNumber(str) {
 
 /**
  * Speichert den aktuellen localStorage-Inhalt in einer Datei.
+ * Sichert nur die Finance-App Daten, nicht systemische Browser-Daten.
  */
-export function exportData(filename = 'backup.json') {
-    const data = JSON.stringify(localStorage, null, 2);
+export function exportData(filename = 'finance-backup.json') {
+    const requiredKeys = [
+        'bankAccounts',
+        'transactions',
+        'categories',
+        'recurringPayments',
+        'insuranceContracts',
+        'securities',
+        'securityPrices',
+        'depots',
+        'depotTransactions',
+        'realEstate',
+        'companyShares',
+        'subscriptions'
+    ];
+    
+    const backup = {};
+    requiredKeys.forEach(key => {
+        const value = localStorage.getItem(key);
+        if (value !== null) {
+            backup[key] = value;
+        }
+    });
+    
+    const data = JSON.stringify(backup, null, 2);
     const blob = new Blob([data], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -38,16 +62,22 @@ export function exportData(filename = 'backup.json') {
 }
 
 /**
- * Lädt Daten aus einer Datei und schreibt sie in localStorage (überschreibt bestehende Werte).
+ * Lädt Daten aus einer Datei und schreibt sie in localStorage.
+ * Stellt alle Finance-App Daten wieder her.
  */
 export function importData(file, callback) {
     const reader = new FileReader();
     reader.onload = (e) => {
         try {
-            const obj = JSON.parse(e.target.result);
-            Object.keys(obj).forEach(key => {
-                localStorage.setItem(key, obj[key]);
+            const backup = JSON.parse(e.target.result);
+            let restoredCount = 0;
+            
+            Object.keys(backup).forEach(key => {
+                localStorage.setItem(key, backup[key]);
+                restoredCount++;
             });
+            
+            console.log(`Backup restored: ${restoredCount} objects`);
             if (callback) callback(true);
         } catch (err) {
             console.error('Import failed', err);
