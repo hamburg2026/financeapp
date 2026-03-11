@@ -13,14 +13,14 @@ function initializeApp() {
 }
 
 function setupNavigationListeners() {
-    const navBtns = document.querySelectorAll('.nav-btn');
-    navBtns.forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            // Entferne active class von allen
-            navBtns.forEach(b => b.classList.remove('active'));
+    const navTiles = document.querySelectorAll('.tile');
+    navTiles.forEach(tile => {
+        tile.addEventListener('click', (e) => {
+            // Entferne active class von allen Tiles
+            navTiles.forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
             
-            // Füge active class zu aktuellem Button hinzu
+            // Aktiviere geklickte Kachel
             e.target.classList.add('active');
             
             // Zeige entsprechende Section

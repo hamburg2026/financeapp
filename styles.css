@@ -30,36 +30,41 @@ header p {
     opacity: 0.9;
 }
 
-/* Navigation Tabs */
-.nav-tabs {
-    display: flex;
-    justify-content: center;
+/* Tile grid navigation (Fiori style) */
+.tile-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
     gap: 1rem;
     padding: 1rem;
+    justify-items: center;
     background: rgba(255,255,255,0.1);
-    flex-wrap: wrap;
 }
 
-.nav-btn {
-    padding: 0.75rem 1.5rem;
+.tile {
     background: white;
     border: 2px solid transparent;
     border-radius: 8px;
-    cursor: pointer;
+    padding: 1.5rem 1rem;
     font-size: 1rem;
     font-weight: 600;
+    text-align: center;
+    cursor: pointer;
     transition: all 0.3s ease;
+    width: 100%;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
 }
 
-.nav-btn:hover {
+.tile:hover {
     background: #f0f0f0;
 }
 
-.nav-btn.active {
+.tile.active {
     background: #003da5;
     color: white;
     border-color: #0052cc;
 }
+
+/* legacy nav-tabs removed */
 
 /* Main Content */
 main {
