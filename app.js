@@ -85,11 +85,11 @@ function renderMatchesSection() {
     const totalMatches = tournament.matches.length;
     
     const allPlayed = playedMatches === totalMatches;
-    const rollAllBtn = allPlayed ? '' : `<button id="roll-all-btn" class="btn-secondary">Alle würfeln</button>`;
+    const rollAllBtnHtml = allPlayed ? '' : `<button id="roll-all-btn" class="btn-secondary">Alle würfeln</button>`;
 
     roundInfo.innerHTML = `
         <h3>Runde ${tournament.currentRound}</h3>
-        <p>Gespielt: ${playedMatches}/${totalMatches} ${rollAllBtn}</p>
+        <p>Gespielt: ${playedMatches}/${totalMatches} ${rollAllBtnHtml}</p>
     `;
 
     container.innerHTML = tournament.matches
