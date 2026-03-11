@@ -5,13 +5,37 @@ export class Dashboard {
             <div class="module">
                 <h2>Dashboard</h2>
                 <p>Übersicht über alle Finanzdaten.</p>
-                <!-- Hier aggregierte Daten anzeigen -->
-                <div id="summary">
-                    <!-- Zusammenfassung -->
+                <div class="backup-buttons">
+                    <button id="export-data" class="btn-small">Daten sichern</button>
+                    <input type="file" id="import-file" style="display:none" />
+                    <button id="import-data" class="btn-small">Daten laden</button>
+                </div>
+                <div id="summary" class="dashboard-grid">
+                    <!-- Zusammenfassungskacheln -->
                 </div>
             </div>
         `;
+        this.setupBackupButtons();
         this.loadSummary();
+    }
+
+    setupBackupButtons() {
+        document.getElementById('export-data').addEventListener('click', () => {
+            import('../utils.js').then(u => u.exportData());
+        });
+        document.getElementById('import-data').addEventListener('click', () => {
+            document.getElementById('import-file').click();
+        });
+        document.getElementById('import-file').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                import('../utils.js').then(u => u.importData(file, success => {
+                    if (success) alert('Daten erfolgreich importiert');
+                    else alert('Fehler beim Import');
+                    this.loadSummary();
+                }));
+            }
+        });
     }
 
     loadSummary() {
@@ -63,17 +87,14 @@ export class Dashboard {
         }, 0);
 
         const summary = document.getElementById('summary');
+        // create coloured tiles
         summary.innerHTML = `
-            <h3>Zusammenfassung</h3>
-            <p>Gesamtvermögen: ${totalAssets.toFixed(2)} €</p>
-            <ul>
-                <li>Bankkonten: ${totalBank.toFixed(2)} €</li>
-                <li>Wertpapiere: ${totalSecurities.toFixed(2)} €</li>
-                <li>Versicherungen: ${totalInsurance.toFixed(2)} €</li>
-                <li>Immobilien: ${totalRealEstate.toFixed(2)} €</li>
-                <li>Firmenbeteiligungen: ${totalShares.toFixed(2)} €</li>
-            </ul>
-            <p>Monatliche Abonnementkosten: ${monthlyExpenses.toFixed(2)} €</p>
+            <div class="tile dashboard-bank">Bankkonten<br>${totalBank.toFixed(2)} €</div>
+            <div class="tile dashboard-securities">Wertpapiere<br>${totalSecurities.toFixed(2)} €</div>
+            <div class="tile dashboard-insurance">Versicherungen<br>${totalInsurance.toFixed(2)} €</div>
+            <div class="tile dashboard-realestate">Immobilien<br>${totalRealEstate.toFixed(2)} €</div>
+            <div class="tile dashboard-shares">Beteiligungen<br>${totalShares.toFixed(2)} €</div>
+            <div class="tile dashboard-subscriptions">Abos p.M.<br>${monthlyExpenses.toFixed(2)} €</div>
         `;
     }
 }

@@ -70,6 +70,48 @@ main {
     padding: 2rem;
 }
 
+/* dashboard tiles */
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.dashboard-grid .tile {
+    min-height: 100px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    font-size: 1rem;
+}
+
+.dashboard-bank { background: #007bff; }
+.dashboard-securities { background: #1abc9c; }
+.dashboard-insurance { background: #e3b341; }
+.dashboard-realestate { background: #9b59b6; }
+.dashboard-shares { background: #f39c12; }
+.dashboard-subscriptions { background: #e74c3c; }
+
+.backup-buttons {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+#export-data, #import-data {
+    background: #0052cc;
+    color: white;
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+#export-data:hover, #import-data:hover {
+    background: #003da5;
+}
+
 .module {
     background-color: white;
     padding: 1rem;
