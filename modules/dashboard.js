@@ -108,40 +108,44 @@ export class Dashboard {
     }
 
     loadCategoryReport(transactions, categories) {
-        // Summiere Transaktionen nach Kategorien
-        const categoryTotals = {};
+        // Hilfsfunktion: Finde die Hauptkategorie für eine gegebene Kategorie-ID
+        const findRootCategory = (catId) => {
+            const category = categories.find(c => c.id == catId);
+            if (!category || category.parent === null) {
+                return catId;
+            }
+            return findRootCategory(category.parent);
+        };
+
+        // Summiere Transaktionen nach Hauptkategorien
+        const rootCategoryTotals = {};
         transactions.forEach(trans => {
-            // Konvertiere category zu String für Konsistenz mit object keys
             const catId = String(trans.category);
             if (catId && catId !== '') {
-                categoryTotals[catId] = (categoryTotals[catId] || 0) + Math.abs(trans.amount);
+                const rootCatId = findRootCategory(catId);
+                rootCategoryTotals[rootCatId] = (rootCategoryTotals[rootCatId] || 0) + Math.abs(trans.amount);
             }
         });
 
-        // Baue hierarchischen Baum auf
-        const buildCategoryTree = (parentId = null, level = 0) => {
+        // Baue Baum nur mit Hauptkategorien auf
+        const buildCategoryTree = () => {
             let html = '';
-            const items = categories.filter(cat => cat.parent == parentId);
+            const rootCategories = categories.filter(cat => cat.parent === null);
             
-            items.forEach(cat => {
-                // Konvertiere cat.id zu String für Lookup
-                const total = categoryTotals[String(cat.id)] || 0;
-                const classLevel = level === 0 ? 'parent' : (level === 1 ? 'child' : 'grandchild');
+            rootCategories.forEach(cat => {
+                const total = rootCategoryTotals[String(cat.id)] || 0;
                 
-                html += `<div class="report-node ${classLevel}">
+                html += `<div class="report-node parent">
                     ${cat.name}
                     <span class="report-amount">${formatNumber(total)} €</span>
                 </div>`;
-                
-                // Rekursiv Unterkategorien hinzufügen
-                html += buildCategoryTree(cat.id, level + 1);
             });
             
             return html;
         };
 
         const reportHtml = `
-            <h3>Ausgaben nach Kategorien</h3>
+            <h3>Ausgaben nach Hauptkategorien</h3>
             <div class="report-tree">
                 ${categories.length > 0 ? buildCategoryTree() : '<p style="color:#999;">Keine Kategorien definiert</p>'}
             </div>
