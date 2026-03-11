@@ -16,27 +16,34 @@ header {
 /* Tile-based Fiori style navigation */
 .tile-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-    gap: 1rem;
-    padding: 1rem;
-    justify-items: center;
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    gap: 1.5rem;
+    padding: 2rem 1rem;
+    background-color: #f4f4f4;
+    max-width: 1400px;
+    margin: 0 auto;
 }
 
 .tile {
     background: #28a745;
     color: white;
     border-radius: 8px;
-    padding: 1rem;
+    padding: 1.5rem 1rem;
     text-align: center;
     font-weight: 600;
     cursor: pointer;
-    transition: transform 0.2s ease;
-    width: 100%;
+    transition: all 0.2s ease;
+    min-height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.15);
 }
 
 .tile:hover {
-    transform: translateY(-2px);
+    transform: translateY(-4px);
     background: #218838;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
 }
 
 .tile.active {
