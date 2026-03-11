@@ -128,13 +128,18 @@ export class BankAccounts {
     populateTransactions() {
         const tbody = document.querySelector('#transactions-table tbody');
         tbody.innerHTML = '';
+        const categories = JSON.parse(localStorage.getItem('categories')) || [];
+        
         this.transactions.forEach(trans => {
             const account = this.accounts.find(acc => acc.id == trans.accountId);
+            const category = categories.find(c => c.id == trans.category);
+            const categoryName = category ? category.name : 'Unbekannt';
+            
             const row = `<tr>
                 <td>${trans.date}</td>
                 <td>${trans.description}</td>
                 <td>${formatNumber(trans.amount)} €</td>
-                <td>${trans.category}</td>
+                <td>${categoryName}</td>
                 <td><button onclick="removeTransaction(${trans.id})">Löschen</button></td>
             </tr>`;
             tbody.innerHTML += row;
@@ -158,7 +163,7 @@ export class BankAccounts {
         const select = document.getElementById('category-select');
         select.innerHTML = '';
         categories.forEach(cat => {
-            select.innerHTML += `<option value="${cat.name}">${cat.name}</option>`;
+            select.innerHTML += `<option value="${cat.id}">${cat.name}</option>`;
         });
     }
 

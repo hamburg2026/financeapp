@@ -111,8 +111,11 @@ export class Dashboard {
         // Summiere Transaktionen nach Kategorien
         const categoryTotals = {};
         transactions.forEach(trans => {
-            const catId = trans.category;
-            categoryTotals[catId] = (categoryTotals[catId] || 0) + Math.abs(trans.amount);
+            // Konvertiere category zu String für Konsistenz mit object keys
+            const catId = String(trans.category);
+            if (catId && catId !== '') {
+                categoryTotals[catId] = (categoryTotals[catId] || 0) + Math.abs(trans.amount);
+            }
         });
 
         // Baue hierarchischen Baum auf
@@ -121,7 +124,8 @@ export class Dashboard {
             const items = categories.filter(cat => cat.parent == parentId);
             
             items.forEach(cat => {
-                const total = categoryTotals[cat.id] || 0;
+                // Konvertiere cat.id zu String für Lookup
+                const total = categoryTotals[String(cat.id)] || 0;
                 const classLevel = level === 0 ? 'parent' : (level === 1 ? 'child' : 'grandchild');
                 
                 html += `<div class="report-node ${classLevel}">
