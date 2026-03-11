@@ -181,6 +181,38 @@ class Tournament {
         return arr;
     }
 
+    saveState() {
+        const state = {
+            currentRound: this.currentRound,
+            matches: this.matches,
+            results: this.results,
+            eliminated: this.eliminated,
+            teams: this.teams
+        };
+        localStorage.setItem('dfbPokalState', JSON.stringify(state));
+    }
+
+    loadState(state) {
+        this.currentRound = state.currentRound;
+        this.matches = state.matches;
+        this.results = state.results;
+        this.eliminated = state.eliminated;
+        this.teams = state.teams;
+    }
+
+    static hasSavedState() {
+        return localStorage.getItem('dfbPokalState') !== null;
+    }
+
+    static getSavedState() {
+        const raw = localStorage.getItem('dfbPokalState');
+        return raw ? JSON.parse(raw) : null;
+    }
+
+    static clearSavedState() {
+        localStorage.removeItem('dfbPokalState');
+    }
+
     getTournamentWinner() {
         if (this.results.length === 0) return null;
         

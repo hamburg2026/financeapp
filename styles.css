@@ -189,6 +189,24 @@ h3, h4 {
     background: #003da5;
 }
 
+.btn-secondary {
+    background: linear-gradient(135deg, #e65c00 0%, #f9a825 100%);
+    color: white;
+    border: none;
+    padding: 0.4rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    margin-left: 1rem;
+}
+
+.btn-secondary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 3px 10px rgba(230, 92, 0, 0.4);
+}
+
 /* Matches */
 .round-info {
     background: #e3f2fd;
