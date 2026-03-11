@@ -1,4 +1,6 @@
 // modules/dashboard.js
+import { formatNumber, exportData, importData } from '../utils.js';
+
 export class Dashboard {
     render(container) {
         container.innerHTML = `
@@ -12,6 +14,9 @@ export class Dashboard {
                 </div>
                 <div id="summary" class="dashboard-grid">
                     <!-- Zusammenfassungskacheln -->
+                </div>
+                <div id="category-report" class="category-report">
+                    <!-- Kategorienübersicht -->
                 </div>
             </div>
         `;
@@ -50,6 +55,7 @@ export class Dashboard {
         const realEstate = JSON.parse(localStorage.getItem('realEstate')) || [];
         const shares = JSON.parse(localStorage.getItem('companyShares')) || [];
         const subscriptions = JSON.parse(localStorage.getItem('subscriptions')) || [];
+        const categories = JSON.parse(localStorage.getItem('categories')) || [];
 
         let totalBank = accounts.reduce((sum, acc) => sum + acc.balance, 0);
         let totalSecurities = 0;
@@ -89,12 +95,54 @@ export class Dashboard {
         const summary = document.getElementById('summary');
         // create coloured tiles
         summary.innerHTML = `
-            <div class="tile dashboard-bank">Bankkonten<br>${totalBank.toFixed(2)} €</div>
-            <div class="tile dashboard-securities">Wertpapiere<br>${totalSecurities.toFixed(2)} €</div>
-            <div class="tile dashboard-insurance">Versicherungen<br>${totalInsurance.toFixed(2)} €</div>
-            <div class="tile dashboard-realestate">Immobilien<br>${totalRealEstate.toFixed(2)} €</div>
-            <div class="tile dashboard-shares">Beteiligungen<br>${totalShares.toFixed(2)} €</div>
-            <div class="tile dashboard-subscriptions">Abos p.M.<br>${monthlyExpenses.toFixed(2)} €</div>
+            <div class="tile dashboard-bank">Bankkonten<br>${formatNumber(totalBank)} €</div>
+            <div class="tile dashboard-securities">Wertpapiere<br>${formatNumber(totalSecurities)} €</div>
+            <div class="tile dashboard-insurance">Versicherungen<br>${formatNumber(totalInsurance)} €</div>
+            <div class="tile dashboard-realestate">Immobilien<br>${formatNumber(totalRealEstate)} €</div>
+            <div class="tile dashboard-shares">Beteiligungen<br>${formatNumber(totalShares)} €</div>
+            <div class="tile dashboard-subscriptions">Abos p.M.<br>${formatNumber(monthlyExpenses)} €</div>
         `;
+        
+        // Kategorien-Bericht
+        this.loadCategoryReport(transactions, categories);
+    }
+
+    loadCategoryReport(transactions, categories) {
+        // Summiere Transaktionen nach Kategorien
+        const categoryTotals = {};
+        transactions.forEach(trans => {
+            const catId = trans.category;
+            categoryTotals[catId] = (categoryTotals[catId] || 0) + Math.abs(trans.amount);
+        });
+
+        // Baue hierarchischen Baum auf
+        const buildCategoryTree = (parentId = null, level = 0) => {
+            let html = '';
+            const items = categories.filter(cat => cat.parent == parentId);
+            
+            items.forEach(cat => {
+                const total = categoryTotals[cat.id] || 0;
+                const classLevel = level === 0 ? 'parent' : (level === 1 ? 'child' : 'grandchild');
+                
+                html += `<div class="report-node ${classLevel}">
+                    ${cat.name}
+                    <span class="report-amount">${formatNumber(total)} €</span>
+                </div>`;
+                
+                // Rekursiv Unterkategorien hinzufügen
+                html += buildCategoryTree(cat.id, level + 1);
+            });
+            
+            return html;
+        };
+
+        const reportHtml = `
+            <h3>Ausgaben nach Kategorien</h3>
+            <div class="report-tree">
+                ${categories.length > 0 ? buildCategoryTree() : '<p style="color:#999;">Keine Kategorien definiert</p>'}
+            </div>
+        `;
+
+        document.getElementById('category-report').innerHTML = reportHtml;
     }
 }

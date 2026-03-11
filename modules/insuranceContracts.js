@@ -1,4 +1,6 @@
 // modules/insuranceContracts.js
+import { formatNumber } from '../utils.js';
+
 export class InsuranceContracts {
     constructor() {
         this.contracts = JSON.parse(localStorage.getItem('insuranceContracts')) || [];
@@ -64,7 +66,7 @@ export class InsuranceContracts {
             const row = `<tr>
                 <td>${contract.name}</td>
                 <td>${contract.provider}</td>
-                <td>${contract.value.toFixed(2)} €</td>
+                <td>${formatNumber(contract.value)} €</td>
                 <td>${contract.start}</td>
                 <td>${contract.end}</td>
                 <td><button onclick="removeContract(${contract.id})">Löschen</button></td>

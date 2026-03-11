@@ -1,4 +1,6 @@
 // modules/bankAccounts.js
+import { formatNumber } from '../utils.js';
+
 export class BankAccounts {
     constructor() {
         this.accounts = JSON.parse(localStorage.getItem('bankAccounts')) || [];
@@ -79,7 +81,7 @@ export class BankAccounts {
         this.accounts.forEach(account => {
             const row = `<tr>
                 <td>${account.name}</td>
-                <td>${account.balance.toFixed(2)} €</td>
+                <td>${formatNumber(account.balance)} €</td>
                 <td><button onclick="removeAccount(${account.id})">Löschen</button></td>
             </tr>`;
             tbody.innerHTML += row;
@@ -131,7 +133,7 @@ export class BankAccounts {
             const row = `<tr>
                 <td>${trans.date}</td>
                 <td>${trans.description}</td>
-                <td>${trans.amount.toFixed(2)} €</td>
+                <td>${formatNumber(trans.amount)} €</td>
                 <td>${trans.category}</td>
                 <td><button onclick="removeTransaction(${trans.id})">Löschen</button></td>
             </tr>`;

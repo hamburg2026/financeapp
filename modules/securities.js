@@ -1,4 +1,6 @@
 // modules/securities.js
+import { formatNumber } from '../utils.js';
+
 export class Securities {
     constructor() {
         this.securities = JSON.parse(localStorage.getItem('securities')) || [];
@@ -71,7 +73,7 @@ export class Securities {
                 <td>${sec.name}</td>
                 <td>${sec.symbol}</td>
                 <td>${sec.type}</td>
-                <td>${currentPrice ? currentPrice.toFixed(2) + ' €' : 'N/A'}</td>
+                <td>${currentPrice ? formatNumber(currentPrice) + ' €' : 'N/A'}</td>
                 <td><button onclick="removeSecurity(${sec.id})">Löschen</button></td>
             </tr>`;
             tbody.innerHTML += row;

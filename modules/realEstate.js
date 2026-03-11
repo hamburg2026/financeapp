@@ -1,4 +1,6 @@
 // modules/realEstate.js
+import { formatNumber } from '../utils.js';
+
 export class RealEstate {
     constructor() {
         this.properties = JSON.parse(localStorage.getItem('realEstate')) || [];
@@ -59,9 +61,9 @@ export class RealEstate {
             const pnl = prop.current - prop.purchase;
             const row = `<tr>
                 <td>${prop.name}</td>
-                <td>${prop.purchase.toFixed(2)} €</td>
-                <td>${prop.current.toFixed(2)} €</td>
-                <td>${pnl.toFixed(2)} €</td>
+                <td>${formatNumber(prop.purchase)} €</td>
+                <td>${formatNumber(prop.current)} €</td>
+                <td>${formatNumber(pnl)} €</td>
                 <td><button onclick="removeProperty(${prop.id})">Löschen</button></td>
             </tr>`;
             tbody.innerHTML += row;

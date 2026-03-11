@@ -1,4 +1,6 @@
 // modules/companyShares.js
+import { formatNumber } from '../utils.js';
+
 export class CompanyShares {
     constructor() {
         this.shares = JSON.parse(localStorage.getItem('companyShares')) || [];
@@ -58,7 +60,7 @@ export class CompanyShares {
             const row = `<tr>
                 <td>${share.company}</td>
                 <td>${share.percentage.toFixed(2)} %</td>
-                <td>${share.value.toFixed(2)} €</td>
+                <td>${formatNumber(share.value)} €</td>
                 <td><button onclick="removeShare(${share.id})">Löschen</button></td>
             </tr>`;
             tbody.innerHTML += row;

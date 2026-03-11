@@ -1,4 +1,6 @@
 // modules/depots.js
+import { formatNumber } from '../utils.js';
+
 export class Depots {
     constructor() {
         this.depots = JSON.parse(localStorage.getItem('depots')) || [];
@@ -126,9 +128,9 @@ export class Depots {
                 tbody.innerHTML += `<tr>
                     <td>${sec.name}</td>
                     <td>${pos.quantity}</td>
-                    <td>${(pos.cost / pos.quantity).toFixed(2)} €</td>
-                    <td>${currentValue.toFixed(2)} €</td>
-                    <td>${pnl.toFixed(2)} €</td>
+                    <td>${formatNumber(pos.cost / pos.quantity)} €</td>
+                    <td>${formatNumber(currentValue)} €</td>
+                    <td>${formatNumber(pnl)} €</td>
                 </tr>`;
             }
         });

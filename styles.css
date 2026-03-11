@@ -25,29 +25,31 @@ header {
 }
 
 .tile {
-    background: #28a745;
+    background: linear-gradient(135deg, #28a745 0%, #1e7e34 100%);
     color: white;
-    border-radius: 8px;
+    border-radius: 12px;
     padding: 1.5rem 1rem;
     text-align: center;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
     min-height: 80px;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .tile:hover {
-    transform: translateY(-4px);
-    background: #218838;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    transform: translateY(-6px);
+    background: linear-gradient(135deg, #218838 0%, #1a6629 100%);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
 }
 
 .tile.active {
-    background: #0052cc;
+    background: linear-gradient(135deg, #0052cc 0%, #003da5 100%);
+    box-shadow: 0 6px 16px rgba(0, 82, 204, 0.4);
 }
 
 /* hide old nav buttons */
@@ -74,24 +76,25 @@ main {
 .dashboard-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    gap: 1rem;
-    margin-top: 1rem;
+    gap: 1.5rem;
+    margin-top: 1.5rem;
 }
 
 .dashboard-grid .tile {
-    min-height: 100px;
+    min-height: 120px;
     display: flex;
     flex-direction: column;
     justify-content: center;
     font-size: 1rem;
+    border: 1px solid rgba(255,255,255,0.2);
 }
 
-.dashboard-bank { background: #007bff; }
-.dashboard-securities { background: #1abc9c; }
-.dashboard-insurance { background: #e3b341; }
-.dashboard-realestate { background: #9b59b6; }
-.dashboard-shares { background: #f39c12; }
-.dashboard-subscriptions { background: #e74c3c; }
+.dashboard-grid .tile.dashboard-bank { background: linear-gradient(135deg, #007bff 0%, #0056b3 100%); }
+.dashboard-grid .tile.dashboard-securities { background: linear-gradient(135deg, #1abc9c 0%, #0a7d7d 100%); }
+.dashboard-grid .tile.dashboard-insurance { background: linear-gradient(135deg, #e3b341 0%, #b8860b 100%); }
+.dashboard-grid .tile.dashboard-realestate { background: linear-gradient(135deg, #9b59b6 0%, #6c3483 100%); }
+.dashboard-grid .tile.dashboard-shares { background: linear-gradient(135deg, #f39c12 0%, #c87f0a 100%); }
+.dashboard-grid .tile.dashboard-subscriptions { background: linear-gradient(135deg, #e74c3c 0%, #a93226 100%); }
 
 .backup-buttons {
     display: flex;
@@ -145,4 +148,116 @@ th, td {
 
 th {
     background-color: #f8f9fa;
+}
+
+/* Category Tree Styles */
+.category-tree {
+    margin-top: 1rem;
+    font-family: 'Courier New', monospace;
+    font-size: 0.95rem;
+}
+
+.tree-node {
+    margin-bottom: 0.25rem;
+}
+
+.tree-item {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+.tree-item:hover {
+    background-color: #f0f0f0;
+}
+
+.tree-toggle {
+    display: inline-block;
+    width: 20px;
+    cursor: pointer;
+    user-select: none;
+    font-size: 0.9rem;
+    color: #666;
+    transition: transform 0.2s;
+}
+
+.tree-toggle.empty {
+    cursor: default;
+    opacity: 0.3;
+}
+
+.tree-label {
+    flex: 1;
+    color: #333;
+    font-weight: 500;
+}
+
+.tree-btn {
+    background: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 3px;
+    padding: 0.25rem 0.5rem;
+    cursor: pointer;
+    font-size: 0.8rem;
+    margin-left: 0.5rem;
+}
+
+.tree-btn:hover {
+    background: #c82333;
+}
+
+.tree-children {
+    border-left: 2px solid #ddd;
+    margin-left: 5px;
+}
+
+/* Category Report in Dashboard */
+.category-report {
+    margin-top: 2rem;
+    padding: 1.5rem;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.category-report h3 {
+    margin-top: 0;
+    color: #333;
+}
+
+.report-tree {
+    margin-top: 1rem;
+}
+
+.report-node {
+    margin-bottom: 0.5rem;
+    padding: 0.75rem;
+    border-left: 3px solid #007bff;
+    background: #f8f9ff;
+    border-radius: 4px;
+}
+
+.report-node.parent {
+    border-left-color: #0056b3;
+    background: #e7f1ff;
+    font-weight: 600;
+}
+
+.report-node.child {
+    margin-left: 1.5rem;
+    border-left-color: #6c8ac9;
+}
+
+.report-node.grandchild {
+    margin-left: 3rem;
+    border-left-color: #b3c9e8;
+}
+
+.report-amount {
+    float: right;
+    font-weight: 600;
+    color: #007bff;
 }

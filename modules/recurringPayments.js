@@ -1,4 +1,6 @@
 // modules/recurringPayments.js
+import { formatNumber } from '../utils.js';
+
 export class RecurringPayments {
     constructor() {
         this.recurrings = JSON.parse(localStorage.getItem('recurringPayments')) || [];
@@ -65,7 +67,7 @@ export class RecurringPayments {
         this.recurrings.forEach(rec => {
             const row = `<tr>
                 <td>${rec.description}</td>
-                <td>${rec.amount.toFixed(2)} €</td>
+                <td>${formatNumber(rec.amount)} €</td>
                 <td>${rec.frequency}</td>
                 <td><button onclick="removeRecurring(${rec.id})">Löschen</button></td>
             </tr>`;

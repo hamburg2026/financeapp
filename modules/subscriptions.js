@@ -1,4 +1,6 @@
 // modules/subscriptions.js
+import { formatNumber } from '../utils.js';
+
 export class Subscriptions {
     constructor() {
         this.subscriptions = JSON.parse(localStorage.getItem('subscriptions')) || [];
@@ -65,7 +67,7 @@ export class Subscriptions {
         this.subscriptions.forEach(sub => {
             const row = `<tr>
                 <td>${sub.name}</td>
-                <td>${sub.cost.toFixed(2)} €</td>
+                <td>${formatNumber(sub.cost)} €</td>
                 <td>${sub.frequency}</td>
                 <td>${sub.cancel}</td>
                 <td>${sub.next}</td>
