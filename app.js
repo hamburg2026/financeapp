@@ -33,17 +33,28 @@ function loadModule(moduleName) {
     }
 }
 
-// Event Listener für Navigation
-document.getElementById('dashboard-btn').addEventListener('click', () => loadModule('dashboard'));
-document.getElementById('bank-btn').addEventListener('click', () => loadModule('bankAccounts'));
-document.getElementById('categories-btn').addEventListener('click', () => loadModule('categories'));
-document.getElementById('recurring-btn').addEventListener('click', () => loadModule('recurringPayments'));
-document.getElementById('insurance-btn').addEventListener('click', () => loadModule('insuranceContracts'));
-document.getElementById('securities-btn').addEventListener('click', () => loadModule('securities'));
-document.getElementById('depots-btn').addEventListener('click', () => loadModule('depots'));
-document.getElementById('subscriptions-btn').addEventListener('click', () => loadModule('subscriptions'));
-document.getElementById('realestate-btn').addEventListener('click', () => loadModule('realEstate'));
-document.getElementById('shares-btn').addEventListener('click', () => loadModule('companyShares'));
+// tile navigation event listeners
+const tiles = document.querySelectorAll('.tile');
+tiles.forEach(tile => {
+    tile.addEventListener('click', (e) => {
+        tiles.forEach(t => t.classList.remove('active'));
+        e.target.classList.add('active');
+        const section = e.target.dataset.section;
+        loadModule(section);
+    });
+});
+
+// legacy button listeners (in case)
+document.getElementById('dashboard-btn')?.addEventListener('click', () => loadModule('dashboard'));
+document.getElementById('bank-btn')?.addEventListener('click', () => loadModule('bankAccounts'));
+document.getElementById('categories-btn')?.addEventListener('click', () => loadModule('categories'));
+document.getElementById('recurring-btn')?.addEventListener('click', () => loadModule('recurringPayments'));
+document.getElementById('insurance-btn')?.addEventListener('click', () => loadModule('insuranceContracts'));
+document.getElementById('securities-btn')?.addEventListener('click', () => loadModule('securities'));
+document.getElementById('depots-btn')?.addEventListener('click', () => loadModule('depots'));
+document.getElementById('subscriptions-btn')?.addEventListener('click', () => loadModule('subscriptions'));
+document.getElementById('realestate-btn')?.addEventListener('click', () => loadModule('realEstate'));
+document.getElementById('shares-btn')?.addEventListener('click', () => loadModule('companyShares'));
 
 // Standardmäßig Dashboard laden
 loadModule('dashboard');

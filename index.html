@@ -9,19 +9,19 @@
 <body>
     <header>
         <h1>Finanzverwaltung</h1>
-        <nav>
-            <button id="dashboard-btn">Dashboard</button>
-            <button id="bank-btn">Bankkonten</button>
-            <button id="categories-btn">Kategorien</button>
-            <button id="recurring-btn">Daueraufträge</button>
-            <button id="insurance-btn">Versicherungen</button>
-            <button id="securities-btn">Wertpapiere</button>
-            <button id="depots-btn">Depots</button>
-            <button id="subscriptions-btn">Abonnements</button>
-            <button id="realestate-btn">Immobilien</button>
-            <button id="shares-btn">Firmenbeteiligungen</button>
-        </nav>
     </header>
+    <div class="tile-grid" id="nav-tiles">
+        <div class="tile active" data-section="dashboard">Dashboard</div>
+        <div class="tile" data-section="bankAccounts">Bankkonten</div>
+        <div class="tile" data-section="categories">Kategorien</div>
+        <div class="tile" data-section="recurringPayments">Daueraufträge</div>
+        <div class="tile" data-section="insuranceContracts">Versicherungen</div>
+        <div class="tile" data-section="securities">Wertpapiere</div>
+        <div class="tile" data-section="depots">Depots</div>
+        <div class="tile" data-section="subscriptions">Abonnements</div>
+        <div class="tile" data-section="realEstate">Immobilien</div>
+        <div class="tile" data-section="companyShares">Firmenbeteiligungen</div>
+    </div>
     <main id="main-content">
         <!-- Hier werden die Module geladen -->
     </main>

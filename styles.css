@@ -13,14 +13,40 @@ header {
     text-align: center;
 }
 
-nav {
-    display: flex;
-    justify-content: center;
+/* Tile-based Fiori style navigation */
+.tile-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
     gap: 1rem;
-    margin-top: 1rem;
+    padding: 1rem;
+    justify-items: center;
 }
 
-button {
+.tile {
+    background: #28a745;
+    color: white;
+    border-radius: 8px;
+    padding: 1rem;
+    text-align: center;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+    width: 100%;
+}
+
+.tile:hover {
+    transform: translateY(-2px);
+    background: #218838;
+}
+
+.tile.active {
+    background: #0052cc;
+}
+
+/* hide old nav buttons */
+nav { display: none; }
+
+button { /* keep fallback style */
     padding: 0.5rem 1rem;
     background-color: #28a745;
     color: white;
