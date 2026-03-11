@@ -4,6 +4,7 @@ import { formatNumber } from '../utils.js';
 export class RecurringPayments {
     constructor() {
         this.recurrings = JSON.parse(localStorage.getItem('recurringPayments')) || [];
+        this.editingId = null;
     }
 
     render(container) {
@@ -19,7 +20,8 @@ export class RecurringPayments {
                         <option value="yearly">Jährlich</option>
                     </select>
                     <select id="recurring-account" required></select>
-                    <button type="submit">Dauerauftrag hinzufügen</button>
+                    <button type="submit" id="submit-recurring">Dauerauftrag hinzufügen</button>
+                    <button type="button" id="cancel-recurring" style="display:none">Abbrechen</button>
                 </form>
                 <h3>Daueraufträge</h3>
                 <table id="recurrings-table">
@@ -43,7 +45,17 @@ export class RecurringPayments {
     setupEventListeners() {
         document.getElementById('recurring-form').addEventListener('submit', (e) => {
             e.preventDefault();
-            this.addRecurring();
+            if (this.editingId) {
+                this.updateRecurring();
+            } else {
+                this.addRecurring();
+            }
+        });
+        document.getElementById('cancel-recurring').addEventListener('click', () => {
+            this.editingId = null;
+            document.getElementById('submit-recurring').textContent = 'Dauerauftrag hinzufügen';
+            document.getElementById('cancel-recurring').style.display = 'none';
+            document.getElementById('recurring-form').reset();
         });
         document.getElementById('execute-recurring').addEventListener('click', () => {
             this.executeRecurrings();
@@ -61,6 +73,26 @@ export class RecurringPayments {
         document.getElementById('recurring-form').reset();
     }
 
+    updateRecurring() {
+        const description = document.getElementById('recurring-description').value;
+        const amount = parseFloat(document.getElementById('recurring-amount').value);
+        const frequency = document.getElementById('recurring-frequency').value;
+        const accountId = document.getElementById('recurring-account').value;
+        const rec = this.recurrings.find(r => r.id == this.editingId);
+        if (rec) {
+            rec.description = description;
+            rec.amount = amount;
+            rec.frequency = frequency;
+            rec.accountId = parseInt(accountId);
+            this.saveRecurrings();
+            this.populateRecurrings();
+        }
+        this.editingId = null;
+        document.getElementById('submit-recurring').textContent = 'Dauerauftrag hinzufügen';
+        document.getElementById('cancel-recurring').style.display = 'none';
+        document.getElementById('recurring-form').reset();
+    }
+
     populateRecurrings() {
         const tbody = document.querySelector('#recurrings-table tbody');
         tbody.innerHTML = '';
@@ -69,7 +101,10 @@ export class RecurringPayments {
                 <td>${rec.description}</td>
                 <td>${formatNumber(rec.amount)} €</td>
                 <td>${rec.frequency}</td>
-                <td><button onclick="removeRecurring(${rec.id})">Löschen</button></td>
+                <td>
+                    <button onclick="editRecurring(${rec.id})">Bearbeiten</button>
+                    <button onclick="removeRecurring(${rec.id})">Löschen</button>
+                </td>
             </tr>`;
             tbody.innerHTML += row;
         });
@@ -92,20 +127,32 @@ export class RecurringPayments {
     }
 
     executeRecurrings() {
-        // Für Einfachheit, alle ausführen (in Realität prüfen Datum)
+        // Datum abfragen
+        const date = prompt('Ausführungsdatum eingeben (YYYY-MM-DD):', new Date().toISOString().split('T')[0]);
+        if (!date) {
+            alert('Ausführung abgebrochen');
+            return;
+        }
         const transactions = JSON.parse(localStorage.getItem('transactions')) || [];
         this.recurrings.forEach(rec => {
             transactions.push({
                 id: Date.now() + Math.random(),
                 accountId: rec.accountId,
-                date: new Date().toISOString().split('T')[0],
+                date,
                 description: rec.description,
                 amount: rec.amount,
                 category: 'Dauerauftrag'
             });
+            // Konto aktualisieren
+            const accounts = JSON.parse(localStorage.getItem('bankAccounts')) || [];
+            const account = accounts.find(a => a.id == rec.accountId);
+            if (account) {
+                account.balance += rec.amount;
+            }
+            localStorage.setItem('bankAccounts', JSON.stringify(accounts));
         });
         localStorage.setItem('transactions', JSON.stringify(transactions));
-        alert('Daueraufträge ausgeführt');
+        alert(`${this.recurrings.length} Daueraufträge am ${date} ausgeführt`);
     }
 
     saveRecurrings() {
@@ -116,4 +163,18 @@ export class RecurringPayments {
 window.removeRecurring = function(id) {
     const module = new RecurringPayments();
     module.removeRecurring(id);
+};
+
+window.editRecurring = function(id) {
+    const module = new RecurringPayments();
+    const rec = module.recurrings.find(r => r.id == id);
+    if (rec) {
+        module.editingId = id;
+        document.getElementById('recurring-description').value = rec.description;
+        document.getElementById('recurring-amount').value = rec.amount;
+        document.getElementById('recurring-frequency').value = rec.frequency;
+        document.getElementById('recurring-account').value = rec.accountId;
+        document.getElementById('submit-recurring').textContent = 'Speichern';
+        document.getElementById('cancel-recurring').style.display = 'inline-block';
+    }
 };

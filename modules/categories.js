@@ -4,6 +4,7 @@ import { formatNumber } from '../utils.js';
 export class Categories {
     constructor() {
         this.categories = JSON.parse(localStorage.getItem('categories')) || [];
+        this.editingId = null;
     }
 
     render(container) {
@@ -15,7 +16,8 @@ export class Categories {
                     <select id="parent-category">
                         <option value="">Hauptkategorie</option>
                     </select>
-                    <button type="submit">Kategorie hinzufügen</button>
+                    <button type="submit" id="submit-category">Kategorie hinzufügen</button>
+                    <button type="button" id="cancel-category" style="display:none">Abbrechen</button>
                 </form>
                 <h3>Kategorien</h3>
                 <ul id="categories-list"></ul>
@@ -28,7 +30,17 @@ export class Categories {
     setupEventListeners() {
         document.getElementById('category-form').addEventListener('submit', (e) => {
             e.preventDefault();
-            this.addCategory();
+            if (this.editingId) {
+                this.updateCategory();
+            } else {
+                this.addCategory();
+            }
+        });
+        document.getElementById('cancel-category').addEventListener('click', () => {
+            this.editingId = null;
+            document.getElementById('submit-category').textContent = 'Kategorie hinzufügen';
+            document.getElementById('cancel-category').style.display = 'none';
+            document.getElementById('category-form').reset();
         });
     }
 
@@ -38,6 +50,22 @@ export class Categories {
         this.categories.push({ id: Date.now(), name, parent: parent || null });
         this.saveCategories();
         this.populateCategories();
+        document.getElementById('category-form').reset();
+    }
+
+    updateCategory() {
+        const name = document.getElementById('category-name').value;
+        const parent = document.getElementById('parent-category').value || null;
+        const cat = this.categories.find(c => c.id == this.editingId);
+        if (cat) {
+            cat.name = name;
+            cat.parent = parent;
+            this.saveCategories();
+            this.populateCategories();
+        }
+        this.editingId = null;
+        document.getElementById('submit-category').textContent = 'Kategorie hinzufügen';
+        document.getElementById('cancel-category').style.display = 'none';
         document.getElementById('category-form').reset();
     }
 
@@ -82,14 +110,19 @@ export class Categories {
                     label.className = 'tree-label';
                     label.textContent = cat.name;
                     
-                    const btn = document.createElement('button');
-                    btn.className = 'tree-btn';
-                    btn.textContent = '✕';
-                    btn.onclick = () => this.removeCategory(cat.id);
+                    const editBtn = document.createElement('button');
+                    editBtn.className = 'tree-btn';
+                    editBtn.textContent = '✎';
+                    editBtn.onclick = () => editCategory(cat.id);
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.className = 'tree-btn';
+                    deleteBtn.textContent = '✕';
+                    deleteBtn.onclick = () => this.removeCategory(cat.id);
                     
                     itemDiv.appendChild(toggle);
                     itemDiv.appendChild(label);
-                    itemDiv.appendChild(btn);
+                    itemDiv.appendChild(editBtn);
+                    itemDiv.appendChild(deleteBtn);
                     node.appendChild(itemDiv);
                     
                     if (hasChildren) {
@@ -131,6 +164,10 @@ export class Categories {
                                     childLabel.className = 'tree-label';
                                     childLabel.textContent = child.name;
                                     
+                                    const childEdit = document.createElement('button');
+                                    childEdit.className = 'tree-btn';
+                                    childEdit.textContent = '✎';
+                                    childEdit.onclick = () => editCategory(child.id);
                                     const childBtn = document.createElement('button');
                                     childBtn.className = 'tree-btn';
                                     childBtn.textContent = '✕';
@@ -138,6 +175,7 @@ export class Categories {
                                     
                                     childItem.appendChild(childToggle);
                                     childItem.appendChild(childLabel);
+                                    childItem.appendChild(childEdit);
                                     childItem.appendChild(childBtn);
                                     childNode.appendChild(childItem);
                                     
@@ -165,6 +203,10 @@ export class Categories {
                                                 gcLabel.className = 'tree-label';
                                                 gcLabel.textContent = grandchild.name;
                                                 
+                                                const gcEdit = document.createElement('button');
+                                                gcEdit.className = 'tree-btn';
+                                                gcEdit.textContent = '✎';
+                                                gcEdit.onclick = () => editCategory(grandchild.id);
                                                 const gcBtn = document.createElement('button');
                                                 gcBtn.className = 'tree-btn';
                                                 gcBtn.textContent = '✕';
@@ -172,6 +214,7 @@ export class Categories {
                                                 
                                                 gcItem.appendChild(gcToggle);
                                                 gcItem.appendChild(gcLabel);
+                                                gcItem.appendChild(gcEdit);
                                                 gcItem.appendChild(gcBtn);
                                                 gcNode.appendChild(gcItem);
                                                 grandchildrenDiv.appendChild(gcNode);
@@ -210,4 +253,16 @@ export class Categories {
 window.removeCategory = function(id) {
     const module = new Categories();
     module.removeCategory(id);
+};
+
+window.editCategory = function(id) {
+    const module = new Categories();
+    const cat = module.categories.find(c => c.id == id);
+    if (cat) {
+        module.editingId = id;
+        document.getElementById('category-name').value = cat.name;
+        document.getElementById('parent-category').value = cat.parent || '';
+        document.getElementById('submit-category').textContent = 'Speichern';
+        document.getElementById('cancel-category').style.display = 'inline-block';
+    }
 };

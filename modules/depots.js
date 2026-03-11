@@ -5,6 +5,7 @@ export class Depots {
     constructor() {
         this.depots = JSON.parse(localStorage.getItem('depots')) || [];
         this.transactions = JSON.parse(localStorage.getItem('depotTransactions')) || [];
+        this.editingId = null;
     }
 
     render(container) {
@@ -13,10 +14,12 @@ export class Depots {
                 <h2>Depots</h2>
                 <form id="depot-form">
                     <input type="text" id="depot-name" placeholder="Depotname" required>
-                    <button type="submit">Depot hinzufügen</button>
+                    <button type="submit" id="submit-depot">Depot hinzufügen</button>
+                    <button type="button" id="cancel-depot" style="display:none">Abbrechen</button>
                 </form>
                 <h3>Depots</h3>
                 <select id="depot-select"></select>
+                <button id="edit-depot" style="margin-left:0.5rem;">Bearbeiten</button>
                 <h3>Transaktionen</h3>
                 <form id="transaction-form">
                     <select id="security-select" required></select>
@@ -43,7 +46,17 @@ export class Depots {
     setupEventListeners() {
         document.getElementById('depot-form').addEventListener('submit', (e) => {
             e.preventDefault();
-            this.addDepot();
+            if (this.editingId) {
+                this.updateDepot();
+            } else {
+                this.addDepot();
+            }
+        });
+        document.getElementById('cancel-depot').addEventListener('click', () => {
+            this.editingId = null;
+            document.getElementById('submit-depot').textContent = 'Depot hinzufügen';
+            document.getElementById('cancel-depot').style.display = 'none';
+            document.getElementById('depot-form').reset();
         });
         document.getElementById('transaction-form').addEventListener('submit', (e) => {
             e.preventDefault();
@@ -52,6 +65,16 @@ export class Depots {
         document.getElementById('depot-select').addEventListener('change', () => {
             this.showOverview();
         });
+        document.getElementById('edit-depot').addEventListener('click', () => {
+            const id = document.getElementById('depot-select').value;
+            const depot = this.depots.find(d => d.id == id);
+            if (depot) {
+                this.editingId = id;
+                document.getElementById('depot-name').value = depot.name;
+                document.getElementById('submit-depot').textContent = 'Speichern';
+                document.getElementById('cancel-depot').style.display = 'inline-block';
+            }
+        });
     }
 
     addDepot() {
@@ -59,6 +82,20 @@ export class Depots {
         this.depots.push({ id: Date.now(), name });
         this.saveDepots();
         this.populateDepots();
+        document.getElementById('depot-form').reset();
+    }
+
+    updateDepot() {
+        const name = document.getElementById('depot-name').value;
+        const depot = this.depots.find(d => d.id == this.editingId);
+        if (depot) {
+            depot.name = name;
+            this.saveDepots();
+            this.populateDepots();
+        }
+        this.editingId = null;
+        document.getElementById('submit-depot').textContent = 'Depot hinzufügen';
+        document.getElementById('cancel-depot').style.display = 'none';
         document.getElementById('depot-form').reset();
     }
 

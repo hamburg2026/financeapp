@@ -4,6 +4,7 @@ import { formatNumber } from '../utils.js';
 export class InsuranceContracts {
     constructor() {
         this.contracts = JSON.parse(localStorage.getItem('insuranceContracts')) || [];
+        this.editingId = null;
     }
 
     render(container) {
@@ -17,7 +18,8 @@ export class InsuranceContracts {
                     <input type="date" id="contract-start" placeholder="Startdatum" required>
                     <input type="date" id="contract-end" placeholder="Enddatum" required>
                     <textarea id="contract-notes" placeholder="Notizen"></textarea>
-                    <button type="submit">Vertrag hinzufügen</button>
+                    <button type="submit" id="submit-contract">Vertrag hinzufügen</button>
+                    <button type="button" id="cancel-contract" style="display:none">Abbrechen</button>
                 </form>
                 <h3>Verträge</h3>
                 <table id="contracts-table">
@@ -42,7 +44,17 @@ export class InsuranceContracts {
     setupEventListeners() {
         document.getElementById('contract-form').addEventListener('submit', (e) => {
             e.preventDefault();
-            this.addContract();
+            if (this.editingId) {
+                this.updateContract();
+            } else {
+                this.addContract();
+            }
+        });
+        document.getElementById('cancel-contract').addEventListener('click', () => {
+            this.editingId = null;
+            document.getElementById('submit-contract').textContent = 'Vertrag hinzufügen';
+            document.getElementById('cancel-contract').style.display = 'none';
+            document.getElementById('contract-form').reset();
         });
     }
 
@@ -59,6 +71,30 @@ export class InsuranceContracts {
         document.getElementById('contract-form').reset();
     }
 
+    updateContract() {
+        const name = document.getElementById('contract-name').value;
+        const provider = document.getElementById('contract-provider').value;
+        const value = parseFloat(document.getElementById('contract-value').value);
+        const start = document.getElementById('contract-start').value;
+        const end = document.getElementById('contract-end').value;
+        const notes = document.getElementById('contract-notes').value;
+        const con = this.contracts.find(c => c.id == this.editingId);
+        if (con) {
+            con.name = name;
+            con.provider = provider;
+            con.value = value;
+            con.start = start;
+            con.end = end;
+            con.notes = notes;
+            this.saveContracts();
+            this.populateContracts();
+        }
+        this.editingId = null;
+        document.getElementById('submit-contract').textContent = 'Vertrag hinzufügen';
+        document.getElementById('cancel-contract').style.display = 'none';
+        document.getElementById('contract-form').reset();
+    }
+
     populateContracts() {
         const tbody = document.querySelector('#contracts-table tbody');
         tbody.innerHTML = '';
@@ -69,7 +105,7 @@ export class InsuranceContracts {
                 <td>${formatNumber(contract.value)} €</td>
                 <td>${contract.start}</td>
                 <td>${contract.end}</td>
-                <td><button onclick="removeContract(${contract.id})">Löschen</button></td>
+                <td><button onclick="editContract(${contract.id})">Bearbeiten</button> <button onclick="removeContract(${contract.id})">Löschen</button></td>
             </tr>`;
             tbody.innerHTML += row;
         });
@@ -89,4 +125,20 @@ export class InsuranceContracts {
 window.removeContract = function(id) {
     const module = new InsuranceContracts();
     module.removeContract(id);
+};
+
+window.editContract = function(id) {
+    const module = new InsuranceContracts();
+    const con = module.contracts.find(c => c.id == id);
+    if (con) {
+        module.editingId = id;
+        document.getElementById('contract-name').value = con.name;
+        document.getElementById('contract-provider').value = con.provider;
+        document.getElementById('contract-value').value = con.value;
+        document.getElementById('contract-start').value = con.start;
+        document.getElementById('contract-end').value = con.end;
+        document.getElementById('contract-notes').value = con.notes;
+        document.getElementById('submit-contract').textContent = 'Speichern';
+        document.getElementById('cancel-contract').style.display = 'inline-block';
+    }
 };

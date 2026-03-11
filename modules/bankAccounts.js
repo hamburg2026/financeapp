@@ -5,6 +5,7 @@ export class BankAccounts {
     constructor() {
         this.accounts = JSON.parse(localStorage.getItem('bankAccounts')) || [];
         this.transactions = JSON.parse(localStorage.getItem('transactions')) || [];
+        this.editingId = null; // für Bearbeitung
     }
 
     render(container) {
@@ -14,7 +15,8 @@ export class BankAccounts {
                 <form id="account-form">
                     <input type="text" id="account-name" placeholder="Kontoname" required>
                     <input type="number" id="account-balance" placeholder="Anfangsstand" step="0.01" required>
-                    <button type="submit">Konto hinzufügen</button>
+                    <button type="submit" id="submit-account">Konto hinzufügen</button>
+                    <button type="button" id="cancel-account" style="display:none">Abbrechen</button>
                 </form>
                 <h3>Konten</h3>
                 <table id="accounts-table">
@@ -58,7 +60,17 @@ export class BankAccounts {
     setupEventListeners() {
         document.getElementById('account-form').addEventListener('submit', (e) => {
             e.preventDefault();
-            this.addAccount();
+            if (this.editingId) {
+                this.updateAccount();
+            } else {
+                this.addAccount();
+            }
+        });
+        document.getElementById('cancel-account').addEventListener('click', () => {
+            this.editingId = null;
+            document.getElementById('submit-account').textContent = 'Konto hinzufügen';
+            document.getElementById('cancel-account').style.display = 'none';
+            document.getElementById('account-form').reset();
         });
         document.getElementById('transaction-form').addEventListener('submit', (e) => {
             e.preventDefault();
@@ -75,6 +87,22 @@ export class BankAccounts {
         document.getElementById('account-form').reset();
     }
 
+    updateAccount() {
+        const name = document.getElementById('account-name').value;
+        const balance = parseFloat(document.getElementById('account-balance').value);
+        const acc = this.accounts.find(a => a.id == this.editingId);
+        if (acc) {
+            acc.name = name;
+            acc.balance = balance;
+            this.saveAccounts();
+            this.populateAccounts();
+        }
+        this.editingId = null;
+        document.getElementById('submit-account').textContent = 'Konto hinzufügen';
+        document.getElementById('cancel-account').style.display = 'none';
+        document.getElementById('account-form').reset();
+    }
+
     populateAccounts() {
         const tbody = document.querySelector('#accounts-table tbody');
         tbody.innerHTML = '';
@@ -82,7 +110,10 @@ export class BankAccounts {
             const row = `<tr>
                 <td>${account.name}</td>
                 <td>${formatNumber(account.balance)} €</td>
-                <td><button onclick="removeAccount(${account.id})">Löschen</button></td>
+                <td>
+                    <button onclick="editAccount(${account.id})">Bearbeiten</button>
+                    <button onclick="removeAccount(${account.id})">Löschen</button>
+                </td>
             </tr>`;
             tbody.innerHTML += row;
         });
@@ -186,6 +217,18 @@ export class BankAccounts {
 window.removeAccount = function(id) {
     const module = new BankAccounts();
     module.removeAccount(id);
+};
+
+window.editAccount = function(id) {
+    const module = new BankAccounts();
+    const acc = module.accounts.find(a => a.id == id);
+    if (acc) {
+        module.editingId = id;
+        document.getElementById('account-name').value = acc.name;
+        document.getElementById('account-balance').value = acc.balance;
+        document.getElementById('submit-account').textContent = 'Speichern';
+        document.getElementById('cancel-account').style.display = 'inline-block';
+    }
 };
 window.removeTransaction = function(id) {
     const module = new BankAccounts();

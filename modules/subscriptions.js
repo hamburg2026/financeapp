@@ -4,6 +4,7 @@ import { formatNumber } from '../utils.js';
 export class Subscriptions {
     constructor() {
         this.subscriptions = JSON.parse(localStorage.getItem('subscriptions')) || [];
+        this.editingId = null;
     }
 
     render(container) {
@@ -20,7 +21,8 @@ export class Subscriptions {
                     </select>
                     <input type="text" id="sub-cancel" placeholder="Kündigungsfrist" required>
                     <input type="date" id="sub-next" placeholder="Nächste Zahlung">
-                    <button type="submit">Abonnement hinzufügen</button>
+                    <button type="submit" id="submit-subscription">Abonnement hinzufügen</button>
+                    <button type="button" id="cancel-subscription" style="display:none">Abbrechen</button>
                 </form>
                 <h3>Abonnements</h3>
                 <table id="subscriptions-table">
@@ -45,7 +47,17 @@ export class Subscriptions {
     setupEventListeners() {
         document.getElementById('subscription-form').addEventListener('submit', (e) => {
             e.preventDefault();
-            this.addSubscription();
+            if (this.editingId) {
+                this.updateSubscription();
+            } else {
+                this.addSubscription();
+            }
+        });
+        document.getElementById('cancel-subscription').addEventListener('click', () => {
+            this.editingId = null;
+            document.getElementById('submit-subscription').textContent = 'Abonnement hinzufügen';
+            document.getElementById('cancel-subscription').style.display = 'none';
+            document.getElementById('subscription-form').reset();
         });
     }
 
@@ -61,6 +73,28 @@ export class Subscriptions {
         document.getElementById('subscription-form').reset();
     }
 
+    updateSubscription() {
+        const name = document.getElementById('sub-name').value;
+        const cost = parseFloat(document.getElementById('sub-cost').value);
+        const frequency = document.getElementById('sub-frequency').value;
+        const cancel = document.getElementById('sub-cancel').value;
+        const next = document.getElementById('sub-next').value;
+        const sub = this.subscriptions.find(s => s.id == this.editingId);
+        if (sub) {
+            sub.name = name;
+            sub.cost = cost;
+            sub.frequency = frequency;
+            sub.cancel = cancel;
+            sub.next = next;
+            this.saveSubscriptions();
+            this.populateSubscriptions();
+        }
+        this.editingId = null;
+        document.getElementById('submit-subscription').textContent = 'Abonnement hinzufügen';
+        document.getElementById('cancel-subscription').style.display = 'none';
+        document.getElementById('subscription-form').reset();
+    }
+
     populateSubscriptions() {
         const tbody = document.querySelector('#subscriptions-table tbody');
         tbody.innerHTML = '';
@@ -71,7 +105,7 @@ export class Subscriptions {
                 <td>${sub.frequency}</td>
                 <td>${sub.cancel}</td>
                 <td>${sub.next}</td>
-                <td><button onclick="removeSubscription(${sub.id})">Löschen</button></td>
+                <td><button onclick="editSubscription(${sub.id})">Bearbeiten</button> <button onclick="removeSubscription(${sub.id})">Löschen</button></td>
             </tr>`;
             tbody.innerHTML += row;
         });
@@ -91,4 +125,19 @@ export class Subscriptions {
 window.removeSubscription = function(id) {
     const module = new Subscriptions();
     module.removeSubscription(id);
+};
+
+window.editSubscription = function(id) {
+    const module = new Subscriptions();
+    const sub = module.subscriptions.find(s => s.id == id);
+    if (sub) {
+        module.editingId = id;
+        document.getElementById('sub-name').value = sub.name;
+        document.getElementById('sub-cost').value = sub.cost;
+        document.getElementById('sub-frequency').value = sub.frequency;
+        document.getElementById('sub-cancel').value = sub.cancel;
+        document.getElementById('sub-next').value = sub.next;
+        document.getElementById('submit-subscription').textContent = 'Speichern';
+        document.getElementById('cancel-subscription').style.display = 'inline-block';
+    }
 };

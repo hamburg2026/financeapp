@@ -5,6 +5,7 @@ export class Securities {
     constructor() {
         this.securities = JSON.parse(localStorage.getItem('securities')) || [];
         this.prices = JSON.parse(localStorage.getItem('securityPrices')) || {};
+        this.editingId = null;
     }
 
     render(container) {
@@ -15,7 +16,8 @@ export class Securities {
                     <input type="text" id="security-name" placeholder="Name" required>
                     <input type="text" id="security-symbol" placeholder="Symbol" required>
                     <input type="text" id="security-type" placeholder="Typ (Aktie, Bond, etc.)" required>
-                    <button type="submit">Wertpapier hinzufügen</button>
+                    <button type="submit" id="submit-security">Wertpapier hinzufügen</button>
+                    <button type="button" id="cancel-security" style="display:none">Abbrechen</button>
                 </form>
                 <h3>Wertpapiere</h3>
                 <table id="securities-table">
@@ -46,7 +48,17 @@ export class Securities {
     setupEventListeners() {
         document.getElementById('security-form').addEventListener('submit', (e) => {
             e.preventDefault();
-            this.addSecurity();
+            if (this.editingId) {
+                this.updateSecurity();
+            } else {
+                this.addSecurity();
+            }
+        });
+        document.getElementById('cancel-security').addEventListener('click', () => {
+            this.editingId = null;
+            document.getElementById('submit-security').textContent = 'Wertpapier hinzufügen';
+            document.getElementById('cancel-security').style.display = 'none';
+            document.getElementById('security-form').reset();
         });
         document.getElementById('price-form').addEventListener('submit', (e) => {
             e.preventDefault();
@@ -64,6 +76,24 @@ export class Securities {
         document.getElementById('security-form').reset();
     }
 
+    updateSecurity() {
+        const name = document.getElementById('security-name').value;
+        const symbol = document.getElementById('security-symbol').value;
+        const type = document.getElementById('security-type').value;
+        const sec = this.securities.find(s => s.id == this.editingId);
+        if (sec) {
+            sec.name = name;
+            sec.symbol = symbol;
+            sec.type = type;
+            this.saveSecurities();
+            this.populateSecurities();
+        }
+        this.editingId = null;
+        document.getElementById('submit-security').textContent = 'Wertpapier hinzufügen';
+        document.getElementById('cancel-security').style.display = 'none';
+        document.getElementById('security-form').reset();
+    }
+
     populateSecurities() {
         const tbody = document.querySelector('#securities-table tbody');
         tbody.innerHTML = '';
@@ -74,7 +104,7 @@ export class Securities {
                 <td>${sec.symbol}</td>
                 <td>${sec.type}</td>
                 <td>${currentPrice ? formatNumber(currentPrice) + ' €' : 'N/A'}</td>
-                <td><button onclick="removeSecurity(${sec.id})">Löschen</button></td>
+                <td><button onclick="editSecurity(${sec.id})">Bearbeiten</button> <button onclick="removeSecurity(${sec.id})">Löschen</button></td>
             </tr>`;
             tbody.innerHTML += row;
         });
@@ -126,4 +156,17 @@ export class Securities {
 window.removeSecurity = function(id) {
     const module = new Securities();
     module.removeSecurity(id);
+};
+
+window.editSecurity = function(id) {
+    const module = new Securities();
+    const sec = module.securities.find(s => s.id == id);
+    if (sec) {
+        module.editingId = id;
+        document.getElementById('security-name').value = sec.name;
+        document.getElementById('security-symbol').value = sec.symbol;
+        document.getElementById('security-type').value = sec.type;
+        document.getElementById('submit-security').textContent = 'Speichern';
+        document.getElementById('cancel-security').style.display = 'inline-block';
+    }
 };
