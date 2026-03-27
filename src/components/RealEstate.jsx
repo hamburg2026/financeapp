@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { fmt } from '../fmt'
 
 function useLocalStorage(key, initial) {
   const [value, setValue] = useState(() => JSON.parse(localStorage.getItem(key)) || initial)
@@ -46,9 +47,9 @@ export default function RealEstate() {
           {properties.map(p => (
             <tr key={p.id}>
               <td>{p.name}</td>
-              <td>{p.purchase.toFixed(2)} €</td>
-              <td>{p.current.toFixed(2)} €</td>
-              <td>{(p.current - p.purchase).toFixed(2)} €</td>
+              <td>{fmt(p.purchase)}</td>
+              <td>{fmt(p.current)}</td>
+              <td>{fmt(p.current - p.purchase)}</td>
               <td><button onClick={() => removeProperty(p.id)}>Löschen</button></td>
             </tr>
           ))}

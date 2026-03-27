@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { fmt } from '../fmt'
 
 function useLocalStorage(key, initial) {
   const [value, setValue] = useState(() => JSON.parse(localStorage.getItem(key)) || initial)
@@ -53,7 +54,7 @@ export default function Subscriptions() {
           {subscriptions.map(s => (
             <tr key={s.id}>
               <td>{s.name}</td>
-              <td>{s.cost.toFixed(2)} €</td>
+              <td>{fmt(s.cost)}</td>
               <td>{s.frequency}</td>
               <td>{s.cancel}</td>
               <td>{s.next}</td>

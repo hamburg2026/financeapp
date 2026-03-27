@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { fmt } from '../fmt'
 
 function useLocalStorage(key, initial) {
   const [value, setValue] = useState(() => JSON.parse(localStorage.getItem(key)) || initial)
@@ -53,7 +54,7 @@ export default function InsuranceContracts() {
             <tr key={c.id}>
               <td>{c.name}</td>
               <td>{c.provider}</td>
-              <td>{c.value.toFixed(2)} €</td>
+              <td>{fmt(c.value)}</td>
               <td>{c.start}</td>
               <td>{c.end}</td>
               <td><button onClick={() => removeContract(c.id)}>Löschen</button></td>

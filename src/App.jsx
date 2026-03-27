@@ -9,6 +9,7 @@ import Depots from './components/Depots'
 import Subscriptions from './components/Subscriptions'
 import RealEstate from './components/RealEstate'
 import CompanyShares from './components/CompanyShares'
+import ExpenseTree from './components/ExpenseTree'
 
 const NAV_ITEMS = [
   { id: 'dashboard',          label: 'Dashboard',           icon: '📊', component: Dashboard },
@@ -21,6 +22,7 @@ const NAV_ITEMS = [
   { id: 'subscriptions',      label: 'Abonnements',          icon: '📱', component: Subscriptions },
   { id: 'realEstate',         label: 'Immobilien',           icon: '🏠', component: RealEstate },
   { id: 'companyShares',      label: 'Firmenbeteiligungen',  icon: '🏢', component: CompanyShares },
+  { id: 'expenseTree',        label: 'Ausgaben',             icon: '📉', component: ExpenseTree },
 ]
 
 export default function App() {

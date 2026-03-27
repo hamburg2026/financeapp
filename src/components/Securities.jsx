@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { fmt } from '../fmt'
 
 function useLocalStorage(key, initial) {
   const [value, setValue] = useState(() => JSON.parse(localStorage.getItem(key)) || initial)
@@ -71,7 +72,7 @@ export default function Securities() {
                 <td>{s.name}</td>
                 <td>{s.symbol}</td>
                 <td>{s.type}</td>
-                <td>{price !== null ? price.toFixed(2) + ' €' : 'N/A'}</td>
+                <td>{price !== null ? fmt(price) : 'N/A'}</td>
                 <td><button onClick={() => removeSecurity(s.id)}>Löschen</button></td>
               </tr>
             )

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { fmt } from '../fmt'
 
 function useLocalStorage(key, initial) {
   const [value, setValue] = useState(() => JSON.parse(localStorage.getItem(key)) || initial)
@@ -121,9 +122,9 @@ export default function Depots() {
             <tr key={secId}>
               <td>{sec?.name || secId}</td>
               <td>{pos.quantity}</td>
-              <td>{(pos.cost / pos.quantity).toFixed(2)} €</td>
-              <td>{currentValue.toFixed(2)} €</td>
-              <td>{pnl.toFixed(2)} €</td>
+              <td>{fmt(pos.cost / pos.quantity)}</td>
+              <td>{fmt(currentValue)}</td>
+              <td>{fmt(pnl)}</td>
             </tr>
           ))}
         </tbody>

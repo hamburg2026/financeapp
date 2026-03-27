@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { fmt } from '../fmt'
 
 function useLocalStorage(key, initial) {
   const [value, setValue] = useState(() => JSON.parse(localStorage.getItem(key)) || initial)
@@ -73,7 +74,7 @@ export default function BankAccounts() {
           {accounts.map(a => (
             <tr key={a.id}>
               <td>{a.name}</td>
-              <td>{a.balance.toFixed(2)} €</td>
+              <td>{fmt(a.balance)}</td>
               <td><button onClick={() => removeAccount(a.id)}>Löschen</button></td>
             </tr>
           ))}
@@ -99,7 +100,7 @@ export default function BankAccounts() {
             <tr key={t.id}>
               <td>{t.date}</td>
               <td>{t.description}</td>
-              <td>{t.amount.toFixed(2)} €</td>
+              <td>{fmt(t.amount)}</td>
               <td>{t.category}</td>
               <td><button onClick={() => removeTransaction(t.id)}>Löschen</button></td>
             </tr>

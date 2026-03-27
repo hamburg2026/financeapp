@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { fmt } from '../fmt'
 
 function useLocalStorage(key, initial) {
   const [value, setValue] = useState(() => JSON.parse(localStorage.getItem(key)) || initial)
@@ -77,7 +78,7 @@ export default function RecurringPayments() {
           {recurrings.map(r => (
             <tr key={r.id}>
               <td>{r.description}</td>
-              <td>{r.amount.toFixed(2)} €</td>
+              <td>{fmt(r.amount)}</td>
               <td>{r.frequency}</td>
               <td><button onClick={() => removeRecurring(r.id)}>Löschen</button></td>
             </tr>

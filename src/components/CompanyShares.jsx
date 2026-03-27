@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { fmt, fmtNum } from '../fmt'
 
 function useLocalStorage(key, initial) {
   const [value, setValue] = useState(() => JSON.parse(localStorage.getItem(key)) || initial)
@@ -46,8 +47,8 @@ export default function CompanyShares() {
           {shares.map(s => (
             <tr key={s.id}>
               <td>{s.company}</td>
-              <td>{s.percentage.toFixed(2)} %</td>
-              <td>{s.value.toFixed(2)} €</td>
+              <td>{fmtNum(s.percentage)} %</td>
+              <td>{fmt(s.value)}</td>
               <td><button onClick={() => removeShare(s.id)}>Löschen</button></td>
             </tr>
           ))}
