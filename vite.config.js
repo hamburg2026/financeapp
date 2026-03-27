@@ -2,7 +2,10 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
+const base = process.env.GITHUB_PAGES === 'true' ? '/financeapp/' : '/'
+
 export default defineConfig({
+  base,
   plugins: [
     react(),
     VitePWA({
@@ -16,7 +19,7 @@ export default defineConfig({
         background_color: '#f0fdf4',
         display: 'standalone',
         orientation: 'any',
-        start_url: '/',
+        start_url: base,
         icons: [
           {
             src: '/icons/icon-192.png',
