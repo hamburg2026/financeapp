@@ -10,43 +10,51 @@ import Subscriptions from './components/Subscriptions'
 import RealEstate from './components/RealEstate'
 import CompanyShares from './components/CompanyShares'
 
-const VIEWS = {
-  dashboard: Dashboard,
-  bankAccounts: BankAccounts,
-  categories: Categories,
-  recurringPayments: RecurringPayments,
-  insuranceContracts: InsuranceContracts,
-  securities: Securities,
-  depots: Depots,
-  subscriptions: Subscriptions,
-  realEstate: RealEstate,
-  companyShares: CompanyShares,
-}
+const NAV_ITEMS = [
+  { id: 'dashboard',          label: 'Dashboard',           icon: '📊', component: Dashboard },
+  { id: 'bankAccounts',       label: 'Bankkonten',           icon: '🏦', component: BankAccounts },
+  { id: 'categories',        label: 'Kategorien',           icon: '🏷️', component: Categories },
+  { id: 'recurringPayments',  label: 'Daueraufträge',        icon: '🔄', component: RecurringPayments },
+  { id: 'insuranceContracts', label: 'Versicherungen',       icon: '🛡️', component: InsuranceContracts },
+  { id: 'securities',         label: 'Wertpapiere',          icon: '📈', component: Securities },
+  { id: 'depots',             label: 'Depots',               icon: '💼', component: Depots },
+  { id: 'subscriptions',      label: 'Abonnements',          icon: '📱', component: Subscriptions },
+  { id: 'realEstate',         label: 'Immobilien',           icon: '🏠', component: RealEstate },
+  { id: 'companyShares',      label: 'Firmenbeteiligungen',  icon: '🏢', component: CompanyShares },
+]
 
 export default function App() {
   const [currentView, setCurrentView] = useState('dashboard')
-  const CurrentComponent = VIEWS[currentView]
+  const current = NAV_ITEMS.find(item => item.id === currentView)
+  const CurrentComponent = current.component
 
   return (
-    <>
-      <header>
-        <h1>Finanzverwaltung</h1>
-        <nav>
-          <button onClick={() => setCurrentView('dashboard')}>Dashboard</button>
-          <button onClick={() => setCurrentView('bankAccounts')}>Bankkonten</button>
-          <button onClick={() => setCurrentView('categories')}>Kategorien</button>
-          <button onClick={() => setCurrentView('recurringPayments')}>Daueraufträge</button>
-          <button onClick={() => setCurrentView('insuranceContracts')}>Versicherungen</button>
-          <button onClick={() => setCurrentView('securities')}>Wertpapiere</button>
-          <button onClick={() => setCurrentView('depots')}>Depots</button>
-          <button onClick={() => setCurrentView('subscriptions')}>Abonnements</button>
-          <button onClick={() => setCurrentView('realEstate')}>Immobilien</button>
-          <button onClick={() => setCurrentView('companyShares')}>Firmenbeteiligungen</button>
+    <div className="app-layout">
+      <aside className="sidebar">
+        <div className="sidebar-header">
+          <h1 className="sidebar-title">Finanzverwaltung</h1>
+          <p className="sidebar-subtitle">Persönliche Finanzen</p>
+        </div>
+        <nav className="sidebar-nav">
+          {NAV_ITEMS.map(item => (
+            <button
+              key={item.id}
+              className={`nav-item${currentView === item.id ? ' active' : ''}`}
+              onClick={() => setCurrentView(item.id)}
+              aria-current={currentView === item.id ? 'page' : undefined}
+            >
+              <span className="nav-icon">{item.icon}</span>
+              {item.label}
+            </button>
+          ))}
         </nav>
-      </header>
-      <main>
-        <CurrentComponent />
-      </main>
-    </>
+      </aside>
+
+      <div className="main-content">
+        <div className="content-area">
+          <CurrentComponent />
+        </div>
+      </div>
+    </div>
   )
 }
