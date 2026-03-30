@@ -1,0 +1,13 @@
+{
+  "name": "financeapp-agents",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Tägliche Aktienanalyse-Agenten mit Claude AI",
+  "scripts": {
+    "analyze": "node stockAnalysisAgent.js",
+    "analyze:single": "node stockAnalysisAgent.js --symbol"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0"
+  }
+}
