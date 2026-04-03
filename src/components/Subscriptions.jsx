@@ -48,14 +48,14 @@ function syncRecurring(sub, isActive) {
   if (existing) {
     localStorage.setItem('recurringPayments', JSON.stringify(
       recurrings.map(r => r.subscriptionId === sub.id
-        ? { ...r, description: sub.name, amount: sub.cost, frequency: sub.frequency, categoryId: sub.categoryId ?? null }
+        ? { ...r, description: sub.name, amount: sub.cost, frequency: sub.frequency, categoryId: sub.categoryId ?? null, type: sub.type ?? 'Ausgabe' }
         : r
       )
     ))
   } else {
     localStorage.setItem('recurringPayments', JSON.stringify([
       ...recurrings,
-      { id: Date.now(), description: sub.name, amount: sub.cost, frequency: sub.frequency, categoryId: sub.categoryId ?? null, subscriptionId: sub.id },
+      { id: Date.now(), description: sub.name, amount: sub.cost, frequency: sub.frequency, categoryId: sub.categoryId ?? null, type: sub.type ?? 'Ausgabe', subscriptionId: sub.id },
     ]))
   }
 }
@@ -71,6 +71,15 @@ export default function Subscriptions() {
   const [next,       setNext]       = useState('')
   const [aktiv,      setAktiv]      = useState(true)
   const [categoryId, setCategoryId] = useState('')
+  const [type,       setType]       = useState('Ausgabe')
+
+  function handleCategoryChange(val) {
+    setCategoryId(val)
+    if (val) {
+      const cat = categories.find(c => c.id === parseInt(val))
+      if (cat?.type) setType(cat.type)
+    }
+  }
 
   function getCategoryLabel(catId) {
     if (!catId) return null
@@ -89,13 +98,14 @@ export default function Subscriptions() {
   const [editNext,        setEditNext]        = useState('')
   const [editAktiv,       setEditAktiv]       = useState(true)
   const [editCategoryId,  setEditCategoryId]  = useState('')
+  const [editType,        setEditType]        = useState('Ausgabe')
 
   function addSubscription(e) {
     e.preventDefault()
-    const sub = { id: Date.now(), name, cost: parseFloat(cost), frequency, cancel, next, aktiv, categoryId: categoryId ? parseInt(categoryId) : null }
+    const sub = { id: Date.now(), name, cost: parseFloat(cost), frequency, cancel, next, aktiv, categoryId: categoryId ? parseInt(categoryId) : null, type }
     setSubscriptions([...subscriptions, sub])
     syncRecurring(sub, aktiv)
-    setName(''); setCost(''); setFrequency('monthly'); setCancel(''); setNext(''); setAktiv(true); setCategoryId('')
+    setName(''); setCost(''); setFrequency('monthly'); setCancel(''); setNext(''); setAktiv(true); setCategoryId(''); setType('Ausgabe')
   }
 
   function startEdit(s) {
@@ -107,6 +117,7 @@ export default function Subscriptions() {
     setEditNext(s.next || '')
     setEditAktiv(s.aktiv ?? true)
     setEditCategoryId(s.categoryId ? String(s.categoryId) : '')
+    setEditType(s.type || 'Ausgabe')
   }
 
   function saveEdit() {
@@ -119,6 +130,7 @@ export default function Subscriptions() {
       next:       editNext,
       aktiv:      editAktiv,
       categoryId: editCategoryId ? parseInt(editCategoryId) : null,
+      type:       editType,
     }
     setSubscriptions(subscriptions.map(s => s.id === editId ? updated : s))
     syncRecurring(updated, updated.aktiv)
@@ -150,7 +162,11 @@ export default function Subscriptions() {
         </select>
         <input value={cancel} onChange={e => setCancel(e.target.value)} placeholder="Kündigungsfrist" required />
         <input type="date" value={next} onChange={e => setNext(e.target.value)} />
-        <CategorySelect value={categoryId} onChange={e => setCategoryId(e.target.value)} categories={categories} />
+        <CategorySelect value={categoryId} onChange={e => handleCategoryChange(e.target.value)} categories={categories} />
+        <select value={type} onChange={e => setType(e.target.value)}>
+          <option value="Ausgabe">Ausgabe</option>
+          <option value="Einnahme">Einnahme</option>
+        </select>
         <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem' }}>
           <input type="checkbox" checked={aktiv} onChange={e => setAktiv(e.target.checked)} />
           Aktiv (als Dauerauftrag übernehmen)
@@ -180,6 +196,10 @@ export default function Subscriptions() {
                   <option value="yearly">Jährlich</option>
                 </select>
                 <CategorySelect value={editCategoryId} onChange={e => setEditCategoryId(e.target.value)} categories={categories} />
+                <select value={editType} onChange={e => setEditType(e.target.value)} style={{ fontSize: '0.82rem', padding: '0.25rem 0.4rem' }}>
+                  <option value="Ausgabe">Ausgabe</option>
+                  <option value="Einnahme">Einnahme</option>
+                </select>
                 <input value={editCancel} onChange={e => setEditCancel(e.target.value)}
                   style={{ width: 110, fontSize: '0.82rem', padding: '0.25rem 0.4rem' }} placeholder="Kündigung" />
                 <input type="date" value={editNext} onChange={e => setEditNext(e.target.value)}
