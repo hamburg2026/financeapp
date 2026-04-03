@@ -100,7 +100,9 @@ export default function ExpenseTree() {
       .sort((a, b) => b.total - a.total)
 
     return nodes.map((c, ni) => {
+      const directItems = recurrings.filter(r => r.categoryId === c.id)
       const hasChildren = categories.some(ch => ch.parent == c.id && subtreeTotal(ch.id) > 0)
+      const hasContent  = directItems.length > 0 || hasChildren
       // Only root level can be toggled; sub-levels always open
       const isOpen  = level > 0 || expandedCats.has(c.id)
       const isLast  = ni === nodes.length - 1 && level === 0
@@ -110,19 +112,19 @@ export default function ExpenseTree() {
       return (
         <div key={c.id}>
           <div
-            onClick={() => level === 0 && hasChildren && toggleCat(c.id)}
+            onClick={() => level === 0 && hasContent && toggleCat(c.id)}
             style={{
               display: 'flex', alignItems: 'center', gap: '0.5rem',
               padding: '0.42rem 0.75rem',
               paddingLeft: `${0.75 + level * 1.2}rem`,
               borderBottom: (!isOpen && isLast) ? 'none' : '1px solid var(--color-border)',
               background: level === 0 ? 'var(--color-bg)' : 'var(--color-surface)',
-              cursor: level === 0 && hasChildren ? 'pointer' : 'default',
+              cursor: level === 0 && hasContent ? 'pointer' : 'default',
               userSelect: 'none',
             }}
           >
             <span style={{ width: '0.9rem', fontSize: '0.68rem', color: 'var(--color-text-muted)', flexShrink: 0 }}>
-              {level === 0 && hasChildren ? (isOpen ? '▼' : '▶') : ''}
+              {level === 0 && hasContent ? (isOpen ? '▼' : '▶') : ''}
             </span>
             <span style={{
               flex: 1,
@@ -136,7 +138,36 @@ export default function ExpenseTree() {
               {income ? '+' : ''}{fmt(c.total)}
             </span>
           </div>
-          {isOpen && renderCategoryTree(c.id, level + 1)}
+          {isOpen && (
+            <>
+              {directItems.map((r, ri) => {
+                const inc = isIncome(r)
+                const p   = proj(r)
+                const lastItem = ri === directItems.length - 1 && !hasChildren
+                return (
+                  <div key={r.id} style={{
+                    display: 'flex', alignItems: 'center', gap: '0.5rem',
+                    padding: '0.26rem 0.75rem',
+                    paddingLeft: `${0.75 + (level + 1) * 1.2}rem`,
+                    borderBottom: (lastItem && isLast) ? 'none' : '1px solid var(--color-border)',
+                    background: 'var(--color-surface)',
+                    fontSize: '0.78rem',
+                  }}>
+                    <span style={{ flex: 1, color: inc ? '#16a34a' : 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {r.description}
+                    </span>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', flexShrink: 0, marginRight: '0.35rem' }}>
+                      {FREQ_SHORT[r.frequency]}
+                    </span>
+                    <span style={{ fontWeight: 500, flexShrink: 0, color: inc ? '#16a34a' : 'inherit' }}>
+                      {inc ? '+' : ''}{fmt(p)}
+                    </span>
+                  </div>
+                )
+              })}
+              {renderCategoryTree(c.id, level + 1)}
+            </>
+          )}
         </div>
       )
     })
