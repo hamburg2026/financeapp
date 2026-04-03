@@ -10,62 +10,145 @@ function useLocalStorage(key, initial) {
   return [value, set]
 }
 
-function today() {
-  return new Date().toISOString().slice(0, 10)
-}
-
+function today() { return new Date().toISOString().slice(0, 10) }
 function firstOfMonth() {
   const d = new Date()
   return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10)
 }
 
+const btnSm = {
+  border: 'none', borderRadius: 5, cursor: 'pointer',
+  fontSize: '0.72rem', padding: '0.2rem 0.45rem', lineHeight: 1.4,
+}
+
 export default function BankAccounts() {
   const [accounts, setAccounts] = useLocalStorage('bankAccounts', [])
   const [transactions, setTransactions] = useLocalStorage('transactions', [])
-  const categories = JSON.parse(localStorage.getItem('categories')) || []
+  const [categories, setCategories_] = useState(() => JSON.parse(localStorage.getItem('categories')) || [])
 
+  const [tab, setTab] = useState('accounts')
+
+  // --- Accounts form ---
   const [accountName, setAccountName] = useState('')
   const [accountBalance, setAccountBalance] = useState('')
 
+  // --- Account inline edit ---
+  const [editAccId, setEditAccId] = useState(null)
+  const [editAccName, setEditAccName] = useState('')
+  const [editAccBalance, setEditAccBalance] = useState('')
+
+  // --- Transaction form ---
   const [txAccountId, setTxAccountId] = useState('')
-  const [txDate, setTxDate] = useState('')
+  const [txDate, setTxDate] = useState(today())
   const [txDescription, setTxDescription] = useState('')
+  const [txRecipient, setTxRecipient] = useState('')
   const [txAmount, setTxAmount] = useState('')
   const [txCategory, setTxCategory] = useState('')
 
-  // Filter state
+  // --- Transaction inline edit ---
+  const [editTxId, setEditTxId] = useState(null)
+  const [editTxAccountId, setEditTxAccountId] = useState('')
+  const [editTxDate, setEditTxDate] = useState('')
+  const [editTxDescription, setEditTxDescription] = useState('')
+  const [editTxRecipient, setEditTxRecipient] = useState('')
+  const [editTxAmount, setEditTxAmount] = useState('')
+  const [editTxCategory, setEditTxCategory] = useState('')
+
+  // --- Transaction filters ---
   const [filterAccount, setFilterAccount] = useState('')
   const [filterCategory, setFilterCategory] = useState('')
   const [filterType, setFilterType] = useState('all')
   const [filterDateFrom, setFilterDateFrom] = useState(firstOfMonth())
   const [filterDateTo, setFilterDateTo] = useState(today())
+  const [filterRecipient, setFilterRecipient] = useState('')
   const [filterSearch, setFilterSearch] = useState('')
 
+  // Derive category type (Ausgabe/Einnahme) for a given category name
+  function catType(catName) {
+    const cat = categories.find(c => c.name === catName)
+    return cat?.type || null
+  }
+
+  // Apply sign based on category type: Ausgabe → negative, Einnahme → positive
+  function applySign(amount, catName) {
+    const type = catType(catName)
+    const abs = Math.abs(parseFloat(amount))
+    if (type === 'Ausgabe') return -abs
+    if (type === 'Einnahme') return abs
+    return parseFloat(amount) // fallback: use as entered
+  }
+
+  // --- Accounts CRUD ---
   function addAccount(e) {
     e.preventDefault()
-    const newAccounts = [...accounts, { id: Date.now(), name: accountName, balance: parseFloat(accountBalance) }]
-    setAccounts(newAccounts)
+    setAccounts([...accounts, { id: Date.now(), name: accountName, balance: parseFloat(accountBalance) }])
     setAccountName('')
     setAccountBalance('')
+  }
+
+  function startEditAcc(a) {
+    setEditAccId(a.id)
+    setEditAccName(a.name)
+    setEditAccBalance(String(a.balance))
+  }
+
+  function saveEditAcc() {
+    setAccounts(accounts.map(a =>
+      a.id === editAccId ? { ...a, name: editAccName, balance: parseFloat(editAccBalance) } : a
+    ))
+    setEditAccId(null)
   }
 
   function removeAccount(id) {
     setAccounts(accounts.filter(a => a.id !== id))
   }
 
+  // --- Transactions CRUD ---
   function addTransaction(e) {
     e.preventDefault()
     const accountId = parseInt(txAccountId || accounts[0]?.id)
-    const amount = parseFloat(txAmount)
-    const newTx = { id: Date.now(), accountId, date: txDate, description: txDescription, amount, category: txCategory }
-    const newTransactions = [...transactions, newTx]
-    setTransactions(newTransactions)
-    const newAccounts = accounts.map(a => a.id === accountId ? { ...a, balance: a.balance + amount } : a)
-    setAccounts(newAccounts)
-    setTxDate('')
+    const amount = applySign(txAmount, txCategory)
+    const newTx = { id: Date.now(), accountId, date: txDate, description: txDescription, recipient: txRecipient, amount, category: txCategory }
+    setTransactions([...transactions, newTx])
+    setAccounts(accounts.map(a => a.id === accountId ? { ...a, balance: a.balance + amount } : a))
+    setTxDate(today())
     setTxDescription('')
+    setTxRecipient('')
     setTxAmount('')
     setTxCategory('')
+  }
+
+  function startEditTx(t) {
+    setEditTxId(t.id)
+    setEditTxAccountId(String(t.accountId))
+    setEditTxDate(t.date)
+    setEditTxDescription(t.description)
+    setEditTxRecipient(t.recipient || '')
+    setEditTxAmount(String(Math.abs(t.amount)))
+    setEditTxCategory(t.category)
+  }
+
+  function saveEditTx() {
+    const oldTx = transactions.find(t => t.id === editTxId)
+    const newAmount = applySign(editTxAmount, editTxCategory)
+    const newAccountId = parseInt(editTxAccountId)
+
+    // Reverse old amount, apply new amount
+    let newAccounts = accounts.map(a => {
+      if (a.id === oldTx.accountId) return { ...a, balance: a.balance - oldTx.amount }
+      return a
+    })
+    newAccounts = newAccounts.map(a => {
+      if (a.id === newAccountId) return { ...a, balance: a.balance + newAmount }
+      return a
+    })
+    setAccounts(newAccounts)
+    setTransactions(transactions.map(t =>
+      t.id === editTxId
+        ? { ...t, accountId: newAccountId, date: editTxDate, description: editTxDescription, recipient: editTxRecipient, amount: newAmount, category: editTxCategory }
+        : t
+    ))
+    setEditTxId(null)
   }
 
   function removeTransaction(id) {
@@ -76,7 +159,7 @@ export default function BankAccounts() {
     }
   }
 
-  // Apply filters
+  // --- Filtered & sorted transactions ---
   const filtered = transactions.filter(t => {
     if (filterAccount && t.accountId !== parseInt(filterAccount)) return false
     if (filterCategory && t.category !== filterCategory) return false
@@ -84,204 +167,265 @@ export default function BankAccounts() {
     if (filterType === 'expense' && t.amount >= 0) return false
     if (filterDateFrom && t.date < filterDateFrom) return false
     if (filterDateTo && t.date > filterDateTo) return false
+    if (filterRecipient && !(t.recipient || '').toLowerCase().includes(filterRecipient.toLowerCase())) return false
     if (filterSearch && !t.description.toLowerCase().includes(filterSearch.toLowerCase())) return false
     return true
   }).sort((a, b) => b.date.localeCompare(a.date))
 
-  const accountName_ = id => accounts.find(a => a.id === id)?.name || '–'
+  function resetFilters() {
+    setFilterAccount(''); setFilterCategory(''); setFilterType('all')
+    setFilterDateFrom(firstOfMonth()); setFilterDateTo(today())
+    setFilterRecipient(''); setFilterSearch('')
+  }
 
-  const compactCell = { padding: '0.3rem 0.5rem', fontSize: '0.8rem' }
+  const accountName_ = id => accounts.find(a => a.id === id)?.name || '–'
+  const cell = { padding: '0.3rem 0.5rem', fontSize: '0.8rem' }
+
+  // Selected category type hint for new transaction form
+  const newTxCatType = catType(txCategory)
 
   return (
     <div className="module">
       <h2>Bankkonten</h2>
-      <form onSubmit={addAccount}>
-        <input value={accountName} onChange={e => setAccountName(e.target.value)} placeholder="Kontoname" required />
-        <input type="number" value={accountBalance} onChange={e => setAccountBalance(e.target.value)} placeholder="Anfangsstand" step="0.01" required />
-        <button type="submit">Konto hinzufügen</button>
-      </form>
-      <h3>Konten</h3>
-      <table>
-        <thead><tr><th>Name</th><th>Saldo</th><th>Aktionen</th></tr></thead>
-        <tbody>
-          {accounts.map(a => (
-            <tr key={a.id}>
-              <td>{a.name}</td>
-              <td>{fmt(a.balance)}</td>
-              <td><button onClick={() => removeAccount(a.id)}>Löschen</button></td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
 
-      <h3>Umsätze</h3>
-      <form onSubmit={addTransaction}>
-        <select value={txAccountId} onChange={e => setTxAccountId(e.target.value)} required>
-          {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-        </select>
-        <input type="date" value={txDate} onChange={e => setTxDate(e.target.value)} required />
-        <input value={txDescription} onChange={e => setTxDescription(e.target.value)} placeholder="Beschreibung" required />
-        <input type="number" value={txAmount} onChange={e => setTxAmount(e.target.value)} placeholder="Betrag" step="0.01" required />
-        <select value={txCategory} onChange={e => setTxCategory(e.target.value)} required>
-          {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-        </select>
-        <button type="submit">Umsatz hinzufügen</button>
-      </form>
-
-      {/* Filter bar */}
-      <div style={{
-        background: 'var(--color-bg)',
-        border: '1px solid var(--color-border)',
-        borderRadius: 8,
-        padding: '0.75rem',
-        marginBottom: '0.75rem',
-        display: 'flex',
-        flexWrap: 'wrap',
-        gap: '0.5rem',
-        alignItems: 'flex-end',
-      }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', minWidth: 120 }}>
-          <label style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', fontWeight: 600 }}>Konto</label>
-          <select
-            value={filterAccount}
-            onChange={e => setFilterAccount(e.target.value)}
-            style={{ fontSize: '0.8rem', padding: '0.3rem 0.4rem' }}
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: 0, marginBottom: '1.25rem', borderBottom: '2px solid var(--color-border)' }}>
+        {[['accounts', 'Konten'], ['transactions', 'Umsätze']].map(([id, label]) => (
+          <button
+            key={id}
+            onClick={() => setTab(id)}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              padding: '0.5rem 1.2rem', fontSize: '0.9rem', fontWeight: tab === id ? 700 : 400,
+              color: tab === id ? 'var(--color-primary)' : 'var(--color-text-muted)',
+              borderBottom: tab === id ? '2px solid var(--color-primary)' : '2px solid transparent',
+              marginBottom: '-2px',
+            }}
           >
-            <option value="">Alle Konten</option>
-            {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-          </select>
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', minWidth: 130 }}>
-          <label style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', fontWeight: 600 }}>Kategorie</label>
-          <select
-            value={filterCategory}
-            onChange={e => setFilterCategory(e.target.value)}
-            style={{ fontSize: '0.8rem', padding: '0.3rem 0.4rem' }}
-          >
-            <option value="">Alle Kategorien</option>
-            {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-          </select>
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', minWidth: 110 }}>
-          <label style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', fontWeight: 600 }}>Typ</label>
-          <select
-            value={filterType}
-            onChange={e => setFilterType(e.target.value)}
-            style={{ fontSize: '0.8rem', padding: '0.3rem 0.4rem' }}
-          >
-            <option value="all">Alle</option>
-            <option value="income">Einnahmen</option>
-            <option value="expense">Ausgaben</option>
-          </select>
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-          <label style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', fontWeight: 600 }}>Von</label>
-          <input
-            type="date"
-            value={filterDateFrom}
-            onChange={e => setFilterDateFrom(e.target.value)}
-            style={{ fontSize: '0.8rem', padding: '0.3rem 0.4rem', width: 'auto' }}
-          />
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-          <label style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', fontWeight: 600 }}>Bis</label>
-          <input
-            type="date"
-            value={filterDateTo}
-            onChange={e => setFilterDateTo(e.target.value)}
-            style={{ fontSize: '0.8rem', padding: '0.3rem 0.4rem', width: 'auto' }}
-          />
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', flex: 1, minWidth: 140 }}>
-          <label style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', fontWeight: 600 }}>Suche</label>
-          <input
-            value={filterSearch}
-            onChange={e => setFilterSearch(e.target.value)}
-            placeholder="Beschreibung..."
-            style={{ fontSize: '0.8rem', padding: '0.3rem 0.4rem' }}
-          />
-        </div>
-
-        <button
-          onClick={() => {
-            setFilterAccount('')
-            setFilterCategory('')
-            setFilterType('all')
-            setFilterDateFrom(firstOfMonth())
-            setFilterDateTo(today())
-            setFilterSearch('')
-          }}
-          style={{
-            fontSize: '0.78rem',
-            padding: '0.32rem 0.7rem',
-            background: 'transparent',
-            border: '1px solid var(--color-border)',
-            borderRadius: 6,
-            color: 'var(--color-text-muted)',
-            cursor: 'pointer',
-            alignSelf: 'flex-end',
-          }}
-        >
-          Zurücksetzen
-        </button>
+            {label}
+          </button>
+        ))}
       </div>
 
-      <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '0.4rem' }}>
-        {filtered.length} Umsatz{filtered.length !== 1 ? 'ätze' : ''}
-      </div>
+      {/* ── KONTEN TAB ── */}
+      {tab === 'accounts' && (
+        <>
+          <form onSubmit={addAccount}>
+            <input value={accountName} onChange={e => setAccountName(e.target.value)} placeholder="Kontoname" required />
+            <input type="number" value={accountBalance} onChange={e => setAccountBalance(e.target.value)} placeholder="Anfangsstand" step="0.01" required />
+            <button type="submit">Konto hinzufügen</button>
+          </form>
 
-      {/* Compact transactions table */}
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ fontSize: '0.82rem', width: '100%' }}>
-          <thead>
-            <tr>
-              <th style={compactCell}>Datum</th>
-              <th style={compactCell}>Konto</th>
-              <th style={compactCell}>Beschreibung</th>
-              <th style={compactCell}>Betrag</th>
-              <th style={compactCell}>Kategorie</th>
-              <th style={compactCell}>Aktionen</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map(t => (
-              <tr key={t.id}>
-                <td style={compactCell}>{t.date}</td>
-                <td style={compactCell}>{accountName_(t.accountId)}</td>
-                <td style={compactCell}>{t.description}</td>
-                <td style={{
-                  ...compactCell,
-                  color: t.amount >= 0 ? '#16a34a' : '#dc2626',
-                  fontWeight: 600,
-                }}>
-                  {fmt(t.amount)}
-                </td>
-                <td style={compactCell}>{t.category}</td>
-                <td style={compactCell}>
-                  <button
-                    onClick={() => removeTransaction(t.id)}
-                    style={{ fontSize: '0.75rem', padding: '0.15rem 0.5rem' }}
-                  >
-                    Löschen
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {filtered.length === 0 && (
-              <tr>
-                <td colSpan={6} style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '1.5rem', fontSize: '0.85rem' }}>
-                  Keine Umsätze gefunden
-                </td>
-              </tr>
+          <div style={{ marginTop: '1rem', border: '1px solid var(--color-border)', borderRadius: 8, overflow: 'hidden' }}>
+            {accounts.length === 0 ? (
+              <p style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '2rem', fontSize: '0.875rem' }}>
+                Noch keine Konten angelegt
+              </p>
+            ) : (
+              <table style={{ width: '100%' }}>
+                <thead>
+                  <tr style={{ background: 'var(--color-bg)' }}>
+                    <th style={cell}>Name</th>
+                    <th style={cell}>Saldo</th>
+                    <th style={cell}>Aktionen</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {accounts.map(a => editAccId === a.id ? (
+                    <tr key={a.id} style={{ background: '#fefce8' }}>
+                      <td style={cell}>
+                        <input value={editAccName} onChange={e => setEditAccName(e.target.value)}
+                          style={{ fontSize: '0.8rem', padding: '0.2rem 0.4rem', width: '100%' }} />
+                      </td>
+                      <td style={cell}>
+                        <input type="number" value={editAccBalance} onChange={e => setEditAccBalance(e.target.value)}
+                          step="0.01" style={{ fontSize: '0.8rem', padding: '0.2rem 0.4rem', width: 90 }} />
+                      </td>
+                      <td style={{ ...cell, whiteSpace: 'nowrap' }}>
+                        <button onClick={saveEditAcc} style={{ ...btnSm, background: '#16a34a', color: '#fff', marginRight: 4 }}>Speichern</button>
+                        <button onClick={() => setEditAccId(null)} style={{ ...btnSm, background: '#e5e7eb', color: '#374151' }}>Abbrechen</button>
+                      </td>
+                    </tr>
+                  ) : (
+                    <tr key={a.id}>
+                      <td style={cell}>{a.name}</td>
+                      <td style={{ ...cell, fontWeight: 600, color: a.balance >= 0 ? '#16a34a' : '#dc2626' }}>{fmt(a.balance)}</td>
+                      <td style={{ ...cell, whiteSpace: 'nowrap' }}>
+                        <button onClick={() => startEditAcc(a)} style={{ ...btnSm, background: '#e5e7eb', color: '#374151', marginRight: 4 }}>✎</button>
+                        <button onClick={() => removeAccount(a.id)} style={{ ...btnSm, background: '#fee2e2', color: '#dc2626' }}>✕</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             )}
-          </tbody>
-        </table>
-      </div>
+          </div>
+        </>
+      )}
+
+      {/* ── UMSÄTZE TAB ── */}
+      {tab === 'transactions' && (
+        <>
+          {/* Add transaction form */}
+          <form onSubmit={addTransaction}>
+            <select value={txAccountId} onChange={e => setTxAccountId(e.target.value)} required>
+              <option value="">Konto wählen</option>
+              {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+            </select>
+            <input type="date" value={txDate} onChange={e => setTxDate(e.target.value)} required />
+            <input value={txDescription} onChange={e => setTxDescription(e.target.value)} placeholder="Beschreibung" required />
+            <input value={txRecipient} onChange={e => setTxRecipient(e.target.value)} placeholder="Empfänger" />
+            <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+              <input
+                type="number" value={txAmount} onChange={e => setTxAmount(e.target.value)}
+                placeholder="Betrag (positiv)" step="0.01" min="0" required
+                style={{ flex: 1 }}
+              />
+              {newTxCatType && (
+                <span style={{
+                  fontSize: '0.75rem', fontWeight: 600, padding: '0.2rem 0.5rem', borderRadius: 5,
+                  background: newTxCatType === 'Ausgabe' ? '#fee2e2' : '#dcfce7',
+                  color: newTxCatType === 'Ausgabe' ? '#dc2626' : '#16a34a',
+                }}>
+                  {newTxCatType === 'Ausgabe' ? '− Ausgabe' : '+ Einnahme'}
+                </span>
+              )}
+            </div>
+            <select value={txCategory} onChange={e => setTxCategory(e.target.value)} required>
+              <option value="">Kategorie wählen</option>
+              {categories.map(c => <option key={c.id} value={c.name}>{c.name} ({c.type || '–'})</option>)}
+            </select>
+            <button type="submit">Umsatz hinzufügen</button>
+          </form>
+
+          {/* Filter bar */}
+          <div style={{
+            background: 'var(--color-bg)', border: '1px solid var(--color-border)',
+            borderRadius: 8, padding: '0.75rem', marginBottom: '0.75rem',
+            display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end',
+          }}>
+            {[
+              ['Konto', <select value={filterAccount} onChange={e => setFilterAccount(e.target.value)} style={{ fontSize: '0.8rem', padding: '0.3rem 0.4rem' }}>
+                <option value="">Alle</option>
+                {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+              </select>],
+              ['Kategorie', <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)} style={{ fontSize: '0.8rem', padding: '0.3rem 0.4rem' }}>
+                <option value="">Alle</option>
+                {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+              </select>],
+              ['Typ', <select value={filterType} onChange={e => setFilterType(e.target.value)} style={{ fontSize: '0.8rem', padding: '0.3rem 0.4rem' }}>
+                <option value="all">Alle</option>
+                <option value="income">Einnahmen</option>
+                <option value="expense">Ausgaben</option>
+              </select>],
+              ['Von', <input type="date" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)} style={{ fontSize: '0.8rem', padding: '0.3rem 0.4rem', width: 'auto' }} />],
+              ['Bis', <input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} style={{ fontSize: '0.8rem', padding: '0.3rem 0.4rem', width: 'auto' }} />],
+              ['Empfänger', <input value={filterRecipient} onChange={e => setFilterRecipient(e.target.value)} placeholder="..." style={{ fontSize: '0.8rem', padding: '0.3rem 0.4rem', width: 110 }} />],
+              ['Suche', <input value={filterSearch} onChange={e => setFilterSearch(e.target.value)} placeholder="Beschreibung..." style={{ fontSize: '0.8rem', padding: '0.3rem 0.4rem', width: 130 }} />],
+            ].map(([label, input]) => (
+              <div key={label} style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                <label style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', fontWeight: 600 }}>{label}</label>
+                {input}
+              </div>
+            ))}
+            <button onClick={resetFilters} style={{ ...btnSm, background: '#e5e7eb', color: '#374151', alignSelf: 'flex-end', padding: '0.32rem 0.7rem' }}>
+              Zurücksetzen
+            </button>
+          </div>
+
+          <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '0.4rem' }}>
+            {filtered.length} Umsatz{filtered.length !== 1 ? 'ätze' : ''}
+          </div>
+
+          {/* Transactions table */}
+          <div style={{ overflowX: 'auto', border: '1px solid var(--color-border)', borderRadius: 8, overflow: 'hidden' }}>
+            <table style={{ fontSize: '0.8rem', width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: 'var(--color-bg)' }}>
+                  {['Datum', 'Konto', 'Beschreibung', 'Empfänger', 'Betrag', 'Kategorie', 'Aktionen'].map(h => (
+                    <th key={h} style={cell}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.length === 0 && (
+                  <tr>
+                    <td colSpan={7} style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '1.5rem', fontSize: '0.85rem' }}>
+                      Keine Umsätze gefunden
+                    </td>
+                  </tr>
+                )}
+                {filtered.map(t => {
+                  if (editTxId === t.id) {
+                    const editCatType = catType(editTxCategory)
+                    return (
+                      <tr key={t.id} style={{ background: '#fefce8' }}>
+                        <td style={cell}>
+                          <input type="date" value={editTxDate} onChange={e => setEditTxDate(e.target.value)}
+                            style={{ fontSize: '0.78rem', padding: '0.2rem 0.3rem', width: 115 }} />
+                        </td>
+                        <td style={cell}>
+                          <select value={editTxAccountId} onChange={e => setEditTxAccountId(e.target.value)}
+                            style={{ fontSize: '0.78rem', padding: '0.2rem 0.3rem' }}>
+                            {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                          </select>
+                        </td>
+                        <td style={cell}>
+                          <input value={editTxDescription} onChange={e => setEditTxDescription(e.target.value)}
+                            style={{ fontSize: '0.78rem', padding: '0.2rem 0.3rem', width: 130 }} />
+                        </td>
+                        <td style={cell}>
+                          <input value={editTxRecipient} onChange={e => setEditTxRecipient(e.target.value)}
+                            style={{ fontSize: '0.78rem', padding: '0.2rem 0.3rem', width: 100 }} />
+                        </td>
+                        <td style={cell}>
+                          <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
+                            <input type="number" value={editTxAmount} onChange={e => setEditTxAmount(e.target.value)}
+                              step="0.01" min="0" style={{ fontSize: '0.78rem', padding: '0.2rem 0.3rem', width: 80 }} />
+                            {editCatType && (
+                              <span style={{ fontSize: '0.68rem', color: editCatType === 'Ausgabe' ? '#dc2626' : '#16a34a', fontWeight: 600 }}>
+                                {editCatType === 'Ausgabe' ? '−' : '+'}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td style={cell}>
+                          <select value={editTxCategory} onChange={e => setEditTxCategory(e.target.value)}
+                            style={{ fontSize: '0.78rem', padding: '0.2rem 0.3rem' }}>
+                            <option value="">–</option>
+                            {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                          </select>
+                        </td>
+                        <td style={{ ...cell, whiteSpace: 'nowrap' }}>
+                          <button onClick={saveEditTx} style={{ ...btnSm, background: '#16a34a', color: '#fff', marginRight: 3 }}>Speichern</button>
+                          <button onClick={() => setEditTxId(null)} style={{ ...btnSm, background: '#e5e7eb', color: '#374151' }}>Abbrechen</button>
+                        </td>
+                      </tr>
+                    )
+                  }
+
+                  return (
+                    <tr key={t.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                      <td style={cell}>{t.date}</td>
+                      <td style={cell}>{accountName_(t.accountId)}</td>
+                      <td style={cell}>{t.description}</td>
+                      <td style={{ ...cell, color: 'var(--color-text-muted)' }}>{t.recipient || '–'}</td>
+                      <td style={{ ...cell, fontWeight: 600, color: t.amount >= 0 ? '#16a34a' : '#dc2626', whiteSpace: 'nowrap' }}>
+                        {fmt(t.amount)}
+                      </td>
+                      <td style={cell}>{t.category}</td>
+                      <td style={{ ...cell, whiteSpace: 'nowrap' }}>
+                        <button onClick={() => startEditTx(t)} style={{ ...btnSm, background: '#e5e7eb', color: '#374151', marginRight: 3 }}>✎</button>
+                        <button onClick={() => removeTransaction(t.id)} style={{ ...btnSm, background: '#fee2e2', color: '#dc2626' }}>✕</button>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </div>
   )
 }
