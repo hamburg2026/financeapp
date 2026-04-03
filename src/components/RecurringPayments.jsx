@@ -20,19 +20,15 @@ const FREQ_ORDER = ['monthly', 'quarterly', 'halfyearly', 'yearly']
 
 export default function RecurringPayments() {
   const [recurrings, setRecurrings] = useLocalStorage('recurringPayments', [])
-  const accounts   = JSON.parse(localStorage.getItem('bankAccounts')) || []
-  const categories = JSON.parse(localStorage.getItem('categories'))   || []
+  const categories = JSON.parse(localStorage.getItem('categories')) || []
 
   const [description, setDescription] = useState('')
   const [amount,      setAmount]       = useState('')
   const [frequency,   setFrequency]    = useState('monthly')
-  const [accountId,   setAccountId]    = useState('')
   const [categoryId,  setCategoryId]   = useState('')
   const [showForm,    setShowForm]     = useState(false)
   const [groupBy,     setGroupBy]      = useState('frequency') // 'frequency' | 'category' | 'none'
   const [expandedGroups, setExpandedGroups] = useState(new Set(FREQ_ORDER))
-
-  const expenseCategories = categories.filter(c => c.type === 'Ausgabe')
 
   function addRecurring(e) {
     e.preventDefault()
@@ -41,37 +37,17 @@ export default function RecurringPayments() {
       description,
       amount:     parseFloat(amount),
       frequency,
-      accountId:  parseInt(accountId || accounts[0]?.id),
       categoryId: categoryId ? parseInt(categoryId) : null,
     }])
     setDescription('')
     setAmount('')
     setFrequency('monthly')
-    setAccountId('')
     setCategoryId('')
     setShowForm(false)
   }
 
   function removeRecurring(id) {
     setRecurrings(recurrings.filter(r => r.id !== id))
-  }
-
-  function executeRecurrings() {
-    const transactions = JSON.parse(localStorage.getItem('transactions')) || []
-    const today = new Date().toISOString().split('T')[0]
-    recurrings.forEach(rec => {
-      const cat = categories.find(c => c.id === rec.categoryId)
-      transactions.push({
-        id:          Date.now() + Math.random(),
-        accountId:   rec.accountId,
-        date:        today,
-        description: rec.description,
-        amount:      -Math.abs(rec.amount),
-        category:    cat?.name || 'Dauerauftrag',
-      })
-    })
-    localStorage.setItem('transactions', JSON.stringify(transactions))
-    alert('Daueraufträge ausgeführt')
   }
 
   function getCategoryName(catId) {
@@ -154,15 +130,10 @@ export default function RecurringPayments() {
           </select>
           <select value={categoryId} onChange={e => setCategoryId(e.target.value)}>
             <option value="">– Kategorie wählen –</option>
-            {expenseCategories.map(c => (
+            {categories.map(c => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>
-          {accounts.length > 0 && (
-            <select value={accountId} onChange={e => setAccountId(e.target.value)}>
-              {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-            </select>
-          )}
           <button type="submit">Hinzufügen</button>
         </form>
       )}
@@ -264,14 +235,6 @@ export default function RecurringPayments() {
         </div>
       )}
 
-      {recurrings.length > 0 && (
-        <button
-          onClick={executeRecurrings}
-          style={{ marginTop: '1rem', background: '#6b7280', fontSize: '0.82rem', padding: '0.4rem 0.9rem' }}
-        >
-          Als Umsätze buchen
-        </button>
-      )}
     </div>
   )
 }
