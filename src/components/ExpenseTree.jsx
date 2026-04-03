@@ -100,31 +100,29 @@ export default function ExpenseTree() {
       .sort((a, b) => b.total - a.total)
 
     return nodes.map((c, ni) => {
-      const directItems = recurrings.filter(r => r.categoryId === c.id)
       const hasChildren = categories.some(ch => ch.parent == c.id && subtreeTotal(ch.id) > 0)
-      const hasContent  = directItems.length > 0 || hasChildren
-      // Only root level (level 0) can be toggled; sub-levels are always open
-      const isOpen      = level > 0 || expandedCats.has(c.id)
-      const isLast      = ni === nodes.length - 1 && level === 0
-      const income      = c.type === 'Einnahme'
-      const amtColor    = income ? '#16a34a' : 'inherit'
+      // Only root level can be toggled; sub-levels always open
+      const isOpen  = level > 0 || expandedCats.has(c.id)
+      const isLast  = ni === nodes.length - 1 && level === 0
+      const income  = c.type === 'Einnahme'
+      const amtColor = income ? '#16a34a' : 'inherit'
 
       return (
         <div key={c.id}>
           <div
-            onClick={() => level === 0 && hasContent && toggleCat(c.id)}
+            onClick={() => level === 0 && hasChildren && toggleCat(c.id)}
             style={{
               display: 'flex', alignItems: 'center', gap: '0.5rem',
               padding: '0.42rem 0.75rem',
               paddingLeft: `${0.75 + level * 1.2}rem`,
               borderBottom: (!isOpen && isLast) ? 'none' : '1px solid var(--color-border)',
               background: level === 0 ? 'var(--color-bg)' : 'var(--color-surface)',
-              cursor: level === 0 && hasContent ? 'pointer' : 'default',
+              cursor: level === 0 && hasChildren ? 'pointer' : 'default',
               userSelect: 'none',
             }}
           >
             <span style={{ width: '0.9rem', fontSize: '0.68rem', color: 'var(--color-text-muted)', flexShrink: 0 }}>
-              {level === 0 && hasContent ? (isOpen ? '▼' : '▶') : ''}
+              {level === 0 && hasChildren ? (isOpen ? '▼' : '▶') : ''}
             </span>
             <span style={{
               flex: 1,
@@ -138,19 +136,7 @@ export default function ExpenseTree() {
               {income ? '+' : ''}{fmt(c.total)}
             </span>
           </div>
-          {isOpen && (
-            <>
-              {directItems.map((r, ri) => (
-                <RecurringRow
-                  key={r.id} r={r} projected={proj(r)}
-                  indent={level + 1} showFreq catById={catById}
-                  isIncome={isIncome(r)}
-                  last={ri === directItems.length - 1 && !hasChildren}
-                />
-              ))}
-              {renderCategoryTree(c.id, level + 1)}
-            </>
-          )}
+          {isOpen && renderCategoryTree(c.id, level + 1)}
         </div>
       )
     })
