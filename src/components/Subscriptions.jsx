@@ -12,6 +12,27 @@ function useLocalStorage(key, initial) {
 
 const FREQ_LABELS = { monthly: 'Monatlich', quarterly: 'Vierteljährlich', yearly: 'Jährlich' }
 
+// Flat options with full path: "Nebenkosten → Strom"
+function CategorySelect({ value, onChange, categories }) {
+  function buildOptions(parentId = null, prefix = '') {
+    return categories
+      .filter(c => c.parent == parentId)
+      .flatMap(c => {
+        const label = prefix ? `${prefix} → ${c.name}` : c.name
+        return [
+          <option key={c.id} value={c.id}>{label}</option>,
+          ...buildOptions(c.id, label),
+        ]
+      })
+  }
+  return (
+    <select value={value} onChange={onChange}>
+      <option value="">– Kategorie wählen –</option>
+      {buildOptions()}
+    </select>
+  )
+}
+
 // Keep recurringPayments in sync for a subscription
 function syncRecurring(sub, isActive) {
   const recurrings = JSON.parse(localStorage.getItem('recurringPayments')) || []
@@ -27,34 +48,44 @@ function syncRecurring(sub, isActive) {
   if (existing) {
     localStorage.setItem('recurringPayments', JSON.stringify(
       recurrings.map(r => r.subscriptionId === sub.id
-        ? { ...r, description: sub.name, amount: sub.cost, frequency: sub.frequency }
+        ? { ...r, description: sub.name, amount: sub.cost, frequency: sub.frequency, categoryId: sub.categoryId ?? null }
         : r
       )
     ))
   } else {
     localStorage.setItem('recurringPayments', JSON.stringify([
       ...recurrings,
-      { id: Date.now(), description: sub.name, amount: sub.cost, frequency: sub.frequency, categoryId: null, subscriptionId: sub.id },
+      { id: Date.now(), description: sub.name, amount: sub.cost, frequency: sub.frequency, categoryId: sub.categoryId ?? null, subscriptionId: sub.id },
     ]))
   }
 }
 
 export default function Subscriptions() {
   const [subscriptions, setSubscriptions] = useLocalStorage('subscriptions', [])
+  const categories = JSON.parse(localStorage.getItem('categories')) || []
 
-  const [name,      setName]      = useState('')
-  const [cost,      setCost]      = useState('')
-  const [frequency, setFrequency] = useState('monthly')
-  const [cancel,    setCancel]    = useState('')
-  const [next,      setNext]      = useState('')
-  const [aktiv,     setAktiv]     = useState(true)
+  const [name,       setName]       = useState('')
+  const [cost,       setCost]       = useState('')
+  const [frequency,  setFrequency]  = useState('monthly')
+  const [cancel,     setCancel]     = useState('')
+  const [next,       setNext]       = useState('')
+  const [aktiv,      setAktiv]      = useState(true)
+  const [categoryId, setCategoryId] = useState('')
+
+  function getCategoryLabel(catId) {
+    if (!catId) return null
+    const cat = categories.find(c => c.id === catId)
+    if (!cat) return null
+    const parent = cat.parent ? categories.find(c => c.id === cat.parent) : null
+    return parent ? `${parent.name} → ${cat.name}` : cat.name
+  }
 
   function addSubscription(e) {
     e.preventDefault()
-    const sub = { id: Date.now(), name, cost: parseFloat(cost), frequency, cancel, next, aktiv }
+    const sub = { id: Date.now(), name, cost: parseFloat(cost), frequency, cancel, next, aktiv, categoryId: categoryId ? parseInt(categoryId) : null }
     setSubscriptions([...subscriptions, sub])
     syncRecurring(sub, aktiv)
-    setName(''); setCost(''); setFrequency('monthly'); setCancel(''); setNext(''); setAktiv(true)
+    setName(''); setCost(''); setFrequency('monthly'); setCancel(''); setNext(''); setAktiv(true); setCategoryId('')
   }
 
   function toggleAktiv(sub) {
@@ -82,6 +113,7 @@ export default function Subscriptions() {
         </select>
         <input value={cancel} onChange={e => setCancel(e.target.value)} placeholder="Kündigungsfrist" required />
         <input type="date" value={next} onChange={e => setNext(e.target.value)} />
+        <CategorySelect value={categoryId} onChange={e => setCategoryId(e.target.value)} categories={categories} />
         <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem' }}>
           <input type="checkbox" checked={aktiv} onChange={e => setAktiv(e.target.checked)} />
           Aktiv (als Dauerauftrag übernehmen)
@@ -108,6 +140,7 @@ export default function Subscriptions() {
               </div>
               <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
                 {FREQ_LABELS[s.frequency] || s.frequency}
+                {getCategoryLabel(s.categoryId) && <span style={{ marginLeft: '0.5rem' }}>· {getCategoryLabel(s.categoryId)}</span>}
                 {s.cancel && <span style={{ marginLeft: '0.5rem' }}>· Kündigung: {s.cancel}</span>}
                 {s.next   && <span style={{ marginLeft: '0.5rem' }}>· Nächste: {s.next}</span>}
               </div>

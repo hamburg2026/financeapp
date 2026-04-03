@@ -18,16 +18,47 @@ const FREQ_LABELS = {
 }
 const FREQ_ORDER = ['monthly', 'quarterly', 'halfyearly', 'yearly']
 
+// Flat options with full path label: "Nebenkosten → Strom"
+function CategorySelect({ value, onChange, categories, style }) {
+  function buildOptions(parentId = null, prefix = '') {
+    return categories
+      .filter(c => c.parent == parentId)
+      .flatMap(c => {
+        const label = prefix ? `${prefix} → ${c.name}` : c.name
+        return [
+          <option key={c.id} value={c.id}>{label}</option>,
+          ...buildOptions(c.id, label),
+        ]
+      })
+  }
+  return (
+    <select value={value} onChange={onChange} style={style}>
+      <option value="">– Kategorie wählen –</option>
+      {buildOptions()}
+    </select>
+  )
+}
+
 export default function RecurringPayments() {
   const [recurrings, setRecurrings] = useLocalStorage('recurringPayments', [])
   const categories = JSON.parse(localStorage.getItem('categories')) || []
 
+  // Add form state
+  const [showForm,   setShowForm]   = useState(false)
   const [description, setDescription] = useState('')
   const [amount,      setAmount]       = useState('')
   const [frequency,   setFrequency]    = useState('monthly')
   const [categoryId,  setCategoryId]   = useState('')
-  const [showForm,    setShowForm]     = useState(false)
-  const [groupBy,     setGroupBy]      = useState('frequency') // 'frequency' | 'category' | 'none'
+
+  // Edit state
+  const [editId,          setEditId]          = useState(null)
+  const [editDescription, setEditDescription] = useState('')
+  const [editAmount,      setEditAmount]      = useState('')
+  const [editFrequency,   setEditFrequency]   = useState('monthly')
+  const [editCategoryId,  setEditCategoryId]  = useState('')
+
+  // Grouping
+  const [groupBy,        setGroupBy]        = useState('frequency')
   const [expandedGroups, setExpandedGroups] = useState(new Set(FREQ_ORDER))
 
   function addRecurring(e) {
@@ -39,20 +70,39 @@ export default function RecurringPayments() {
       frequency,
       categoryId: categoryId ? parseInt(categoryId) : null,
     }])
-    setDescription('')
-    setAmount('')
-    setFrequency('monthly')
-    setCategoryId('')
+    setDescription(''); setAmount(''); setFrequency('monthly'); setCategoryId('')
     setShowForm(false)
+  }
+
+  function startEdit(r) {
+    setEditId(r.id)
+    setEditDescription(r.description)
+    setEditAmount(String(r.amount))
+    setEditFrequency(r.frequency)
+    setEditCategoryId(r.categoryId ? String(r.categoryId) : '')
+  }
+
+  function saveEdit() {
+    setRecurrings(recurrings.map(r => r.id === editId ? {
+      ...r,
+      description: editDescription,
+      amount:      parseFloat(editAmount),
+      frequency:   editFrequency,
+      categoryId:  editCategoryId ? parseInt(editCategoryId) : null,
+    } : r))
+    setEditId(null)
   }
 
   function removeRecurring(id) {
     setRecurrings(recurrings.filter(r => r.id !== id))
   }
 
-  function getCategoryName(catId) {
+  function getCategoryLabel(catId) {
     if (!catId) return '–'
-    return categories.find(c => c.id === catId)?.name || '–'
+    const cat = categories.find(c => c.id === catId)
+    if (!cat) return '–'
+    const parent = cat.parent ? categories.find(c => c.id === cat.parent) : null
+    return parent ? `${parent.name} → ${cat.name}` : cat.name
   }
 
   function toggleGroup(key) {
@@ -84,7 +134,7 @@ export default function RecurringPayments() {
       })
       return Object.entries(map).map(([key, items]) => ({
         key,
-        label: key === '__none__' ? 'Ohne Kategorie' : getCategoryName(parseInt(key)),
+        label: key === '__none__' ? 'Ohne Kategorie' : getCategoryLabel(parseInt(key)),
         items,
       }))
     }
@@ -92,48 +142,28 @@ export default function RecurringPayments() {
   }
 
   const groups = getGroups()
+  const btnSmall = { border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: '0.75rem', padding: '0.2rem 0.45rem' }
 
   return (
     <div className="module">
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
         <h2 style={{ margin: 0 }}>Daueraufträge</h2>
-        <button
-          onClick={() => setShowForm(v => !v)}
-          style={{ padding: '0.4rem 0.9rem', fontSize: '0.85rem' }}
-        >
+        <button onClick={() => { setShowForm(v => !v); setEditId(null) }} style={{ padding: '0.4rem 0.9rem', fontSize: '0.85rem' }}>
           {showForm ? 'Abbrechen' : '+ Neu'}
         </button>
       </div>
 
       {showForm && (
         <form onSubmit={addRecurring} style={{ marginBottom: '1.5rem', background: 'var(--color-bg)', padding: '1rem', borderRadius: 8, gap: '0.6rem' }}>
-          <input
-            value={description}
-            onChange={e => setDescription(e.target.value)}
-            placeholder="Beschreibung"
-            required
-          />
-          <input
-            type="number"
-            value={amount}
-            onChange={e => setAmount(e.target.value)}
-            placeholder="Betrag (€)"
-            step="0.01"
-            min="0.01"
-            required
-          />
+          <input value={description} onChange={e => setDescription(e.target.value)} placeholder="Beschreibung" required />
+          <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="Betrag (€)" step="0.01" min="0.01" required />
           <select value={frequency} onChange={e => setFrequency(e.target.value)}>
             <option value="monthly">Monatlich</option>
             <option value="quarterly">Vierteljährlich</option>
             <option value="halfyearly">Halbjährlich</option>
             <option value="yearly">Jährlich</option>
           </select>
-          <select value={categoryId} onChange={e => setCategoryId(e.target.value)}>
-            <option value="">– Kategorie wählen –</option>
-            {categories.map(c => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
+          <CategorySelect value={categoryId} onChange={e => setCategoryId(e.target.value)} categories={categories} />
           <button type="submit">Hinzufügen</button>
         </form>
       )}
@@ -142,20 +172,12 @@ export default function RecurringPayments() {
       <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '0.9rem', alignItems: 'center' }}>
         <span style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>Gruppieren:</span>
         {[['frequency', 'Frequenz'], ['category', 'Kategorie'], ['none', 'Keine']].map(([v, l]) => (
-          <button
-            key={v}
-            onClick={() => setGroupBy(v)}
-            style={{
-              background: groupBy === v ? 'var(--color-primary)' : 'transparent',
-              border: '1px solid var(--color-primary)',
-              color: groupBy === v ? '#fff' : 'var(--color-primary)',
-              borderRadius: 6,
-              padding: '0.22rem 0.6rem',
-              fontSize: '0.78rem',
-            }}
-          >
-            {l}
-          </button>
+          <button key={v} onClick={() => setGroupBy(v)} style={{
+            background: groupBy === v ? 'var(--color-primary)' : 'transparent',
+            border: '1px solid var(--color-primary)',
+            color: groupBy === v ? '#fff' : 'var(--color-primary)',
+            borderRadius: 6, padding: '0.22rem 0.6rem', fontSize: '0.78rem',
+          }}>{l}</button>
         ))}
       </div>
 
@@ -172,17 +194,11 @@ export default function RecurringPayments() {
             return (
               <div key={group.key}>
                 {group.label && (
-                  <div
-                    onClick={() => toggleGroup(group.key)}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: '0.5rem',
-                      padding: '0.38rem 0.75rem',
-                      background: 'var(--color-bg)',
-                      borderBottom: '1px solid var(--color-border)',
-                      cursor: 'pointer',
-                      userSelect: 'none',
-                    }}
-                  >
+                  <div onClick={() => toggleGroup(group.key)} style={{
+                    display: 'flex', alignItems: 'center', gap: '0.5rem',
+                    padding: '0.38rem 0.75rem', background: 'var(--color-bg)',
+                    borderBottom: '1px solid var(--color-border)', cursor: 'pointer', userSelect: 'none',
+                  }}>
                     <span style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)', width: '0.9rem' }}>
                       {isOpen ? '▼' : '▶'}
                     </span>
@@ -192,49 +208,65 @@ export default function RecurringPayments() {
                     <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>{fmt(groupTotal)}</span>
                   </div>
                 )}
-                {isOpen && group.items.map((r, ri) => (
-                  <div
-                    key={r.id}
-                    style={{
+                {isOpen && group.items.map((r, ri) => {
+                  const isEditing = editId === r.id
+                  const isLast = ri === group.items.length - 1 && gi === groups.length - 1
+                  return isEditing ? (
+                    <div key={r.id} style={{
+                      display: 'flex', flexWrap: 'wrap', gap: '0.4rem', alignItems: 'center',
+                      padding: '0.45rem 0.75rem', paddingLeft: group.label ? '1.75rem' : '0.75rem',
+                      borderBottom: isLast ? 'none' : '1px solid var(--color-border)',
+                      background: '#fefce8',
+                    }}>
+                      <input value={editDescription} onChange={e => setEditDescription(e.target.value)}
+                        style={{ flex: 2, minWidth: 120, fontSize: '0.82rem', padding: '0.25rem 0.4rem' }} />
+                      <input type="number" value={editAmount} onChange={e => setEditAmount(e.target.value)}
+                        style={{ width: 90, fontSize: '0.82rem', padding: '0.25rem 0.4rem' }} step="0.01" min="0.01" />
+                      <select value={editFrequency} onChange={e => setEditFrequency(e.target.value)}
+                        style={{ fontSize: '0.82rem', padding: '0.25rem 0.4rem' }}>
+                        <option value="monthly">Monatlich</option>
+                        <option value="quarterly">Vierteljährlich</option>
+                        <option value="halfyearly">Halbjährlich</option>
+                        <option value="yearly">Jährlich</option>
+                      </select>
+                      <CategorySelect value={editCategoryId} onChange={e => setEditCategoryId(e.target.value)}
+                        categories={categories} style={{ fontSize: '0.82rem', padding: '0.25rem 0.4rem' }} />
+                      <button onClick={saveEdit} style={{ ...btnSmall, background: '#16a34a', color: '#fff' }}>Speichern</button>
+                      <button onClick={() => setEditId(null)} style={{ ...btnSmall, background: '#e5e7eb', color: '#374151' }}>Abbrechen</button>
+                    </div>
+                  ) : (
+                    <div key={r.id} style={{
                       display: 'flex', alignItems: 'center', gap: '0.5rem',
                       padding: '0.32rem 0.75rem',
                       paddingLeft: group.label ? '1.75rem' : '0.75rem',
-                      borderBottom: ri < group.items.length - 1 || gi < groups.length - 1
-                        ? '1px solid var(--color-border)' : 'none',
+                      borderBottom: isLast ? 'none' : '1px solid var(--color-border)',
                       fontSize: '0.85rem',
-                    }}
-                  >
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {r.description}
+                    }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {r.description}
+                        </div>
+                        <div style={{ fontSize: '0.73rem', color: 'var(--color-text-muted)', marginTop: '0.1rem' }}>
+                          {getCategoryLabel(r.categoryId)}
+                          {groupBy !== 'frequency' && (
+                            <span style={{ marginLeft: '0.5rem', opacity: 0.7 }}>{FREQ_LABELS[r.frequency]}</span>
+                          )}
+                        </div>
                       </div>
-                      <div style={{ fontSize: '0.73rem', color: 'var(--color-text-muted)', marginTop: '0.1rem' }}>
-                        {getCategoryName(r.categoryId)}
-                        {groupBy !== 'frequency' && (
-                          <span style={{ marginLeft: '0.5rem', opacity: 0.7 }}>{FREQ_LABELS[r.frequency]}</span>
-                        )}
-                      </div>
+                      <span style={{ fontWeight: 600, flexShrink: 0 }}>{fmt(r.amount)}</span>
+                      <button onClick={() => startEdit(r)}
+                        style={{ ...btnSmall, background: '#e5e7eb', color: '#374151' }} title="Bearbeiten">✎</button>
+                      <button onClick={() => removeRecurring(r.id)}
+                        style={{ background: 'none', border: 'none', color: '#dc2626', padding: '0.15rem 0.3rem', fontSize: '0.8rem', cursor: 'pointer', flexShrink: 0 }}
+                        title="Löschen">✕</button>
                     </div>
-                    <span style={{ fontWeight: 600, flexShrink: 0 }}>{fmt(r.amount)}</span>
-                    <button
-                      onClick={() => removeRecurring(r.id)}
-                      style={{
-                        background: 'none', border: 'none', color: '#dc2626',
-                        padding: '0.15rem 0.3rem', fontSize: '0.8rem',
-                        cursor: 'pointer', flexShrink: 0, lineHeight: 1,
-                      }}
-                      title="Löschen"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )
           })}
         </div>
       )}
-
     </div>
   )
 }
