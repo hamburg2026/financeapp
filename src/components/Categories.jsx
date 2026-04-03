@@ -88,16 +88,13 @@ export default function Categories() {
               onChange={e => setEditName(e.target.value)}
               style={{ flex: 1, minWidth: 100, fontSize: '0.82rem', padding: '0.25rem 0.4rem' }}
             />
-            <select
-              value={editParent}
-              onChange={e => setEditParent(e.target.value)}
-              style={{ fontSize: '0.82rem', padding: '0.25rem 0.4rem' }}
-            >
-              <option value="">Hauptkategorie</option>
-              {categories.filter(x => x.id !== c.id).map(x => (
-                <option key={x.id} value={x.id}>{x.name}</option>
-              ))}
-            </select>
+            <div style={{ fontSize: '0.82rem' }}>
+              <ParentSelect
+                value={editParent}
+                onChange={e => setEditParent(e.target.value)}
+                excludeId={c.id}
+              />
+            </div>
             <select
               value={editType}
               onChange={e => setEditType(e.target.value)}
@@ -183,15 +180,38 @@ export default function Categories() {
     })
   }
 
+  // Build grouped options for parent selects
+  function ParentSelect({ value, onChange, excludeId }) {
+    const roots = categories.filter(c => c.parent == null && c.id !== excludeId)
+    const subs  = categories.filter(c => c.parent != null && c.id !== excludeId)
+    return (
+      <select value={value} onChange={onChange}>
+        <option value="">– Hauptkategorie (keine Oberkategorie) –</option>
+        {roots.length > 0 && (
+          <optgroup label="Hauptkategorien">
+            {roots.map(c => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </optgroup>
+        )}
+        {subs.length > 0 && (
+          <optgroup label="Unterkategorien">
+            {subs.map(c => {
+              const p = categories.find(x => x.id === c.parent)
+              return <option key={c.id} value={c.id}>{p ? `${p.name} › ` : ''}{c.name}</option>
+            })}
+          </optgroup>
+        )}
+      </select>
+    )
+  }
+
   return (
     <div className="module">
       <h2>Kategorien</h2>
       <form onSubmit={addCategory}>
         <input value={name} onChange={e => setName(e.target.value)} placeholder="Kategoriename" required />
-        <select value={parent} onChange={e => setParent(e.target.value)}>
-          <option value="">Hauptkategorie</option>
-          {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
+        <ParentSelect value={parent} onChange={e => setParent(e.target.value)} />
         <select value={type} onChange={e => setType(e.target.value)}>
           <option value="Ausgabe">Ausgabe</option>
           <option value="Einnahme">Einnahme</option>

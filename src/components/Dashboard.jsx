@@ -1,9 +1,57 @@
+import { useRef } from 'react'
+
 const fmt = (n) =>
   new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(n)
 
 const fmtPnl = (n) => (n >= 0 ? '+\u202f' : '\u2212\u202f') + fmt(Math.abs(n))
 
 const pnlStyle = (n) => ({ color: n >= 0 ? '#16a34a' : '#dc2626', fontWeight: 600 })
+
+// All localStorage keys that belong to the app
+const BACKUP_KEYS = [
+  'bankAccounts', 'transactions', 'categories', 'recurringPayments',
+  'depots', 'depotTransactions', 'securityPrices', 'securities',
+  'insuranceContracts', 'realEstate', 'companyShares', 'subscriptions',
+]
+
+function exportBackup() {
+  const data = {}
+  BACKUP_KEYS.forEach(key => {
+    const raw = localStorage.getItem(key)
+    if (raw) data[key] = JSON.parse(raw)
+  })
+  const payload = { version: 1, exportedAt: new Date().toISOString(), data }
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `financeapp-sicherung-${new Date().toISOString().slice(0, 10)}.json`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+function importBackup(file) {
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    try {
+      const parsed = JSON.parse(e.target.result)
+      // Accept both { version, data: {...} } and a plain object of keys
+      const data = parsed.data && typeof parsed.data === 'object' ? parsed.data : parsed
+      let count = 0
+      Object.entries(data).forEach(([key, val]) => {
+        if (BACKUP_KEYS.includes(key)) {
+          localStorage.setItem(key, JSON.stringify(val))
+          count++
+        }
+      })
+      if (count === 0) { alert('Keine bekannten Daten in der Sicherungsdatei gefunden.'); return }
+      window.location.reload()
+    } catch {
+      alert('Sicherungsdatei konnte nicht gelesen werden.')
+    }
+  }
+  reader.readAsText(file)
+}
 
 function Section({ title, children }) {
   return (
@@ -14,12 +62,17 @@ function Section({ title, children }) {
   )
 }
 
-function StatRow({ label, value, sub }) {
+function MiniRow({ label, value, sub, muted }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '0.35rem 0', borderBottom: '1px solid var(--color-border)' }}>
-      <span style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem' }}>{label}</span>
-      <span style={{ display: 'flex', gap: '0.75rem', alignItems: 'baseline' }}>
-        <strong>{value}</strong>
+    <div style={{
+      display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+      padding: '0.28rem 0',
+      borderBottom: '1px solid var(--color-border)',
+      fontSize: '0.82rem',
+    }}>
+      <span style={{ color: muted ? 'var(--color-text-muted)' : 'var(--color-text)' }}>{label}</span>
+      <span style={{ display: 'flex', gap: '0.6rem', alignItems: 'baseline' }}>
+        <span style={{ fontWeight: 500 }}>{value}</span>
         {sub != null && <span style={pnlStyle(sub)}>{fmtPnl(sub)}</span>}
       </span>
     </div>
@@ -27,20 +80,22 @@ function StatRow({ label, value, sub }) {
 }
 
 export default function Dashboard() {
-  const accounts    = JSON.parse(localStorage.getItem('bankAccounts'))       || []
-  const depots      = JSON.parse(localStorage.getItem('depots'))             || []
-  const depotTrans  = JSON.parse(localStorage.getItem('depotTransactions'))  || []
-  const prices      = JSON.parse(localStorage.getItem('securityPrices'))     || {}
-  const securities  = JSON.parse(localStorage.getItem('securities'))         || []
-  const insurance   = JSON.parse(localStorage.getItem('insuranceContracts')) || []
-  const realEstate  = JSON.parse(localStorage.getItem('realEstate'))         || []
-  const shares      = JSON.parse(localStorage.getItem('companyShares'))      || []
-  const subscriptions = JSON.parse(localStorage.getItem('subscriptions'))    || []
+  const fileInputRef = useRef(null)
 
-  // ── Bankkonten ──────────────────────────────────
+  const accounts     = JSON.parse(localStorage.getItem('bankAccounts'))       || []
+  const depots       = JSON.parse(localStorage.getItem('depots'))             || []
+  const depotTrans   = JSON.parse(localStorage.getItem('depotTransactions'))  || []
+  const prices       = JSON.parse(localStorage.getItem('securityPrices'))     || {}
+  const securities   = JSON.parse(localStorage.getItem('securities'))         || []
+  const insurance    = JSON.parse(localStorage.getItem('insuranceContracts')) || []
+  const realEstate   = JSON.parse(localStorage.getItem('realEstate'))         || []
+  const shares       = JSON.parse(localStorage.getItem('companyShares'))      || []
+  const subscriptions = JSON.parse(localStorage.getItem('subscriptions'))     || []
+
+  // ── Bankkonten ──
   const totalBank = accounts.reduce((s, a) => s + a.balance, 0)
 
-  // ── Depots ──────────────────────────────────────
+  // ── Depots ──
   function getCurrentPrice(secId) {
     const list = prices[secId]
     if (!list || list.length === 0) return 0
@@ -70,38 +125,37 @@ export default function Dashboard() {
         return { secId, name: sec?.name || secId, qty: p.qty, curValue, pnl }
       })
     const totalValue = positions.reduce((s, p) => s + p.curValue, 0)
-    const totalPnl   = positions.reduce((s, p) => s + p.pnl, 0)
+    const totalPnl   = positions.reduce((s, p) => s + p.pnl,      0)
     return { depot, positions, totalValue, totalPnl }
   })
   const totalSecurities = depotData.reduce((s, d) => s + d.totalValue, 0)
 
-  // ── Immobilien ──────────────────────────────────
+  // ── Immobilien ──
   const totalRealEstate = realEstate.reduce((s, p) => s + p.current, 0)
 
-  // ── Firmenbeteiligungen ─────────────────────────
+  // ── Firmenbeteiligungen ──
   const totalShares = shares.reduce((s, sh) => s + sh.value, 0)
 
-  // ── Versicherungen ──────────────────────────────
+  // ── Versicherungen ──
   const totalInsurance = insurance.reduce((s, c) => s + c.value, 0)
 
-  // ── Gesamtvermögen ──────────────────────────────
+  // ── Gesamtvermögen ──
   const totalAssets = totalBank + totalSecurities + totalInsurance + totalRealEstate + totalShares
 
-  // ── Abonnements monatlich ───────────────────────
-  const freqLabel = { monthly: 'mtl.', quarterly: 'vrtlj.', yearly: 'jährl.' }
+  const freqLabel = { monthly: 'mtl.', quarterly: 'quartl.', yearly: 'jährl.' }
 
   return (
     <div>
-      {/* Gesamtvermögen */}
+      {/* ── Gesamtvermögen ── */}
       <div className="module" style={{ marginBottom: '1.25rem', background: 'var(--color-primary)', color: '#fff' }}>
         <div style={{ fontSize: '0.8rem', opacity: 0.75, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Gesamtvermögen</div>
         <div style={{ fontSize: '2.25rem', fontWeight: 700, margin: '0.25rem 0 0.75rem' }}>{fmt(totalAssets)}</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '0.5rem' }}>
           {[
-            ['Bankkonten', totalBank],
-            ['Wertpapiere', totalSecurities],
+            ['Bankkonten',    totalBank],
+            ['Wertpapiere',   totalSecurities],
             ['Versicherungen', totalInsurance],
-            ['Immobilien', totalRealEstate],
+            ['Immobilien',    totalRealEstate],
             ['Beteiligungen', totalShares],
           ].map(([label, val]) => (
             <div key={label} style={{ background: 'rgba(255,255,255,0.15)', borderRadius: 8, padding: '0.5rem 0.75rem' }}>
@@ -112,96 +166,133 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Depots */}
+      {/* ── Sicherung ── */}
+      <div className="module" style={{ marginBottom: '1.25rem' }}>
+        <h2 style={{ marginBottom: '0.75rem' }}>Datensicherung</h2>
+        <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <button
+            onClick={exportBackup}
+            style={{ fontSize: '0.85rem', padding: '0.45rem 1rem' }}
+          >
+            Sicherung herunterladen
+          </button>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            style={{ fontSize: '0.85rem', padding: '0.45rem 1rem', background: '#6b7280' }}
+          >
+            Sicherung wiederherstellen
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json,application/json"
+            style={{ display: 'none' }}
+            onChange={e => { if (e.target.files[0]) importBackup(e.target.files[0]) }}
+          />
+        </div>
+        <p style={{ margin: '0.6rem 0 0', fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
+          Die Sicherungsdatei enthält alle lokalen Daten und kann jederzeit wieder eingespielt werden.
+        </p>
+      </div>
+
+      {/* ── Bankkonten ── */}
+      {accounts.length > 0 && (
+        <Section title="Bankkonten">
+          {accounts.map(a => (
+            <MiniRow key={a.id} label={a.name} value={fmt(a.balance)} />
+          ))}
+          {accounts.length > 1 && (
+            <MiniRow label="Gesamt" value={fmt(totalBank)} muted />
+          )}
+        </Section>
+      )}
+
+      {/* ── Versicherungen ── */}
+      {insurance.length > 0 && (
+        <Section title="Versicherungen">
+          {insurance.map(c => (
+            <MiniRow
+              key={c.id}
+              label={c.name || c.company || '–'}
+              value={fmt(c.value || 0)}
+            />
+          ))}
+          {insurance.length > 1 && (
+            <MiniRow label="Gesamt" value={fmt(totalInsurance)} muted />
+          )}
+        </Section>
+      )}
+
+      {/* ── Depots ── */}
       {depotData.length > 0 && (
         <Section title="Depots">
           {depotData.map(({ depot, positions, totalValue, totalPnl }) => (
-            <div key={depot.id} style={{ marginBottom: '1rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
-                <strong>{depot.name}</strong>
+            <div key={depot.id} style={{ marginBottom: '0.75rem' }}>
+              <div style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+                padding: '0.3rem 0', borderBottom: '2px solid var(--color-border)',
+                fontWeight: 600, fontSize: '0.88rem',
+              }}>
+                <span>{depot.name}</span>
                 <span>
                   {fmt(totalValue)}{' '}
                   <span style={pnlStyle(totalPnl)}>{fmtPnl(totalPnl)}</span>
                 </span>
               </div>
-              {positions.length > 0 ? (
-                <div className="table-wrapper">
-                  <table>
-                    <thead>
-                      <tr><th>Wertpapier</th><th style={{textAlign:'right'}}>Anzahl</th><th style={{textAlign:'right'}}>Wert</th><th style={{textAlign:'right'}}>G/V</th></tr>
-                    </thead>
-                    <tbody>
-                      {positions.map(p => (
-                        <tr key={p.secId}>
-                          <td>{p.name}</td>
-                          <td style={{textAlign:'right'}}>{p.qty.toLocaleString('de-DE')}</td>
-                          <td style={{textAlign:'right'}}>{fmt(p.curValue)}</td>
-                          <td style={{textAlign:'right', ...pnlStyle(p.pnl)}}>{fmtPnl(p.pnl)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <p style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem' }}>Keine Positionen</p>
+              {positions.map(p => (
+                <MiniRow
+                  key={p.secId}
+                  label={`${p.name} (${p.qty.toLocaleString('de-DE')} Stk.)`}
+                  value={fmt(p.curValue)}
+                  sub={p.pnl}
+                />
+              ))}
+              {positions.length === 0 && (
+                <p style={{ color: 'var(--color-text-muted)', fontSize: '0.8rem', margin: '0.3rem 0' }}>Keine Positionen</p>
               )}
             </div>
           ))}
         </Section>
       )}
 
-      {/* Immobilien */}
+      {/* ── Immobilien ── */}
       {realEstate.length > 0 && (
         <Section title="Immobilien">
-          <div className="table-wrapper">
-            <table>
-              <thead>
-                <tr><th>Objekt</th><th style={{textAlign:'right'}}>Zeitwert</th><th style={{textAlign:'right'}}>G/V</th></tr>
-              </thead>
-              <tbody>
-                {realEstate.map(p => {
-                  const pnl = p.current - p.purchase
-                  return (
-                    <tr key={p.id}>
-                      <td>{p.name}</td>
-                      <td style={{textAlign:'right'}}>{fmt(p.current)}</td>
-                      <td style={{textAlign:'right', ...pnlStyle(pnl)}}>{fmtPnl(pnl)}</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+          {realEstate.map(p => (
+            <MiniRow
+              key={p.id}
+              label={p.name}
+              value={fmt(p.current)}
+              sub={p.current - p.purchase}
+            />
+          ))}
+          {realEstate.length > 1 && (
+            <MiniRow label="Gesamt" value={fmt(totalRealEstate)} muted />
+          )}
         </Section>
       )}
 
-      {/* Firmenbeteiligungen */}
+      {/* ── Firmenbeteiligungen ── */}
       {shares.length > 0 && (
         <Section title="Firmenbeteiligungen">
-          <div className="table-wrapper">
-            <table>
-              <thead>
-                <tr><th>Firma</th><th style={{textAlign:'right'}}>Anteil</th><th style={{textAlign:'right'}}>Wert</th></tr>
-              </thead>
-              <tbody>
-                {shares.map(s => (
-                  <tr key={s.id}>
-                    <td>{s.company}</td>
-                    <td style={{textAlign:'right'}}>{s.percentage.toLocaleString('de-DE', {minimumFractionDigits:2, maximumFractionDigits:2})} %</td>
-                    <td style={{textAlign:'right'}}>{fmt(s.value)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          {shares.map(s => (
+            <MiniRow
+              key={s.id}
+              label={`${s.company} (${s.percentage.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} %)`}
+              value={fmt(s.value)}
+            />
+          ))}
+          {shares.length > 1 && (
+            <MiniRow label="Gesamt" value={fmt(totalShares)} muted />
+          )}
         </Section>
       )}
 
-      {/* Abonnements */}
+      {/* ── Abonnements ── */}
       {subscriptions.length > 0 && (
         <Section title="Abonnements">
           {subscriptions.map(s => (
-            <StatRow
+            <MiniRow
               key={s.id}
               label={`${s.name} (${freqLabel[s.frequency] || s.frequency})`}
               value={fmt(s.cost)}
