@@ -24,7 +24,8 @@ const FREQ_FULL = {
 
 const FREQ_ORDER = ['monthly', 'quarterly', 'halfyearly', 'yearly']
 
-function RecurringRow({ r, projected, indent, showFreq, showCat, catById, last }) {
+function RecurringRow({ r, projected, indent, showFreq, showCat, catById, last, isIncome }) {
+  const color = isIncome ? '#16a34a' : 'var(--color-text)'
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: '0.5rem',
@@ -34,7 +35,7 @@ function RecurringRow({ r, projected, indent, showFreq, showCat, catById, last }
       background: 'var(--color-surface)',
       fontSize: '0.8rem',
     }}>
-      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color }}>
         {r.description}
       </span>
       {showCat && r.categoryId && (
@@ -47,7 +48,7 @@ function RecurringRow({ r, projected, indent, showFreq, showCat, catById, last }
           {FREQ_SHORT[r.frequency]}
         </span>
       )}
-      <span style={{ fontWeight: 500, flexShrink: 0 }}>{fmt(projected)}</span>
+      <span style={{ fontWeight: 500, flexShrink: 0, color }}>{isIncome ? '+' : ''}{fmt(projected)}</span>
     </div>
   )
 }
@@ -68,7 +69,13 @@ export default function ExpenseTree() {
     return rec.amount * (factors[rec.frequency] ?? 1)
   }
 
-  const totalProjected = recurrings.reduce((s, r) => s + proj(r), 0)
+  function isIncome(rec) {
+    return catById[rec.categoryId]?.type === 'Einnahme'
+  }
+
+  const totalExpense = recurrings.filter(r => !isIncome(r)).reduce((s, r) => s + proj(r), 0)
+  const totalIncome  = recurrings.filter(r =>  isIncome(r)).reduce((s, r) => s + proj(r), 0)
+  const totalBalance = totalIncome - totalExpense
 
   /* ── category tree ── */
   function subtreeTotal(catId) {
@@ -96,35 +103,39 @@ export default function ExpenseTree() {
       const directItems = recurrings.filter(r => r.categoryId === c.id)
       const hasChildren = categories.some(ch => ch.parent == c.id && subtreeTotal(ch.id) > 0)
       const hasContent  = directItems.length > 0 || hasChildren
-      const isOpen      = expandedCats.has(c.id)
+      // Only root level (level 0) can be toggled; sub-levels are always open
+      const isOpen      = level > 0 || expandedCats.has(c.id)
       const isLast      = ni === nodes.length - 1 && level === 0
+      const income      = c.type === 'Einnahme'
+      const amtColor    = income ? '#16a34a' : 'inherit'
 
       return (
         <div key={c.id}>
           <div
-            onClick={() => hasContent && toggleCat(c.id)}
+            onClick={() => level === 0 && hasContent && toggleCat(c.id)}
             style={{
               display: 'flex', alignItems: 'center', gap: '0.5rem',
               padding: '0.42rem 0.75rem',
               paddingLeft: `${0.75 + level * 1.2}rem`,
               borderBottom: (!isOpen && isLast) ? 'none' : '1px solid var(--color-border)',
               background: level === 0 ? 'var(--color-bg)' : 'var(--color-surface)',
-              cursor: hasContent ? 'pointer' : 'default',
+              cursor: level === 0 && hasContent ? 'pointer' : 'default',
               userSelect: 'none',
             }}
           >
             <span style={{ width: '0.9rem', fontSize: '0.68rem', color: 'var(--color-text-muted)', flexShrink: 0 }}>
-              {hasContent ? (isOpen ? '▼' : '▶') : ''}
+              {level === 0 && hasContent ? (isOpen ? '▼' : '▶') : ''}
             </span>
             <span style={{
               flex: 1,
               fontSize: level === 0 ? '0.9rem' : '0.83rem',
               fontWeight: level === 0 ? 600 : 400,
+              color: income ? '#16a34a' : 'inherit',
             }}>
               {c.name}
             </span>
-            <span style={{ fontWeight: level === 0 ? 700 : 400, fontSize: '0.87rem', flexShrink: 0 }}>
-              {fmt(c.total)}
+            <span style={{ fontWeight: level === 0 ? 700 : 400, fontSize: '0.87rem', flexShrink: 0, color: amtColor }}>
+              {income ? '+' : ''}{fmt(c.total)}
             </span>
           </div>
           {isOpen && (
@@ -133,6 +144,7 @@ export default function ExpenseTree() {
                 <RecurringRow
                   key={r.id} r={r} projected={proj(r)}
                   indent={level + 1} showFreq catById={catById}
+                  isIncome={isIncome(r)}
                   last={ri === directItems.length - 1 && !hasChildren}
                 />
               ))}
@@ -173,23 +185,25 @@ export default function ExpenseTree() {
         ))}
       </div>
 
-      {/* Summary card */}
-      <div style={{
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        background: '#dc2626', color: '#fff',
-        borderRadius: 8, padding: '0.75rem 1rem', marginBottom: '1.25rem',
-      }}>
-        <div>
-          <div style={{ fontSize: '0.72rem', opacity: 0.85 }}>Gesamt {PERIOD_LABEL[period]}</div>
-          <div style={{ fontWeight: 700, fontSize: '1.3rem' }}>{fmt(totalProjected)}</div>
+      {/* Summary cards */}
+      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 110, background: '#dc2626', color: '#fff', borderRadius: 8, padding: '0.5rem 0.75rem' }}>
+          <div style={{ fontSize: '0.72rem', opacity: 0.85 }}>Ausgaben {PERIOD_LABEL[period]}</div>
+          <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>{fmt(totalExpense)}</div>
         </div>
-        <div style={{ textAlign: 'right', fontSize: '0.78rem', opacity: 0.85 }}>
-          <div>{recurrings.length} Dauerauftrag{recurrings.length !== 1 ? 'träge' : ''}</div>
-          <div style={{ opacity: 0.8, marginTop: '0.15rem' }}>
-            {period === 'month'   && `${fmt(totalProjected * 3)} / Quartal  ·  ${fmt(totalProjected * 12)} / Jahr`}
-            {period === 'quarter' && `${fmt(totalProjected / 3)} / Monat  ·  ${fmt(totalProjected * 4)} / Jahr`}
-            {period === 'year'    && `${fmt(totalProjected / 12)} / Monat  ·  ${fmt(totalProjected / 4)} / Quartal`}
+        {totalIncome > 0 && (
+          <div style={{ flex: 1, minWidth: 110, background: '#16a34a', color: '#fff', borderRadius: 8, padding: '0.5rem 0.75rem' }}>
+            <div style={{ fontSize: '0.72rem', opacity: 0.85 }}>Einnahmen {PERIOD_LABEL[period]}</div>
+            <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>+{fmt(totalIncome)}</div>
           </div>
+        )}
+        <div style={{
+          flex: 1, minWidth: 110,
+          background: totalBalance >= 0 ? 'var(--color-primary)' : '#9f1239',
+          color: '#fff', borderRadius: 8, padding: '0.5rem 0.75rem',
+        }}>
+          <div style={{ fontSize: '0.72rem', opacity: 0.85 }}>Saldo {PERIOD_LABEL[period]}</div>
+          <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>{totalBalance >= 0 ? '+' : ''}{fmt(totalBalance)}</div>
         </div>
       </div>
 
@@ -265,6 +279,7 @@ export default function ExpenseTree() {
                   <RecurringRow
                     key={r.id} r={r} projected={proj(r)}
                     indent={1} showCat catById={catById}
+                    isIncome={isIncome(r)}
                     last={ri === items.length - 1 && isLast}
                   />
                 ))}
