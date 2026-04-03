@@ -44,11 +44,12 @@ export default function RecurringPayments() {
   const categories = JSON.parse(localStorage.getItem('categories')) || []
 
   // Add form state
-  const [showForm,   setShowForm]   = useState(false)
+  const [showForm,    setShowForm]    = useState(false)
   const [description, setDescription] = useState('')
-  const [amount,      setAmount]       = useState('')
-  const [frequency,   setFrequency]    = useState('monthly')
-  const [categoryId,  setCategoryId]   = useState('')
+  const [amount,      setAmount]      = useState('')
+  const [frequency,   setFrequency]   = useState('monthly')
+  const [categoryId,  setCategoryId]  = useState('')
+  const [type,        setType]        = useState('Ausgabe')
 
   // Edit state
   const [editId,          setEditId]          = useState(null)
@@ -56,6 +57,23 @@ export default function RecurringPayments() {
   const [editAmount,      setEditAmount]      = useState('')
   const [editFrequency,   setEditFrequency]   = useState('monthly')
   const [editCategoryId,  setEditCategoryId]  = useState('')
+  const [editType,        setEditType]        = useState('Ausgabe')
+
+  function handleCategoryChange(val) {
+    setCategoryId(val)
+    if (val) {
+      const cat = categories.find(c => c.id === parseInt(val))
+      if (cat?.type) setType(cat.type)
+    }
+  }
+
+  function handleEditCategoryChange(val) {
+    setEditCategoryId(val)
+    if (val) {
+      const cat = categories.find(c => c.id === parseInt(val))
+      if (cat?.type) setEditType(cat.type)
+    }
+  }
 
   // Grouping
   const [groupBy,        setGroupBy]        = useState('frequency')
@@ -69,8 +87,9 @@ export default function RecurringPayments() {
       amount:     parseFloat(amount),
       frequency,
       categoryId: categoryId ? parseInt(categoryId) : null,
+      type,
     }])
-    setDescription(''); setAmount(''); setFrequency('monthly'); setCategoryId('')
+    setDescription(''); setAmount(''); setFrequency('monthly'); setCategoryId(''); setType('Ausgabe')
     setShowForm(false)
   }
 
@@ -80,6 +99,7 @@ export default function RecurringPayments() {
     setEditAmount(String(r.amount))
     setEditFrequency(r.frequency)
     setEditCategoryId(r.categoryId ? String(r.categoryId) : '')
+    setEditType(r.type || 'Ausgabe')
   }
 
   function saveEdit() {
@@ -89,6 +109,7 @@ export default function RecurringPayments() {
       amount:      parseFloat(editAmount),
       frequency:   editFrequency,
       categoryId:  editCategoryId ? parseInt(editCategoryId) : null,
+      type:        editType,
     } : r))
     setEditId(null)
   }
@@ -163,7 +184,11 @@ export default function RecurringPayments() {
             <option value="halfyearly">Halbjährlich</option>
             <option value="yearly">Jährlich</option>
           </select>
-          <CategorySelect value={categoryId} onChange={e => setCategoryId(e.target.value)} categories={categories} />
+          <CategorySelect value={categoryId} onChange={e => handleCategoryChange(e.target.value)} categories={categories} />
+          <select value={type} onChange={e => setType(e.target.value)}>
+            <option value="Ausgabe">Ausgabe</option>
+            <option value="Einnahme">Einnahme</option>
+          </select>
           <button type="submit">Hinzufügen</button>
         </form>
       )}
@@ -229,8 +254,12 @@ export default function RecurringPayments() {
                         <option value="halfyearly">Halbjährlich</option>
                         <option value="yearly">Jährlich</option>
                       </select>
-                      <CategorySelect value={editCategoryId} onChange={e => setEditCategoryId(e.target.value)}
+                      <CategorySelect value={editCategoryId} onChange={e => handleEditCategoryChange(e.target.value)}
                         categories={categories} style={{ fontSize: '0.82rem', padding: '0.25rem 0.4rem' }} />
+                      <select value={editType} onChange={e => setEditType(e.target.value)} style={{ fontSize: '0.82rem', padding: '0.25rem 0.4rem' }}>
+                        <option value="Ausgabe">Ausgabe</option>
+                        <option value="Einnahme">Einnahme</option>
+                      </select>
                       <button onClick={saveEdit} style={{ ...btnSmall, background: '#16a34a', color: '#fff' }}>Speichern</button>
                       <button onClick={() => setEditId(null)} style={{ ...btnSmall, background: '#e5e7eb', color: '#374151' }}>Abbrechen</button>
                     </div>
@@ -248,6 +277,13 @@ export default function RecurringPayments() {
                         </div>
                         <div style={{ fontSize: '0.73rem', color: 'var(--color-text-muted)', marginTop: '0.1rem' }}>
                           {getCategoryLabel(r.categoryId)}
+                          {r.type && (
+                            <span style={{
+                              marginLeft: '0.4rem',
+                              color: r.type === 'Einnahme' ? '#16a34a' : '#dc2626',
+                              fontWeight: 600,
+                            }}>{r.type === 'Einnahme' ? '+ Einnahme' : '− Ausgabe'}</span>
+                          )}
                           {groupBy !== 'frequency' && (
                             <span style={{ marginLeft: '0.5rem', opacity: 0.7 }}>{FREQ_LABELS[r.frequency]}</span>
                           )}

@@ -24,38 +24,45 @@ const FREQ_FULL = {
 
 const FREQ_ORDER = ['monthly', 'quarterly', 'halfyearly', 'yearly']
 
-function RecurringRow({ r, projected, indent, showFreq, showCat, catById, last, isIncome }) {
-  const color = isIncome ? '#16a34a' : 'var(--color-text)'
+// Income check: r.type takes precedence, then category type, default = expense
+function recIsIncome(r, catById) {
+  const type = r.type || catById[r.categoryId]?.type
+  return type === 'Einnahme'
+}
+
+function RecurringRow({ r, projected, indent, showCat, catById, last }) {
+  const inc = recIsIncome(r, catById)
+  const color = inc ? '#16a34a' : 'var(--color-text-muted)'
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: '0.5rem',
-      padding: '0.28rem 0.75rem',
+      padding: '0.26rem 0.75rem',
       paddingLeft: `${0.75 + indent * 1.2}rem`,
       borderBottom: last ? 'none' : '1px solid var(--color-border)',
       background: 'var(--color-surface)',
-      fontSize: '0.8rem',
+      fontSize: '0.78rem',
     }}>
-      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color }}>
+      <span style={{ flex: 1, color, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         {r.description}
       </span>
       {showCat && r.categoryId && (
-        <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', flexShrink: 0 }}>
+        <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', flexShrink: 0 }}>
           {catById[r.categoryId]?.name}
         </span>
       )}
-      {showFreq && (
-        <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', flexShrink: 0 }}>
-          {FREQ_SHORT[r.frequency]}
-        </span>
-      )}
-      <span style={{ fontWeight: 500, flexShrink: 0, color }}>{isIncome ? '+' : ''}{fmt(projected)}</span>
+      <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', flexShrink: 0, marginRight: '0.25rem' }}>
+        {FREQ_SHORT[r.frequency]}
+      </span>
+      <span style={{ fontWeight: 500, flexShrink: 0, color: inc ? '#16a34a' : 'inherit' }}>
+        {inc ? '+' : ''}{fmt(projected)}
+      </span>
     </div>
   )
 }
 
 export default function ExpenseTree() {
-  const [period,  setPeriod]  = useState('month')
-  const [groupBy, setGroupBy] = useState('category')
+  const [period,        setPeriod]        = useState('month')
+  const [groupBy,       setGroupBy]       = useState('category')
   const [expandedCats,  setExpandedCats]  = useState(new Set())
   const [expandedFreqs, setExpandedFreqs] = useState(new Set(FREQ_ORDER))
 
@@ -69,20 +76,28 @@ export default function ExpenseTree() {
     return rec.amount * (factors[rec.frequency] ?? 1)
   }
 
-  function isIncome(rec) {
-    return catById[rec.categoryId]?.type === 'Einnahme'
+  // Signed projected: +proj for income, -proj for expense
+  function projSigned(rec) {
+    return recIsIncome(rec, catById) ? proj(rec) : -proj(rec)
   }
 
-  const totalExpense = recurrings.filter(r => !isIncome(r)).reduce((s, r) => s + proj(r), 0)
-  const totalIncome  = recurrings.filter(r =>  isIncome(r)).reduce((s, r) => s + proj(r), 0)
-  const totalBalance = totalIncome - totalExpense
-
-  /* ── category tree ── */
-  function subtreeTotal(catId) {
-    const direct   = recurrings.filter(r => r.categoryId === catId).reduce((s, r) => s + proj(r), 0)
-    const children = categories.filter(c => c.parent == catId).reduce((s, c) => s + subtreeTotal(c.id), 0)
+  // Net value for a subtree (income positive, expense negative)
+  function subtreeNet(catId) {
+    const direct   = recurrings.filter(r => r.categoryId === catId).reduce((s, r) => s + projSigned(r), 0)
+    const children = categories.filter(c => c.parent == catId).reduce((s, c) => s + subtreeNet(c.id), 0)
     return direct + children
   }
+
+  // Absolute total for filtering (to detect non-empty subtrees)
+  function subtreeAbs(catId) {
+    const direct   = recurrings.filter(r => r.categoryId === catId).reduce((s, r) => s + proj(r), 0)
+    const children = categories.filter(c => c.parent == catId).reduce((s, c) => s + subtreeAbs(c.id), 0)
+    return direct + children
+  }
+
+  const totalIncome  = recurrings.filter(r =>  recIsIncome(r, catById)).reduce((s, r) => s + proj(r), 0)
+  const totalExpense = recurrings.filter(r => !recIsIncome(r, catById)).reduce((s, r) => s + proj(r), 0)
+  const totalBalance = totalIncome - totalExpense
 
   function toggleCat(id) {
     setExpandedCats(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
@@ -95,76 +110,56 @@ export default function ExpenseTree() {
   function renderCategoryTree(parentId = null, level = 0) {
     const nodes = categories
       .filter(c => c.parent == parentId)
-      .map(c => ({ ...c, total: subtreeTotal(c.id) }))
-      .filter(c => c.total > 0)
-      .sort((a, b) => b.total - a.total)
+      .map(c => ({ ...c, net: subtreeNet(c.id), abs: subtreeAbs(c.id) }))
+      .filter(c => c.abs > 0)
+      .sort((a, b) => Math.abs(b.net) - Math.abs(a.net))
 
     return nodes.map((c, ni) => {
       const directItems = recurrings.filter(r => r.categoryId === c.id)
-      const hasChildren = categories.some(ch => ch.parent == c.id && subtreeTotal(ch.id) > 0)
+      const hasChildren = categories.some(ch => ch.parent == c.id && subtreeAbs(ch.id) > 0)
       const hasContent  = directItems.length > 0 || hasChildren
-      // Only root level can be toggled; sub-levels always open
-      const isOpen  = level > 0 || expandedCats.has(c.id)
-      const isLast  = ni === nodes.length - 1 && level === 0
-      const income  = c.type === 'Einnahme'
-      const amtColor = income ? '#16a34a' : 'inherit'
+      const isOpen      = expandedCats.has(c.id)           // ALL levels individually toggleable
+      const isLast      = ni === nodes.length - 1
+      const netPositive = c.net >= 0
+      const amtColor    = netPositive ? '#16a34a' : '#dc2626'
 
       return (
         <div key={c.id}>
           <div
-            onClick={() => level === 0 && hasContent && toggleCat(c.id)}
+            onClick={() => hasContent && toggleCat(c.id)}
             style={{
               display: 'flex', alignItems: 'center', gap: '0.5rem',
               padding: '0.42rem 0.75rem',
               paddingLeft: `${0.75 + level * 1.2}rem`,
-              borderBottom: (!isOpen && isLast) ? 'none' : '1px solid var(--color-border)',
+              borderBottom: (!isOpen && isLast && level === 0) ? 'none' : '1px solid var(--color-border)',
               background: level === 0 ? 'var(--color-bg)' : 'var(--color-surface)',
-              cursor: level === 0 && hasContent ? 'pointer' : 'default',
+              cursor: hasContent ? 'pointer' : 'default',
               userSelect: 'none',
             }}
           >
             <span style={{ width: '0.9rem', fontSize: '0.68rem', color: 'var(--color-text-muted)', flexShrink: 0 }}>
-              {level === 0 && hasContent ? (isOpen ? '▼' : '▶') : ''}
+              {hasContent ? (isOpen ? '▼' : '▶') : ''}
             </span>
             <span style={{
               flex: 1,
               fontSize: level === 0 ? '0.9rem' : '0.83rem',
               fontWeight: level === 0 ? 600 : 400,
-              color: income ? '#16a34a' : 'inherit',
             }}>
               {c.name}
             </span>
             <span style={{ fontWeight: level === 0 ? 700 : 400, fontSize: '0.87rem', flexShrink: 0, color: amtColor }}>
-              {income ? '+' : ''}{fmt(c.total)}
+              {c.net > 0 ? '+' : ''}{fmt(c.net)}
             </span>
           </div>
           {isOpen && (
             <>
-              {directItems.map((r, ri) => {
-                const inc = isIncome(r)
-                const p   = proj(r)
-                const lastItem = ri === directItems.length - 1 && !hasChildren
-                return (
-                  <div key={r.id} style={{
-                    display: 'flex', alignItems: 'center', gap: '0.5rem',
-                    padding: '0.26rem 0.75rem',
-                    paddingLeft: `${0.75 + (level + 1) * 1.2}rem`,
-                    borderBottom: (lastItem && isLast) ? 'none' : '1px solid var(--color-border)',
-                    background: 'var(--color-surface)',
-                    fontSize: '0.78rem',
-                  }}>
-                    <span style={{ flex: 1, color: inc ? '#16a34a' : 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {r.description}
-                    </span>
-                    <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', flexShrink: 0, marginRight: '0.35rem' }}>
-                      {FREQ_SHORT[r.frequency]}
-                    </span>
-                    <span style={{ fontWeight: 500, flexShrink: 0, color: inc ? '#16a34a' : 'inherit' }}>
-                      {inc ? '+' : ''}{fmt(p)}
-                    </span>
-                  </div>
-                )
-              })}
+              {directItems.map((r, ri) => (
+                <RecurringRow
+                  key={r.id} r={r} projected={proj(r)}
+                  indent={level + 1} catById={catById}
+                  last={ri === directItems.length - 1 && !hasChildren && isLast && level === 0}
+                />
+              ))}
               {renderCategoryTree(c.id, level + 1)}
             </>
           )}
@@ -173,8 +168,8 @@ export default function ExpenseTree() {
     })
   }
 
-  const uncategorised      = recurrings.filter(r => !r.categoryId)
-  const uncategorisedTotal = uncategorised.reduce((s, r) => s + proj(r), 0)
+  const uncategorised    = recurrings.filter(r => !r.categoryId)
+  const uncatNet         = uncategorised.reduce((s, r) => s + projSigned(r), 0)
 
   const PERIOD_LABEL = { month: 'pro Monat', quarter: 'pro Quartal', year: 'pro Jahr' }
 
@@ -185,20 +180,12 @@ export default function ExpenseTree() {
       {/* Period tabs */}
       <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
         {[['month', 'Monat'], ['quarter', 'Quartal'], ['year', 'Jahr']].map(([val, label]) => (
-          <button
-            key={val}
-            onClick={() => setPeriod(val)}
-            style={{
-              background: period === val ? 'var(--color-primary)' : 'transparent',
-              border: '1px solid var(--color-primary)',
-              color: period === val ? '#fff' : 'var(--color-primary)',
-              borderRadius: 8,
-              padding: '0.4rem 0.9rem',
-              fontSize: '0.85rem',
-            }}
-          >
-            {label}
-          </button>
+          <button key={val} onClick={() => setPeriod(val)} style={{
+            background: period === val ? 'var(--color-primary)' : 'transparent',
+            border: '1px solid var(--color-primary)',
+            color: period === val ? '#fff' : 'var(--color-primary)',
+            borderRadius: 8, padding: '0.4rem 0.9rem', fontSize: '0.85rem',
+          }}>{label}</button>
         ))}
       </div>
 
@@ -228,20 +215,12 @@ export default function ExpenseTree() {
       <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '0.75rem', alignItems: 'center' }}>
         <span style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>Gruppieren:</span>
         {[['category', 'Kategorie'], ['frequency', 'Frequenz']].map(([v, l]) => (
-          <button
-            key={v}
-            onClick={() => setGroupBy(v)}
-            style={{
-              background: groupBy === v ? 'var(--color-primary)' : 'transparent',
-              border: '1px solid var(--color-primary)',
-              color: groupBy === v ? '#fff' : 'var(--color-primary)',
-              borderRadius: 6,
-              padding: '0.22rem 0.6rem',
-              fontSize: '0.78rem',
-            }}
-          >
-            {l}
-          </button>
+          <button key={v} onClick={() => setGroupBy(v)} style={{
+            background: groupBy === v ? 'var(--color-primary)' : 'transparent',
+            border: '1px solid var(--color-primary)',
+            color: groupBy === v ? '#fff' : 'var(--color-primary)',
+            borderRadius: 6, padding: '0.22rem 0.6rem', fontSize: '0.78rem',
+          }}>{l}</button>
         ))}
       </div>
 
@@ -250,10 +229,9 @@ export default function ExpenseTree() {
           Noch keine Daueraufträge angelegt.
         </p>
       ) : groupBy === 'category' ? (
-        /* ── by category tree ── */
         <div style={{ border: '1px solid var(--color-border)', borderRadius: 8, overflow: 'hidden' }}>
           {renderCategoryTree()}
-          {uncategorisedTotal > 0 && (
+          {uncategorised.length > 0 && (
             <div style={{
               display: 'flex', justifyContent: 'space-between',
               padding: '0.4rem 0.75rem', paddingLeft: '1.65rem',
@@ -261,42 +239,40 @@ export default function ExpenseTree() {
               color: 'var(--color-text-muted)', fontSize: '0.85rem',
             }}>
               <span>Ohne Kategorie</span>
-              <span>{fmt(uncategorisedTotal)}</span>
+              <span style={{ color: uncatNet >= 0 ? '#16a34a' : '#dc2626' }}>
+                {uncatNet > 0 ? '+' : ''}{fmt(uncatNet)}
+              </span>
             </div>
           )}
         </div>
       ) : (
-        /* ── by frequency ── */
         <div style={{ border: '1px solid var(--color-border)', borderRadius: 8, overflow: 'hidden' }}>
           {FREQ_ORDER.map((freq, fi) => {
-            const items = recurrings.filter(r => r.frequency === freq)
+            const items  = recurrings.filter(r => r.frequency === freq)
             if (items.length === 0) return null
-            const freqTotal = items.reduce((s, r) => s + proj(r), 0)
-            const isOpen    = expandedFreqs.has(freq)
-            const isLast    = FREQ_ORDER.slice(fi + 1).every(f => recurrings.filter(r => r.frequency === f).length === 0)
+            const net    = items.reduce((s, r) => s + projSigned(r), 0)
+            const isOpen = expandedFreqs.has(freq)
+            const isLast = FREQ_ORDER.slice(fi + 1).every(f => recurrings.filter(r => r.frequency === f).length === 0)
             return (
               <div key={freq}>
-                <div
-                  onClick={() => toggleFreq(freq)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: '0.5rem',
-                    padding: '0.42rem 0.75rem',
-                    background: 'var(--color-bg)',
-                    borderBottom: (!isOpen && isLast) ? 'none' : '1px solid var(--color-border)',
-                    cursor: 'pointer', userSelect: 'none',
-                  }}
-                >
+                <div onClick={() => toggleFreq(freq)} style={{
+                  display: 'flex', alignItems: 'center', gap: '0.5rem',
+                  padding: '0.42rem 0.75rem', background: 'var(--color-bg)',
+                  borderBottom: (!isOpen && isLast) ? 'none' : '1px solid var(--color-border)',
+                  cursor: 'pointer', userSelect: 'none',
+                }}>
                   <span style={{ width: '0.9rem', fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>
                     {isOpen ? '▼' : '▶'}
                   </span>
                   <span style={{ flex: 1, fontSize: '0.9rem', fontWeight: 600 }}>{FREQ_FULL[freq]}</span>
-                  <span style={{ fontWeight: 700, fontSize: '0.87rem' }}>{fmt(freqTotal)}</span>
+                  <span style={{ fontWeight: 700, fontSize: '0.87rem', color: net >= 0 ? '#16a34a' : '#dc2626' }}>
+                    {net > 0 ? '+' : ''}{fmt(net)}
+                  </span>
                 </div>
                 {isOpen && items.map((r, ri) => (
                   <RecurringRow
                     key={r.id} r={r} projected={proj(r)}
                     indent={1} showCat catById={catById}
-                    isIncome={isIncome(r)}
                     last={ri === items.length - 1 && isLast}
                   />
                 ))}
