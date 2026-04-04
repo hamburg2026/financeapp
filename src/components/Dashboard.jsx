@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 
 const fmt = (n) =>
   new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(n)
@@ -14,43 +14,81 @@ const BACKUP_KEYS = [
   'insuranceContracts', 'realEstate', 'companyShares', 'subscriptions',
 ]
 
-function exportBackup() {
+// ── Crypto helpers ──
+async function deriveKey(password, salt) {
+  const enc = new TextEncoder()
+  const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveKey'])
+  return crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt, iterations: 200000, hash: 'SHA-256' },
+    keyMaterial,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt'],
+  )
+}
+
+function toBase64(buf) { return btoa(String.fromCharCode(...new Uint8Array(buf))) }
+function fromBase64(str) { return Uint8Array.from(atob(str), c => c.charCodeAt(0)) }
+
+async function exportBackup(password) {
   const data = {}
   BACKUP_KEYS.forEach(key => {
     const raw = localStorage.getItem(key)
     if (raw) data[key] = JSON.parse(raw)
   })
-  const payload = { version: 1, exportedAt: new Date().toISOString(), data }
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+  const plaintext = new TextEncoder().encode(JSON.stringify({ version: 2, exportedAt: new Date().toISOString(), data }))
+  let blob, filename
+  if (password) {
+    const salt = crypto.getRandomValues(new Uint8Array(16))
+    const iv   = crypto.getRandomValues(new Uint8Array(12))
+    const key  = await deriveKey(password, salt)
+    const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, plaintext)
+    const payload = { version: 2, encrypted: true, salt: toBase64(salt), iv: toBase64(iv), payload: toBase64(encrypted) }
+    blob = new Blob([JSON.stringify(payload)], { type: 'application/json' })
+    filename = `financeapp-sicherung-${new Date().toISOString().slice(0, 10)}.enc.json`
+  } else {
+    blob = new Blob([plaintext], { type: 'application/json' })
+    filename = `financeapp-sicherung-${new Date().toISOString().slice(0, 10)}.json`
+  }
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `financeapp-sicherung-${new Date().toISOString().slice(0, 10)}.json`
+  a.download = filename
   a.click()
   URL.revokeObjectURL(url)
 }
 
-function importBackup(file) {
-  const reader = new FileReader()
-  reader.onload = (e) => {
-    try {
-      const parsed = JSON.parse(e.target.result)
-      // Accept both { version, data: {...} } and a plain object of keys
-      const data = parsed.data && typeof parsed.data === 'object' ? parsed.data : parsed
-      let count = 0
-      Object.entries(data).forEach(([key, val]) => {
-        if (BACKUP_KEYS.includes(key)) {
-          localStorage.setItem(key, JSON.stringify(val))
-          count++
-        }
-      })
-      if (count === 0) { alert('Keine bekannten Daten in der Sicherungsdatei gefunden.'); return }
-      window.location.reload()
-    } catch {
-      alert('Sicherungsdatei konnte nicht gelesen werden.')
+async function importBackup(file, password) {
+  const text = await file.text()
+  try {
+    const parsed = JSON.parse(text)
+    let inner
+    if (parsed.encrypted) {
+      if (!password) { alert('Diese Sicherungsdatei ist verschlüsselt. Bitte Passwort eingeben.'); return false }
+      try {
+        const salt = fromBase64(parsed.salt)
+        const iv   = fromBase64(parsed.iv)
+        const key  = await deriveKey(password, salt)
+        const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, fromBase64(parsed.payload))
+        inner = JSON.parse(new TextDecoder().decode(decrypted))
+      } catch {
+        alert('Falsches Passwort oder beschädigte Datei.'); return false
+      }
+    } else {
+      inner = parsed
     }
+    const data = inner.data && typeof inner.data === 'object' ? inner.data : inner
+    let count = 0
+    Object.entries(data).forEach(([key, val]) => {
+      if (BACKUP_KEYS.includes(key)) { localStorage.setItem(key, JSON.stringify(val)); count++ }
+    })
+    if (count === 0) { alert('Keine bekannten Daten in der Sicherungsdatei gefunden.'); return false }
+    window.location.reload()
+    return true
+  } catch {
+    alert('Sicherungsdatei konnte nicht gelesen werden.')
+    return false
   }
-  reader.readAsText(file)
 }
 
 function Section({ title, children }) {
@@ -81,6 +119,8 @@ function MiniRow({ label, value, sub, muted }) {
 
 export default function Dashboard() {
   const fileInputRef = useRef(null)
+  const [backupPassword, setBackupPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
 
   const accounts     = JSON.parse(localStorage.getItem('bankAccounts'))       || []
   const depots       = JSON.parse(localStorage.getItem('depots'))             || []
@@ -169,8 +209,24 @@ export default function Dashboard() {
       {/* ── Sicherung ── */}
       <div className="module" style={{ marginBottom: '1.25rem' }}>
         <h2 style={{ marginBottom: '0.75rem' }}>Datensicherung</h2>
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.6rem', flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <input
+              type={showPassword ? 'text' : 'password'}
+              value={backupPassword}
+              onChange={e => setBackupPassword(e.target.value)}
+              placeholder="Passwort (optional)"
+              style={{ fontSize: '0.85rem', padding: '0.38rem 2.2rem 0.38rem 0.6rem', minWidth: 180 }}
+            />
+            <button
+              onClick={() => setShowPassword(v => !v)}
+              style={{ position: 'absolute', right: 4, background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: '0.1rem 0.3rem', fontSize: '0.8rem' }}
+              title={showPassword ? 'Verbergen' : 'Anzeigen'}
+            >{showPassword ? '🙈' : '👁'}</button>
+          </div>
+        </div>
         <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          <button onClick={exportBackup} style={{ fontSize: '0.85rem', padding: '0.45rem 1rem' }}>
+          <button onClick={() => exportBackup(backupPassword || null)} style={{ fontSize: '0.85rem', padding: '0.45rem 1rem' }}>
             Sicherung herunterladen
           </button>
           <button onClick={() => fileInputRef.current?.click()} style={{ fontSize: '0.85rem', padding: '0.45rem 1rem', background: '#6b7280' }}>
@@ -181,7 +237,7 @@ export default function Dashboard() {
             type="file"
             accept=".json,application/json"
             style={{ display: 'none' }}
-            onChange={e => { if (e.target.files[0]) importBackup(e.target.files[0]) }}
+            onChange={e => { if (e.target.files[0]) importBackup(e.target.files[0], backupPassword || null) }}
           />
           <button
             onClick={() => {
@@ -196,7 +252,7 @@ export default function Dashboard() {
           </button>
         </div>
         <p style={{ margin: '0.6rem 0 0', fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
-          Die Sicherungsdatei enthält alle lokalen Daten und kann jederzeit wieder eingespielt werden. Browser-Reset löscht alles dauerhaft.
+          Mit Passwort wird die Sicherung verschlüsselt (AES-256). Ohne Passwort wird unverschlüsselt gespeichert. Browser-Reset löscht alle Daten dauerhaft.
         </p>
       </div>
 

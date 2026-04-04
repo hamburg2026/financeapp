@@ -10,7 +10,7 @@ function useLocalStorage(key, initial) {
   return [value, set]
 }
 
-const FREQ_LABELS = { monthly: 'Monatlich', quarterly: 'Vierteljährlich', yearly: 'Jährlich' }
+const FREQ_LABELS = { monthly: 'Monatlich', quarterly: 'Vierteljährlich', halfyearly: 'Halbjährlich', yearly: 'Jährlich' }
 
 // Flat options with full path: "Nebenkosten → Strom"
 function CategorySelect({ value, onChange, categories }) {
@@ -68,7 +68,7 @@ export default function Subscriptions() {
   const [cost,       setCost]       = useState('')
   const [frequency,  setFrequency]  = useState('monthly')
   const [cancel,     setCancel]     = useState('')
-  const [next,       setNext]       = useState('')
+  const [cancelDate, setCancelDate] = useState('')
   const [aktiv,      setAktiv]      = useState(true)
   const [categoryId, setCategoryId] = useState('')
   const [type,       setType]       = useState('Ausgabe')
@@ -95,17 +95,17 @@ export default function Subscriptions() {
   const [editCost,        setEditCost]        = useState('')
   const [editFrequency,   setEditFrequency]   = useState('monthly')
   const [editCancel,      setEditCancel]      = useState('')
-  const [editNext,        setEditNext]        = useState('')
+  const [editCancelDate,  setEditCancelDate]  = useState('')
   const [editAktiv,       setEditAktiv]       = useState(true)
   const [editCategoryId,  setEditCategoryId]  = useState('')
   const [editType,        setEditType]        = useState('Ausgabe')
 
   function addSubscription(e) {
     e.preventDefault()
-    const sub = { id: Date.now(), name, cost: parseFloat(cost), frequency, cancel, next, aktiv, categoryId: categoryId ? parseInt(categoryId) : null, type }
+    const sub = { id: Date.now(), name, cost: parseFloat(cost), frequency, cancel, cancelDate, aktiv, categoryId: categoryId ? parseInt(categoryId) : null, type }
     setSubscriptions([...subscriptions, sub])
     syncRecurring(sub, aktiv)
-    setName(''); setCost(''); setFrequency('monthly'); setCancel(''); setNext(''); setAktiv(true); setCategoryId(''); setType('Ausgabe')
+    setName(''); setCost(''); setFrequency('monthly'); setCancel(''); setCancelDate(''); setAktiv(true); setCategoryId(''); setType('Ausgabe')
   }
 
   function startEdit(s) {
@@ -114,7 +114,7 @@ export default function Subscriptions() {
     setEditCost(String(s.cost))
     setEditFrequency(s.frequency)
     setEditCancel(s.cancel || '')
-    setEditNext(s.next || '')
+    setEditCancelDate(s.cancelDate || '')
     setEditAktiv(s.aktiv ?? true)
     setEditCategoryId(s.categoryId ? String(s.categoryId) : '')
     setEditType(s.type || 'Ausgabe')
@@ -127,7 +127,7 @@ export default function Subscriptions() {
       cost:       parseFloat(editCost),
       frequency:  editFrequency,
       cancel:     editCancel,
-      next:       editNext,
+      cancelDate: editCancelDate,
       aktiv:      editAktiv,
       categoryId: editCategoryId ? parseInt(editCategoryId) : null,
       type:       editType,
@@ -158,10 +158,11 @@ export default function Subscriptions() {
         <select value={frequency} onChange={e => setFrequency(e.target.value)} required>
           <option value="monthly">Monatlich</option>
           <option value="quarterly">Vierteljährlich</option>
+          <option value="halfyearly">Halbjährlich</option>
           <option value="yearly">Jährlich</option>
         </select>
-        <input value={cancel} onChange={e => setCancel(e.target.value)} placeholder="Kündigungsfrist" required />
-        <input type="date" value={next} onChange={e => setNext(e.target.value)} />
+        <input value={cancel} onChange={e => setCancel(e.target.value)} placeholder="Kündigungsfrist" />
+        <input type="date" value={cancelDate} onChange={e => setCancelDate(e.target.value)} placeholder="Kündigungsdatum" />
         <CategorySelect value={categoryId} onChange={e => handleCategoryChange(e.target.value)} categories={categories} />
         <select value={type} onChange={e => setType(e.target.value)}>
           <option value="Ausgabe">Ausgabe</option>
@@ -193,6 +194,7 @@ export default function Subscriptions() {
                 <select value={editFrequency} onChange={e => setEditFrequency(e.target.value)} style={{ fontSize: '0.82rem', padding: '0.25rem 0.4rem' }}>
                   <option value="monthly">Monatlich</option>
                   <option value="quarterly">Vierteljährlich</option>
+                  <option value="halfyearly">Halbjährlich</option>
                   <option value="yearly">Jährlich</option>
                 </select>
                 <CategorySelect value={editCategoryId} onChange={e => setEditCategoryId(e.target.value)} categories={categories} />
@@ -201,8 +203,8 @@ export default function Subscriptions() {
                   <option value="Einnahme">Einnahme</option>
                 </select>
                 <input value={editCancel} onChange={e => setEditCancel(e.target.value)}
-                  style={{ width: 110, fontSize: '0.82rem', padding: '0.25rem 0.4rem' }} placeholder="Kündigung" />
-                <input type="date" value={editNext} onChange={e => setEditNext(e.target.value)}
+                  style={{ width: 110, fontSize: '0.82rem', padding: '0.25rem 0.4rem' }} placeholder="Kündigungsfrist" />
+                <input type="date" value={editCancelDate} onChange={e => setEditCancelDate(e.target.value)}
                   style={{ fontSize: '0.82rem', padding: '0.25rem 0.4rem' }} />
                 <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.82rem' }}>
                   <input type="checkbox" checked={editAktiv} onChange={e => setEditAktiv(e.target.checked)} />
@@ -225,8 +227,8 @@ export default function Subscriptions() {
                 <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
                   {FREQ_LABELS[s.frequency] || s.frequency}
                   {getCategoryLabel(s.categoryId) && <span style={{ marginLeft: '0.5rem' }}>· {getCategoryLabel(s.categoryId)}</span>}
-                  {s.cancel && <span style={{ marginLeft: '0.5rem' }}>· Kündigung: {s.cancel}</span>}
-                  {s.next   && <span style={{ marginLeft: '0.5rem' }}>· Nächste: {s.next}</span>}
+                  {s.cancel     && <span style={{ marginLeft: '0.5rem' }}>· Frist: {s.cancel}</span>}
+                  {s.cancelDate && <span style={{ marginLeft: '0.5rem' }}>· Kündigung bis: {s.cancelDate}</span>}
                 </div>
               </div>
               <span style={{ fontWeight: 600, flexShrink: 0 }}>{fmt(s.cost)}</span>
