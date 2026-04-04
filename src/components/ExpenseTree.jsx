@@ -125,21 +125,21 @@ export default function ExpenseTree() {
 
       return (
         <div key={c.id}>
-          <div
-            onClick={() => hasContent && toggleCat(c.id)}
-            style={{
+          <div style={{
               display: 'flex', alignItems: 'center', gap: '0.5rem',
               padding: '0.42rem 0.75rem',
               paddingLeft: `${0.75 + level * 1.2}rem`,
               borderBottom: (!isOpen && isLast && level === 0) ? 'none' : '1px solid var(--color-border)',
               background: level === 0 ? 'var(--color-bg)' : 'var(--color-surface)',
-              cursor: hasContent ? 'pointer' : 'default',
-              userSelect: 'none',
-            }}
-          >
-            <span style={{ width: '0.9rem', fontSize: '0.68rem', color: 'var(--color-text-muted)', flexShrink: 0 }}>
-              {hasContent ? (isOpen ? '▼' : '▶') : ''}
-            </span>
+          }}>
+            {hasContent ? (
+              <button onClick={e => { e.stopPropagation(); toggleCat(c.id) }} style={{
+                background: 'none', border: 'none', padding: '0.1rem 0.3rem',
+                color: 'var(--color-text-muted)', cursor: 'pointer', flexShrink: 0, fontSize: '0.85rem', lineHeight: 1,
+              }}>{isOpen ? '▾' : '▸'}</button>
+            ) : (
+              <span style={{ width: '1.4rem', flexShrink: 0 }} />
+            )}
             <span style={{
               flex: 1,
               fontSize: level === 0 ? '0.9rem' : '0.83rem',
@@ -255,15 +255,15 @@ export default function ExpenseTree() {
             const isLast = FREQ_ORDER.slice(fi + 1).every(f => recurrings.filter(r => r.frequency === f).length === 0)
             return (
               <div key={freq}>
-                <div onClick={() => toggleFreq(freq)} style={{
+                <div style={{
                   display: 'flex', alignItems: 'center', gap: '0.5rem',
                   padding: '0.42rem 0.75rem', background: 'var(--color-bg)',
                   borderBottom: (!isOpen && isLast) ? 'none' : '1px solid var(--color-border)',
-                  cursor: 'pointer', userSelect: 'none',
                 }}>
-                  <span style={{ width: '0.9rem', fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>
-                    {isOpen ? '▼' : '▶'}
-                  </span>
+                  <button onClick={e => { e.stopPropagation(); toggleFreq(freq) }} style={{
+                    background: 'none', border: 'none', padding: '0.1rem 0.3rem',
+                    color: 'var(--color-text-muted)', cursor: 'pointer', flexShrink: 0, fontSize: '0.85rem', lineHeight: 1,
+                  }}>{isOpen ? '▾' : '▸'}</button>
                   <span style={{ flex: 1, fontSize: '0.9rem', fontWeight: 600 }}>{FREQ_FULL[freq]}</span>
                   <span style={{ fontWeight: 700, fontSize: '0.87rem', color: net >= 0 ? '#16a34a' : '#dc2626' }}>
                     {net > 0 ? '+' : ''}{fmt(net)}

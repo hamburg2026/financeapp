@@ -170,16 +170,10 @@ export default function Dashboard() {
       <div className="module" style={{ marginBottom: '1.25rem' }}>
         <h2 style={{ marginBottom: '0.75rem' }}>Datensicherung</h2>
         <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          <button
-            onClick={exportBackup}
-            style={{ fontSize: '0.85rem', padding: '0.45rem 1rem' }}
-          >
+          <button onClick={exportBackup} style={{ fontSize: '0.85rem', padding: '0.45rem 1rem' }}>
             Sicherung herunterladen
           </button>
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            style={{ fontSize: '0.85rem', padding: '0.45rem 1rem', background: '#6b7280' }}
-          >
+          <button onClick={() => fileInputRef.current?.click()} style={{ fontSize: '0.85rem', padding: '0.45rem 1rem', background: '#6b7280' }}>
             Sicherung wiederherstellen
           </button>
           <input
@@ -189,9 +183,20 @@ export default function Dashboard() {
             style={{ display: 'none' }}
             onChange={e => { if (e.target.files[0]) importBackup(e.target.files[0]) }}
           />
+          <button
+            onClick={() => {
+              if (window.confirm('Alle lokalen Daten unwiderruflich löschen? Vorher bitte sichern!')) {
+                BACKUP_KEYS.forEach(k => localStorage.removeItem(k))
+                window.location.reload()
+              }
+            }}
+            style={{ fontSize: '0.85rem', padding: '0.45rem 1rem', background: '#dc2626' }}
+          >
+            Browser-Reset
+          </button>
         </div>
         <p style={{ margin: '0.6rem 0 0', fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
-          Die Sicherungsdatei enthält alle lokalen Daten und kann jederzeit wieder eingespielt werden.
+          Die Sicherungsdatei enthält alle lokalen Daten und kann jederzeit wieder eingespielt werden. Browser-Reset löscht alles dauerhaft.
         </p>
       </div>
 
