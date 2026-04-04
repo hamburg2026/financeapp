@@ -10,7 +10,7 @@ const pnlStyle = (n) => ({ color: n >= 0 ? '#16a34a' : '#dc2626', fontWeight: 60
 // All localStorage keys that belong to the app
 const BACKUP_KEYS = [
   'bankAccounts', 'transactions', 'categories', 'recurringPayments',
-  'depots', 'depotTransactions', 'securityPrices', 'securities',
+  'depots', 'depotTransactions', 'securityPrices', 'securities', 'fxRates',
   'insuranceContracts', 'realEstate', 'companyShares', 'subscriptions',
 ]
 
@@ -100,17 +100,26 @@ function Section({ title, children }) {
   )
 }
 
-function MiniRow({ label, value, sub, muted }) {
+function MiniRow({ label, value, sub, pct, hint, muted }) {
   return (
     <div style={{
-      display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+      display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
       padding: '0.28rem 0',
       borderBottom: '1px solid var(--color-border)',
       fontSize: '0.82rem',
+      gap: '0.5rem',
     }}>
-      <span style={{ color: muted ? 'var(--color-text-muted)' : 'var(--color-text)' }}>{label}</span>
-      <span style={{ display: 'flex', gap: '0.6rem', alignItems: 'baseline' }}>
+      <span style={{ color: muted ? 'var(--color-text-muted)' : 'var(--color-text)', flex: 1 }}>
+        {label}
+        {hint && <span style={{ display: 'block', fontSize: '0.72rem', color: 'var(--color-text-muted)', fontWeight: 400, marginTop: 1 }}>{hint}</span>}
+      </span>
+      <span style={{ display: 'flex', gap: '0.45rem', alignItems: 'baseline', flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
         <span style={{ fontWeight: 500 }}>{value}</span>
+        {pct != null && (
+          <span style={{ fontSize: '0.73rem', fontWeight: 600, color: pct >= 0 ? '#16a34a' : '#dc2626' }}>
+            {pct >= 0 ? '+' : ''}{pct.toFixed(1)} %
+          </span>
+        )}
         {sub != null && <span style={pnlStyle(sub)}>{fmtPnl(sub)}</span>}
       </span>
     </div>
@@ -162,11 +171,14 @@ export default function Dashboard() {
         const curPrice = getCurrentPrice(secId)
         const curValue = p.qty * curPrice
         const pnl = curValue - p.cost
-        return { secId, name: sec?.name || secId, qty: p.qty, curValue, pnl }
+        const pct = p.cost > 0 ? (pnl / p.cost) * 100 : null
+        return { secId, name: sec?.name || secId, qty: p.qty, cost: p.cost, curValue, pnl, pct }
       })
     const totalValue = positions.reduce((s, p) => s + p.curValue, 0)
+    const totalCost  = positions.reduce((s, p) => s + p.cost,     0)
     const totalPnl   = positions.reduce((s, p) => s + p.pnl,      0)
-    return { depot, positions, totalValue, totalPnl }
+    const totalPct   = totalCost > 0 ? (totalPnl / totalCost) * 100 : null
+    return { depot, positions, totalValue, totalCost, totalPnl, totalPct }
   })
   const totalSecurities = depotData.reduce((s, d) => s + d.totalValue, 0)
 
@@ -182,7 +194,7 @@ export default function Dashboard() {
   // ── Gesamtvermögen ──
   const totalAssets = totalBank + totalSecurities + totalInsurance + totalRealEstate + totalShares
 
-  const freqLabel = { monthly: 'mtl.', quarterly: 'quartl.', yearly: 'jährl.' }
+  const freqLabel = { monthly: 'mtl.', quarterly: 'quartl.', halfyearly: 'halbj.', yearly: 'jährl.' }
 
   return (
     <div>
@@ -287,24 +299,26 @@ export default function Dashboard() {
       {/* ── Depots ── */}
       {depotData.length > 0 && (
         <Section title="Depots">
-          {depotData.map(({ depot, positions, totalValue, totalPnl }) => (
+          {depotData.map(({ depot, positions, totalValue, totalPnl, totalPct }) => (
             <div key={depot.id} style={{ marginBottom: '0.75rem' }}>
               <div style={{
                 display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
                 padding: '0.3rem 0', borderBottom: '2px solid var(--color-border)',
-                fontWeight: 600, fontSize: '0.88rem',
+                fontWeight: 600, fontSize: '0.88rem', gap: '0.5rem',
               }}>
                 <span>{depot.name}</span>
-                <span>
-                  {fmt(totalValue)}{' '}
+                <span style={{ display: 'flex', gap: '0.45rem', alignItems: 'baseline', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                  {fmt(totalValue)}
+                  {totalPct != null && <span style={{ fontSize: '0.73rem', fontWeight: 600, color: totalPct >= 0 ? '#16a34a' : '#dc2626' }}>{totalPct >= 0 ? '+' : ''}{totalPct.toFixed(1)} %</span>}
                   <span style={pnlStyle(totalPnl)}>{fmtPnl(totalPnl)}</span>
                 </span>
               </div>
               {positions.map(p => (
                 <MiniRow
                   key={p.secId}
-                  label={`${p.name} (${p.qty.toLocaleString('de-DE')} Stk.)`}
+                  label={`${p.name} (${p.qty.toLocaleString('de-DE', { maximumFractionDigits: 4 })} Stk.)`}
                   value={fmt(p.curValue)}
+                  pct={p.pct}
                   sub={p.pnl}
                 />
               ))}
@@ -319,14 +333,19 @@ export default function Dashboard() {
       {/* ── Immobilien ── */}
       {realEstate.length > 0 && (
         <Section title="Immobilien">
-          {realEstate.map(p => (
-            <MiniRow
-              key={p.id}
-              label={p.name}
-              value={fmt(p.current)}
-              sub={p.current - p.purchase}
-            />
-          ))}
+          {realEstate.map(p => {
+            const diff = p.current - p.purchase
+            const pct  = p.purchase > 0 ? (diff / p.purchase) * 100 : null
+            return (
+              <MiniRow
+                key={p.id}
+                label={p.name}
+                value={fmt(p.current)}
+                pct={pct}
+                sub={diff}
+              />
+            )
+          })}
           {realEstate.length > 1 && (
             <MiniRow label="Gesamt" value={fmt(totalRealEstate)} muted />
           )}
@@ -352,13 +371,20 @@ export default function Dashboard() {
       {/* ── Abonnements ── */}
       {subscriptions.length > 0 && (
         <Section title="Abonnements">
-          {subscriptions.map(s => (
-            <MiniRow
-              key={s.id}
-              label={`${s.name} (${freqLabel[s.frequency] || s.frequency})`}
-              value={fmt(s.cost)}
-            />
-          ))}
+          {subscriptions.map(s => {
+            const cancelParts = []
+            if (s.cancel)     cancelParts.push(`Frist: ${s.cancel}`)
+            if (s.cancelDate) cancelParts.push(`Kündigung bis: ${s.cancelDate}`)
+            return (
+              <MiniRow
+                key={s.id}
+                label={`${s.name} (${freqLabel[s.frequency] || s.frequency})`}
+                value={fmt(s.cost)}
+                hint={cancelParts.length ? cancelParts.join(' · ') : null}
+                muted={!s.aktiv}
+              />
+            )
+          })}
         </Section>
       )}
     </div>

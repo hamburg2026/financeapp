@@ -215,8 +215,15 @@ export default function Subscriptions() {
                 </select>
                 <input list="cancel-options" value={editCancel} onChange={e => setEditCancel(e.target.value)}
                   style={{ width: 130, fontSize: '0.82rem', padding: '0.25rem 0.4rem' }} placeholder="Kündigungsfrist" />
-                <input type="date" value={editCancelDate} onChange={e => setEditCancelDate(e.target.value)}
-                  style={{ fontSize: '0.82rem', padding: '0.25rem 0.4rem' }} />
+                <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                  <input type="date" value={editCancelDate} onChange={e => setEditCancelDate(e.target.value)}
+                    style={{ fontSize: '0.82rem', padding: '0.25rem 0.4rem' }} />
+                  {editCancelDate && (
+                    <button type="button" onClick={() => setEditCancelDate('')}
+                      style={{ border: 'none', background: '#e5e7eb', borderRadius: 4, cursor: 'pointer', fontSize: '0.7rem', padding: '0.2rem 0.4rem', color: '#374151' }}
+                      title="Datum entfernen">✕</button>
+                  )}
+                </span>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.82rem' }}>
                   <input type="checkbox" checked={editAktiv} onChange={e => setEditAktiv(e.target.checked)} />
                   Aktiv
