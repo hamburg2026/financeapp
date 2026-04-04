@@ -161,7 +161,18 @@ export default function Subscriptions() {
           <option value="halfyearly">Halbjährlich</option>
           <option value="yearly">Jährlich</option>
         </select>
-        <input value={cancel} onChange={e => setCancel(e.target.value)} placeholder="Kündigungsfrist" />
+        <input list="cancel-options" value={cancel} onChange={e => setCancel(e.target.value)} placeholder="Kündigungsfrist" />
+        <datalist id="cancel-options">
+          <option value="1 Monat" />
+          <option value="2 Monate" />
+          <option value="3 Monate" />
+          <option value="6 Monate" />
+          <option value="12 Monate" />
+          <option value="quartalsweise" />
+          <option value="halbjährlich" />
+          <option value="jährlich" />
+          <option value="individuell" />
+        </datalist>
         <input type="date" value={cancelDate} onChange={e => setCancelDate(e.target.value)} placeholder="Kündigungsdatum" />
         <CategorySelect value={categoryId} onChange={e => handleCategoryChange(e.target.value)} categories={categories} />
         <select value={type} onChange={e => setType(e.target.value)}>
@@ -202,8 +213,8 @@ export default function Subscriptions() {
                   <option value="Ausgabe">Ausgabe</option>
                   <option value="Einnahme">Einnahme</option>
                 </select>
-                <input value={editCancel} onChange={e => setEditCancel(e.target.value)}
-                  style={{ width: 110, fontSize: '0.82rem', padding: '0.25rem 0.4rem' }} placeholder="Kündigungsfrist" />
+                <input list="cancel-options" value={editCancel} onChange={e => setEditCancel(e.target.value)}
+                  style={{ width: 130, fontSize: '0.82rem', padding: '0.25rem 0.4rem' }} placeholder="Kündigungsfrist" />
                 <input type="date" value={editCancelDate} onChange={e => setEditCancelDate(e.target.value)}
                   style={{ fontSize: '0.82rem', padding: '0.25rem 0.4rem' }} />
                 <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.82rem' }}>
