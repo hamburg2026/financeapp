@@ -107,6 +107,17 @@ export default function ExpenseTree() {
     setExpandedFreqs(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n })
   }
 
+  function expandAll() {
+    const allCatIds = categories.filter(c => categories.some(ch => ch.parent == c.id) || recurrings.some(r => r.categoryId === c.id)).map(c => c.id)
+    setExpandedCats(new Set(allCatIds))
+    setExpandedFreqs(new Set(FREQ_ORDER))
+  }
+
+  function collapseAll() {
+    setExpandedCats(new Set())
+    setExpandedFreqs(new Set())
+  }
+
   function renderCategoryTree(parentId = null, level = 0) {
     const nodes = categories
       .filter(c => c.parent == parentId)
@@ -211,7 +222,7 @@ export default function ExpenseTree() {
         </div>
       </div>
 
-      {/* Grouping toggle */}
+      {/* Grouping toggle + expand/collapse */}
       <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '0.75rem', alignItems: 'center' }}>
         <span style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>Gruppieren:</span>
         {[['category', 'Kategorie'], ['frequency', 'Frequenz']].map(([v, l]) => (
@@ -222,6 +233,9 @@ export default function ExpenseTree() {
             borderRadius: 6, padding: '0.22rem 0.6rem', fontSize: '0.78rem',
           }}>{l}</button>
         ))}
+        <span style={{ marginLeft: '0.25rem', color: 'var(--color-border)' }}>|</span>
+        <button onClick={expandAll}   style={{ fontSize: '0.78rem', padding: '0.22rem 0.6rem', background: 'transparent', border: '1px solid var(--color-border)', color: 'var(--color-text-muted)', borderRadius: 6 }}>Alle aufklappen</button>
+        <button onClick={collapseAll} style={{ fontSize: '0.78rem', padding: '0.22rem 0.6rem', background: 'transparent', border: '1px solid var(--color-border)', color: 'var(--color-text-muted)', borderRadius: 6 }}>Alle zuklappen</button>
       </div>
 
       {recurrings.length === 0 ? (

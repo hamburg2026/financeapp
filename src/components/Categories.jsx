@@ -66,6 +66,9 @@ export default function Categories() {
     })
   }
 
+  function expandAll()   { setExpanded(new Set(categories.filter(c => categories.some(ch => ch.parent == c.id)).map(c => c.id))) }
+  function collapseAll() { setExpanded(new Set()) }
+
   function renderTree(parentId = null, level = 0) {
     const siblings = categories.filter(c => c.parent == parentId)
     return siblings.map((c, idx) => {
@@ -219,7 +222,14 @@ export default function Categories() {
         <button type="submit">Kategorie hinzufügen</button>
       </form>
 
-      <div style={{ marginTop: '1rem', border: '1px solid var(--color-border)', borderRadius: 8, overflow: 'hidden' }}>
+      {categories.length > 0 && (
+        <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.75rem', marginBottom: '0.5rem' }}>
+          <button onClick={expandAll}   style={{ fontSize: '0.78rem', padding: '0.28rem 0.75rem', background: 'transparent', border: '1px solid var(--color-primary)', color: 'var(--color-primary)', borderRadius: 6 }}>Alle aufklappen</button>
+          <button onClick={collapseAll} style={{ fontSize: '0.78rem', padding: '0.28rem 0.75rem', background: 'transparent', border: '1px solid var(--color-border)',   color: 'var(--color-text-muted)', borderRadius: 6 }}>Alle zuklappen</button>
+        </div>
+      )}
+
+      <div style={{ marginTop: '0.5rem', border: '1px solid var(--color-border)', borderRadius: 8, overflow: 'hidden' }}>
         {categories.filter(c => c.parent == null).length === 0 ? (
           <p style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '2rem', fontSize: '0.875rem' }}>
             Noch keine Kategorien angelegt
