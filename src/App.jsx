@@ -10,19 +10,23 @@ import Subscriptions from './components/Subscriptions'
 import RealEstate from './components/RealEstate'
 import CompanyShares from './components/CompanyShares'
 import ExpenseTree from './components/ExpenseTree'
+import WealthChart from './components/WealthChart'
+import ExpenseChart from './components/ExpenseChart'
 
 const NAV_ITEMS = [
   { id: 'dashboard',          label: 'Dashboard',           icon: '📊', component: Dashboard },
-  { id: 'bankAccounts',       label: 'Bankkonten',           icon: '🏦', component: BankAccounts },
-  { id: 'categories',        label: 'Kategorien',           icon: '🏷️', component: Categories },
-  { id: 'recurringPayments',  label: 'Daueraufträge',        icon: '🔄', component: RecurringPayments },
-  { id: 'insuranceContracts', label: 'Versicherungen',       icon: '🛡️', component: InsuranceContracts },
-  { id: 'securities',         label: 'Wertpapiere',          icon: '📈', component: Securities },
-  { id: 'depots',             label: 'Depots',               icon: '💼', component: Depots },
-  { id: 'subscriptions',      label: 'Abonnements',          icon: '📱', component: Subscriptions },
-  { id: 'realEstate',         label: 'Immobilien',           icon: '🏠', component: RealEstate },
-  { id: 'companyShares',      label: 'Firmenbeteiligungen',  icon: '🏢', component: CompanyShares },
-  { id: 'expenseTree',        label: 'Ausgaben',             icon: '📉', component: ExpenseTree },
+  { id: 'wealthChart',        label: 'Vermögen',            icon: '💰', component: WealthChart },
+  { id: 'expenseChart',       label: 'Ausgaben-Grafik',     icon: '🎯', component: ExpenseChart },
+  { id: 'bankAccounts',       label: 'Bankkonten',          icon: '🏦', component: BankAccounts },
+  { id: 'categories',         label: 'Kategorien',          icon: '🏷️', component: Categories },
+  { id: 'recurringPayments',  label: 'Daueraufträge',       icon: '🔄', component: RecurringPayments },
+  { id: 'insuranceContracts', label: 'Versicherungen',      icon: '🛡️', component: InsuranceContracts },
+  { id: 'securities',         label: 'Wertpapiere',         icon: '📈', component: Securities },
+  { id: 'depots',             label: 'Depots',              icon: '💼', component: Depots },
+  { id: 'subscriptions',      label: 'Abonnements',         icon: '📱', component: Subscriptions },
+  { id: 'realEstate',         label: 'Immobilien',          icon: '🏠', component: RealEstate },
+  { id: 'companyShares',      label: 'Firmenbeteiligungen', icon: '🏢', component: CompanyShares },
+  { id: 'expenseTree',        label: 'Ausgaben',            icon: '📉', component: ExpenseTree },
 ]
 
 export default function App() {
