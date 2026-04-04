@@ -204,6 +204,12 @@ input:focus, select:focus, textarea:focus {
   border-color: var(--color-primary);
 }
 
+input[type="date"] {
+  width: auto;
+  align-self: flex-start;
+  min-width: 9rem;
+}
+
 button {
   padding: 0.6rem 1rem;
   background-color: var(--color-primary);
