@@ -27,7 +27,7 @@ function DonutChart({ segments, size = 200, strokeWidth = 38 }) {
   const cx = size / 2
   const cy = size / 2
   const circumference = 2 * Math.PI * r
-  const gapCirc = 3
+  const gapCirc = 0
   let offsetAngle = -90
 
   return (

@@ -3,6 +3,16 @@ import { useRef, useState } from 'react'
 const fmt = (n) =>
   new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(n)
 
+// ── Liquiditätsstufen ──
+const LIQUIDITY_LEVELS = {
+  1: { label: 'Stufe 1', desc: 'Liquidität',                   color: '#16a34a', bg: '#dcfce7' },
+  2: { label: 'Stufe 2', desc: 'Kurzfristig liquidierbar',     color: '#22c55e', bg: '#f0fdf4' },
+  3: { label: 'Stufe 3', desc: 'Mittelfristig liquidierbar',   color: '#eab308', bg: '#fefce8' },
+  5: { label: 'Stufe 5', desc: 'Schwer liquidierbar',          color: '#f97316', bg: '#fff7ed' },
+  6: { label: 'Stufe 6', desc: 'Theoretisch liquidierbar',     color: '#dc2626', bg: '#fef2f2' },
+}
+const LIQUIDITY_ORDER = [1, 2, 3, 5, 6]
+
 const fmtPnl = (n) => (n >= 0 ? '+\u202f' : '\u2212\u202f') + fmt(Math.abs(n))
 
 const pnlStyle = (n) => ({ color: n >= 0 ? '#16a34a' : '#dc2626', fontWeight: 600 })
@@ -12,6 +22,7 @@ const BACKUP_KEYS = [
   'bankAccounts', 'transactions', 'categories', 'recurringPayments',
   'depots', 'depotTransactions', 'securityPrices', 'securities', 'fxRates',
   'insuranceContracts', 'realEstate', 'companyShares', 'subscriptions',
+  'liquidityLevels',
 ]
 
 // ── Crypto helpers ──
@@ -136,6 +147,21 @@ export default function Dashboard() {
   const fileInputRef = useRef(null)
   const [backupPassword, setBackupPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [showLiqConfig, setShowLiqConfig] = useState(false)
+  const [liquidityLevels, setLiquidityLevelsState] = useState(
+    () => JSON.parse(localStorage.getItem('liquidityLevels')) || {}
+  )
+
+  function setLiquidityLevel(key, level) {
+    const next = { ...liquidityLevels }
+    if (level === '') {
+      delete next[key]
+    } else {
+      next[key] = parseInt(level)
+    }
+    localStorage.setItem('liquidityLevels', JSON.stringify(next))
+    setLiquidityLevelsState(next)
+  }
 
   const accounts     = JSON.parse(localStorage.getItem('bankAccounts'))       || []
   const depots       = JSON.parse(localStorage.getItem('depots'))             || []
@@ -203,6 +229,18 @@ export default function Dashboard() {
   // ── Gesamtvermögen ──
   const totalAssets = totalBank + totalSecurities + totalInsurance + totalRealEstate + totalShares
 
+  // ── Liquidität: alle Positionen als flache Liste ──
+  const allAssetItems = [
+    ...accounts.map(a => ({ key: `bank_${a.id}`, name: a.name, type: 'Bankkonto', value: a.balance })),
+    ...depotData.map(({ depot, totalValue }) => ({ key: `depot_${depot.id}`, name: depot.name, type: 'Depot', value: totalValue })),
+    ...insurance.map(c => ({ key: `insurance_${c.id}`, name: c.name || c.company || '–', type: 'Versicherung', value: c.value || 0 })),
+    ...realEstate.map(p => ({ key: `realestate_${p.id}`, name: p.name, type: 'Immobilie', value: p.current || 0 })),
+    ...shares.map(s => ({ key: `shares_${s.id}`, name: s.company, type: 'Beteiligung', value: s.value || 0 })),
+  ]
+
+  const assignedItems   = allAssetItems.filter(a => liquidityLevels[a.key] != null)
+  const unassignedItems = allAssetItems.filter(a => liquidityLevels[a.key] == null)
+
   const freqLabel = { monthly: 'mtl.', quarterly: 'quartl.', halfyearly: 'halbj.', yearly: 'jährl.' }
 
   return (
@@ -225,6 +263,95 @@ export default function Dashboard() {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* ── Liquiditätsübersicht ── */}
+      <div className="module" style={{ marginBottom: '1.25rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+          <h2 style={{ margin: 0 }}>Liquiditätsübersicht</h2>
+          <button
+            onClick={() => setShowLiqConfig(v => !v)}
+            style={{ fontSize: '0.8rem', padding: '0.3rem 0.75rem', background: 'transparent', border: '1px solid var(--color-border)', borderRadius: 6, cursor: 'pointer', color: 'var(--color-text-muted)' }}
+          >
+            {showLiqConfig ? 'Konfiguration schließen' : 'Stufen konfigurieren'}
+          </button>
+        </div>
+
+        {/* Konfiguration */}
+        {showLiqConfig && (
+          <div style={{ background: 'var(--color-bg)', borderRadius: 8, padding: '0.85rem', marginBottom: '1rem' }}>
+            <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '0.6rem' }}>
+              Liquiditätsstufe je Position festlegen
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+              {allAssetItems.map(item => (
+                <div key={item.key} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem' }}>
+                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <span style={{ color: 'var(--color-text-muted)', fontSize: '0.72rem', marginRight: '0.3rem' }}>{item.type}</span>
+                    {item.name}
+                  </span>
+                  <span style={{ color: 'var(--color-text-muted)', fontSize: '0.78rem', flexShrink: 0 }}>{fmt(item.value)}</span>
+                  <select
+                    value={liquidityLevels[item.key] ?? ''}
+                    onChange={e => setLiquidityLevel(item.key, e.target.value)}
+                    style={{ fontSize: '0.78rem', padding: '0.18rem 0.4rem', flexShrink: 0 }}
+                  >
+                    <option value="">– nicht zugeordnet –</option>
+                    {LIQUIDITY_ORDER.map(l => (
+                      <option key={l} value={l}>{LIQUIDITY_LEVELS[l].label} – {LIQUIDITY_LEVELS[l].desc}</option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Übersicht je Stufe */}
+        {LIQUIDITY_ORDER.map(level => {
+          const lDef  = LIQUIDITY_LEVELS[level]
+          const items = assignedItems.filter(a => liquidityLevels[a.key] === level)
+          if (items.length === 0) return null
+          const total = items.reduce((s, a) => s + a.value, 0)
+          const pct   = totalAssets > 0 ? (total / totalAssets) * 100 : 0
+          return (
+            <div key={level} style={{ marginBottom: '0.65rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.3rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                  <span style={{ width: 10, height: 10, borderRadius: '50%', background: lDef.color, display: 'inline-block', flexShrink: 0 }} />
+                  <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>{lDef.label}</span>
+                  <span style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>{lDef.desc}</span>
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'baseline' }}>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>{pct.toFixed(1)} %</span>
+                  <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>{fmt(total)}</span>
+                </div>
+              </div>
+              {/* Fortschrittsbalken */}
+              <div style={{ width: '100%', height: 4, borderRadius: 9999, background: 'var(--color-border)', overflow: 'hidden', marginBottom: '0.3rem' }}>
+                <div style={{ width: `${pct}%`, height: '100%', borderRadius: 9999, background: lDef.color, transition: 'width 0.4s ease' }} />
+              </div>
+              {/* Einzelne Positionen */}
+              {items.map(a => (
+                <MiniRow key={a.key} label={a.name} value={fmt(a.value)} hint={a.type} muted />
+              ))}
+            </div>
+          )
+        })}
+
+        {/* Nicht zugeordnete Positionen */}
+        {unassignedItems.length > 0 && (
+          <div style={{ marginTop: '0.5rem', padding: '0.5rem 0.75rem', background: '#fef9c3', borderRadius: 6, fontSize: '0.78rem', color: '#854d0e' }}>
+            {unassignedItems.length} Position{unassignedItems.length > 1 ? 'en' : ''} noch keiner Liquiditätsstufe zugeordnet
+            ({unassignedItems.map(a => a.name).join(', ')})
+          </div>
+        )}
+
+        {allAssetItems.length === 0 && (
+          <p style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem', margin: 0 }}>
+            Noch keine Vermögenswerte vorhanden.
+          </p>
+        )}
       </div>
 
       {/* ── Sicherung ── */}
