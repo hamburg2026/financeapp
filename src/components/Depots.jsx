@@ -12,6 +12,7 @@ function useLocalStorage(key, initial) {
 
 const TYPE_LABELS = { buy: 'Kauf', sell: 'Verkauf', dividend: 'Dividende', interest: 'Zinsen' }
 const TYPE_COLOR  = { buy: '#16a34a', sell: '#dc2626', dividend: '#2563eb', interest: '#7c3aed' }
+const INCOME_TYPES = new Set(['dividend', 'interest'])
 
 const btnBase  = { border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: '0.72rem', padding: '0.2rem 0.45rem', lineHeight: 1.4 }
 const labelSt  = { fontSize: '0.68rem', color: 'var(--color-text-muted)', marginBottom: 2, display: 'block' }
@@ -83,13 +84,14 @@ export default function Depots() {
   // ─── Add transaction ─────────────────────────────────────────────────────────
   function addTransaction(e) {
     e.preventDefault()
-    const price = resolvedPrice(txQuantity, txPrice, txTotal, txPriceMode)
+    const income = isIncomeType(txType)
+    const price  = income ? parseFloat(txTotal) || 0 : resolvedPrice(txQuantity, txPrice, txTotal, txPriceMode)
     setTransactions([...transactions, {
       id:         Date.now(),
       depotId:    activeDepotId,
       securityId: parseInt(txSecurityId || securities[0]?.id),
       type:       txType,
-      quantity:   parseFloat(txQuantity),
+      quantity:   income ? 1 : parseFloat(txQuantity),
       price,
       fees:       parseFloat(txFees) || 0,
       date:       txDate,
@@ -131,28 +133,48 @@ export default function Depots() {
   function getPositions() {
     const pos = {}
     transactions.filter(t => t.depotId === activeDepotId).forEach(t => {
-      if (!pos[t.securityId]) pos[t.securityId] = { quantity: 0, cost: 0 }
+      if (!pos[t.securityId]) pos[t.securityId] = { quantity: 0, cost: 0, income: 0 }
       if (t.type === 'buy') {
         pos[t.securityId].quantity += t.quantity
         pos[t.securityId].cost    += t.quantity * t.price + (t.fees || 0)
       } else if (t.type === 'sell') {
         pos[t.securityId].quantity -= t.quantity
         pos[t.securityId].cost    -= t.quantity * t.price - (t.fees || 0)
+      } else if (INCOME_TYPES.has(t.type)) {
+        pos[t.securityId].income  += t.quantity * t.price - (t.fees || 0)
       }
     })
-    return Object.entries(pos).filter(([, p]) => p.quantity > 0.0001).map(([secId, p]) => {
-      const sec      = securities.find(s => s.id == secId)
-      const curPrice = getCurrentPrice(secId)
-      const curValue = p.quantity * curPrice
-      const pnl      = curValue - p.cost
-      return { secId, sec, quantity: p.quantity, cost: p.cost, avgPrice: p.cost / p.quantity, curPrice, curValue, pnl }
-    })
+    return Object.entries(pos)
+      .filter(([, p]) => p.quantity > 0.0001 || p.income > 0)
+      .map(([secId, p]) => {
+        const sec        = securities.find(s => s.id == secId)
+        const curPrice   = getCurrentPrice(secId)
+        const curValue   = p.quantity * curPrice
+        const priceGain  = curValue - p.cost
+        const pnl        = priceGain + p.income
+        const pct        = p.cost > 0 ? (pnl / p.cost) * 100 : null
+        return {
+          secId, sec,
+          quantity:  p.quantity,
+          cost:      p.cost,
+          avgPrice:  p.quantity > 0 ? p.cost / p.quantity : 0,
+          curPrice,  curValue, priceGain,
+          income:    p.income,
+          pnl,       pct,
+          incomeOnly: p.quantity <= 0.0001,
+        }
+      })
   }
+
+  const isIncomeType = (type) => INCOME_TYPES.has(type)
 
   const positions = depots.length > 0 ? getPositions() : []
   const depotTxs  = transactions.filter(t => t.depotId === activeDepotId).slice().sort((a, b) => new Date(b.date) - new Date(a.date))
   const totalVal  = positions.reduce((s, p) => s + p.curValue, 0)
+  const totalCost = positions.reduce((s, p) => s + p.cost, 0)
+  const totalIncome = positions.reduce((s, p) => s + p.income, 0)
   const totalPnl  = positions.reduce((s, p) => s + p.pnl, 0)
+  const totalPct  = totalCost > 0 ? (totalPnl / totalCost) * 100 : null
 
   const tabSt = (active) => ({
     padding: '0.38rem 0.9rem', fontSize: '0.83rem', cursor: 'pointer', borderRadius: 8,
@@ -221,34 +243,58 @@ export default function Depots() {
               ? <p style={{ color: 'var(--color-text-muted)', textAlign: 'center', padding: '1.5rem 0' }}>Keine Positionen im Depot.</p>
               : (
                 <div style={{ border: '1px solid var(--color-border)', borderRadius: 8, overflow: 'hidden' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
                     <thead>
                       <tr style={{ background: 'var(--color-bg)', borderBottom: '2px solid var(--color-border)' }}>
-                        {['Wertpapier', 'Anzahl', 'Ø Preis', 'Kurs', 'Wert', 'G/V'].map((h, i) => (
-                          <th key={h} style={{ textAlign: i < 2 ? 'left' : 'right', padding: '0.4rem 0.75rem', fontWeight: 600, fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>{h}</th>
+                        {[
+                          ['Wertpapier', 'left'],
+                          ['Anzahl',     'right'],
+                          ['Ø Preis',    'right'],
+                          ['Kurs',       'right'],
+                          ['Wert',       'right'],
+                          ['Erträge',    'right'],
+                          ['G/V',        'right'],
+                          ['%',          'right'],
+                        ].map(([h, align]) => (
+                          <th key={h} style={{ textAlign: align, padding: '0.38rem 0.6rem', fontWeight: 600, fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {positions.map(({ secId, sec, quantity, avgPrice, curPrice, curValue, pnl }, i) => (
-                        <tr key={secId} style={{ borderBottom: i < positions.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
-                          <td style={{ padding: '0.42rem 0.75rem', fontWeight: 500 }}>{sec?.name || secId}</td>
-                          <td style={{ padding: '0.42rem 0.75rem' }}>{quantity.toLocaleString('de-DE', { maximumFractionDigits: 4 })}</td>
-                          <td style={{ padding: '0.42rem 0.75rem', textAlign: 'right' }}>{fmt(avgPrice)}</td>
-                          <td style={{ padding: '0.42rem 0.75rem', textAlign: 'right' }}>{fmt(curPrice)}</td>
-                          <td style={{ padding: '0.42rem 0.75rem', textAlign: 'right', fontWeight: 600 }}>{fmt(curValue)}</td>
-                          <td style={{ padding: '0.42rem 0.75rem', textAlign: 'right', fontWeight: 600, color: pnl >= 0 ? '#16a34a' : '#dc2626' }}>
+                      {positions.map(({ secId, sec, quantity, avgPrice, curPrice, curValue, income, pnl, pct, incomeOnly }, i) => (
+                        <tr key={secId} style={{ borderBottom: i < positions.length - 1 ? '1px solid var(--color-border)' : 'none', opacity: incomeOnly ? 0.7 : 1 }}>
+                          <td style={{ padding: '0.4rem 0.6rem', fontWeight: 500 }}>
+                            {sec?.name || secId}
+                            {incomeOnly && <span style={{ marginLeft: 4, fontSize: '0.65rem', color: 'var(--color-text-muted)' }}>(kein Bestand)</span>}
+                          </td>
+                          <td style={{ padding: '0.4rem 0.6rem', textAlign: 'right', color: incomeOnly ? 'var(--color-text-muted)' : 'inherit' }}>
+                            {incomeOnly ? '–' : quantity.toLocaleString('de-DE', { maximumFractionDigits: 4 })}
+                          </td>
+                          <td style={{ padding: '0.4rem 0.6rem', textAlign: 'right', color: 'var(--color-text-muted)', fontSize: '0.78rem' }}>{incomeOnly ? '–' : fmt(avgPrice)}</td>
+                          <td style={{ padding: '0.4rem 0.6rem', textAlign: 'right', color: 'var(--color-text-muted)', fontSize: '0.78rem' }}>{incomeOnly ? '–' : fmt(curPrice)}</td>
+                          <td style={{ padding: '0.4rem 0.6rem', textAlign: 'right', fontWeight: 600 }}>{incomeOnly ? '–' : fmt(curValue)}</td>
+                          <td style={{ padding: '0.4rem 0.6rem', textAlign: 'right', color: income > 0 ? '#2563eb' : 'var(--color-text-muted)', fontWeight: income > 0 ? 600 : 400 }}>
+                            {income > 0 ? `+${fmt(income)}` : '–'}
+                          </td>
+                          <td style={{ padding: '0.4rem 0.6rem', textAlign: 'right', fontWeight: 700, color: pnl >= 0 ? '#16a34a' : '#dc2626' }}>
                             {pnl >= 0 ? '+' : ''}{fmt(pnl)}
+                          </td>
+                          <td style={{ padding: '0.4rem 0.6rem', textAlign: 'right', fontSize: '0.78rem', fontWeight: 600, color: (pct ?? 0) >= 0 ? '#16a34a' : '#dc2626' }}>
+                            {pct != null ? `${pct >= 0 ? '+' : ''}${pct.toFixed(1)} %` : '–'}
                           </td>
                         </tr>
                       ))}
                     </tbody>
                     <tfoot>
                       <tr style={{ borderTop: '2px solid var(--color-border)', background: 'var(--color-bg)' }}>
-                        <td colSpan={4} style={{ padding: '0.42rem 0.75rem', fontWeight: 600, fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>Gesamt</td>
-                        <td style={{ padding: '0.42rem 0.75rem', textAlign: 'right', fontWeight: 700 }}>{fmt(totalVal)}</td>
-                        <td style={{ padding: '0.42rem 0.75rem', textAlign: 'right', fontWeight: 700, color: totalPnl >= 0 ? '#16a34a' : '#dc2626' }}>
+                        <td colSpan={4} style={{ padding: '0.4rem 0.6rem', fontWeight: 600, fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Gesamt</td>
+                        <td style={{ padding: '0.4rem 0.6rem', textAlign: 'right', fontWeight: 700 }}>{fmt(totalVal)}</td>
+                        <td style={{ padding: '0.4rem 0.6rem', textAlign: 'right', fontWeight: 700, color: '#2563eb' }}>{totalIncome > 0 ? `+${fmt(totalIncome)}` : '–'}</td>
+                        <td style={{ padding: '0.4rem 0.6rem', textAlign: 'right', fontWeight: 700, color: totalPnl >= 0 ? '#16a34a' : '#dc2626' }}>
                           {totalPnl >= 0 ? '+' : ''}{fmt(totalPnl)}
+                        </td>
+                        <td style={{ padding: '0.4rem 0.6rem', textAlign: 'right', fontWeight: 700, fontSize: '0.78rem', color: (totalPct ?? 0) >= 0 ? '#16a34a' : '#dc2626' }}>
+                          {totalPct != null ? `${totalPct >= 0 ? '+' : ''}${totalPct.toFixed(1)} %` : '–'}
                         </td>
                       </tr>
                     </tfoot>
@@ -271,7 +317,7 @@ export default function Depots() {
                         {securities.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                       </select>
                     </div>
-                    <div style={fieldCol(100)}>
+                    <div style={fieldCol(110)}>
                       <span style={labelSt}>Typ</span>
                       <select value={txType} onChange={e => setTxType(e.target.value)}>
                         <option value="buy">Kauf</option>
@@ -280,21 +326,31 @@ export default function Depots() {
                         <option value="interest">Zinsen</option>
                       </select>
                     </div>
-                    <div style={fieldCol(85)}>
-                      <span style={labelSt}>Anzahl</span>
-                      <input type="number" value={txQuantity} onChange={e => { setTxQuantity(e.target.value); if (txPriceMode === 'total' && e.target.value && txTotal) setTxPrice((parseFloat(txTotal) / parseFloat(e.target.value)).toFixed(4)) }} step="0.0001" min="0.0001" required />
-                    </div>
-                    <PriceModeToggle mode={txPriceMode} setMode={setTxPriceMode} />
-                    {txPriceMode === 'price' ? (
-                      <div style={fieldCol(95)}>
-                        <span style={labelSt}>Kurs/Stk.</span>
-                        <input type="number" value={txPrice} onChange={e => setTxPrice(e.target.value)} step="0.0001" min="0" required />
+                    {isIncomeType(txType) ? (
+                      /* Income-only: just a total amount */
+                      <div style={fieldCol(110)}>
+                        <span style={labelSt}>Betrag (gesamt)</span>
+                        <input type="number" value={txTotal} onChange={e => setTxTotal(e.target.value)} step="0.01" min="0" required placeholder="0.00" />
                       </div>
                     ) : (
-                      <div style={fieldCol(100)}>
-                        <span style={labelSt}>Einstandswert</span>
-                        <input type="number" value={txTotal} onChange={e => setTxTotal(e.target.value)} step="0.01" min="0" required placeholder="Gesamt" />
-                      </div>
+                      <>
+                        <div style={fieldCol(85)}>
+                          <span style={labelSt}>Anzahl</span>
+                          <input type="number" value={txQuantity} onChange={e => setTxQuantity(e.target.value)} step="0.0001" min="0.0001" required />
+                        </div>
+                        <PriceModeToggle mode={txPriceMode} setMode={setTxPriceMode} />
+                        {txPriceMode === 'price' ? (
+                          <div style={fieldCol(95)}>
+                            <span style={labelSt}>Kurs/Stk.</span>
+                            <input type="number" value={txPrice} onChange={e => setTxPrice(e.target.value)} step="0.0001" min="0" required />
+                          </div>
+                        ) : (
+                          <div style={fieldCol(105)}>
+                            <span style={labelSt}>Einstandswert</span>
+                            <input type="number" value={txTotal} onChange={e => setTxTotal(e.target.value)} step="0.01" min="0" required placeholder="Gesamt" />
+                          </div>
+                        )}
+                      </>
                     )}
                     <div style={fieldCol(80)}>
                       <span style={labelSt}>Gebühren</span>
@@ -315,8 +371,7 @@ export default function Depots() {
                 : (
                   <div style={{ border: '1px solid var(--color-border)', borderRadius: 8, overflow: 'hidden' }}>
                     {depotTxs.map((t, i) => {
-                      const sec   = securities.find(s => s.id == t.securityId)
-                      const total = t.quantity * t.price + (t.fees || 0)
+                      const sec    = securities.find(s => s.id == t.securityId)
                       const isLast = i === depotTxs.length - 1
                       const border = isLast ? 'none' : '1px solid var(--color-border)'
 
@@ -368,14 +423,24 @@ export default function Depots() {
                         )
                       }
 
+                      const incType = INCOME_TYPES.has(t.type)
+                      const total   = incType
+                        ? t.quantity * t.price - (t.fees || 0)
+                        : t.quantity * t.price + (t.fees || 0)
                       return (
                         <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', padding: '0.42rem 0.75rem', borderBottom: border, fontSize: '0.82rem' }}>
                           <span style={{ color: 'var(--color-text-muted)', minWidth: 80, fontSize: '0.78rem' }}>{t.date}</span>
-                          <span style={{ fontWeight: 700, color: TYPE_COLOR[t.type] || '#374151', minWidth: 60 }}>{TYPE_LABELS[t.type]}</span>
+                          <span style={{ fontWeight: 700, color: TYPE_COLOR[t.type] || '#374151', minWidth: 65 }}>{TYPE_LABELS[t.type]}</span>
                           <span style={{ flex: 1, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sec?.name || t.securityId}</span>
-                          <span style={{ color: 'var(--color-text-muted)', fontSize: '0.75rem', whiteSpace: 'nowrap' }}>{t.quantity?.toLocaleString('de-DE', { maximumFractionDigits: 4 })} × {fmt(t.price)}</span>
-                          {t.fees > 0 && <span style={{ color: 'var(--color-text-muted)', fontSize: '0.72rem' }}>+{fmt(t.fees)} Geb.</span>}
-                          <span style={{ fontWeight: 700, minWidth: 70, textAlign: 'right' }}>{fmt(total)}</span>
+                          {!incType && (
+                            <span style={{ color: 'var(--color-text-muted)', fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
+                              {t.quantity?.toLocaleString('de-DE', { maximumFractionDigits: 4 })} × {fmt(t.price)}
+                            </span>
+                          )}
+                          {t.fees > 0 && <span style={{ color: 'var(--color-text-muted)', fontSize: '0.72rem' }}>{incType ? '-' : '+'}{fmt(t.fees)} Geb.</span>}
+                          <span style={{ fontWeight: 700, minWidth: 70, textAlign: 'right', color: incType ? '#2563eb' : 'inherit' }}>
+                            {incType ? '+' : ''}{fmt(total)}
+                          </span>
                           <button onClick={() => startEditTx(t)} style={{ ...btnBase, background: '#e5e7eb', color: '#374151' }} title="Bearbeiten">✎</button>
                           <button onClick={() => removeTx(t.id)} style={{ ...btnBase, background: '#fee2e2', color: '#dc2626' }} title="Löschen">✕</button>
                         </div>

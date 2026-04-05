@@ -100,28 +100,34 @@ function Section({ title, children }) {
   )
 }
 
+// Right-side cells: fixed-width columns so values align across all rows
+const COL_VAL  = { width: 90,  textAlign: 'right', fontWeight: 500, flexShrink: 0 }
+const COL_PCT  = { width: 58,  textAlign: 'right', fontSize: '0.73rem', fontWeight: 600, flexShrink: 0 }
+const COL_CHG  = { width: 88,  textAlign: 'right', fontWeight: 600, flexShrink: 0 }
+
 function MiniRow({ label, value, sub, pct, hint, muted }) {
+  const showRight = sub != null || pct != null
   return (
     <div style={{
       display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
       padding: '0.28rem 0',
       borderBottom: '1px solid var(--color-border)',
       fontSize: '0.82rem',
-      gap: '0.5rem',
+      gap: '0.25rem',
     }}>
-      <span style={{ color: muted ? 'var(--color-text-muted)' : 'var(--color-text)', flex: 1 }}>
+      <span style={{ color: muted ? 'var(--color-text-muted)' : 'var(--color-text)', flex: 1, minWidth: 0 }}>
         {label}
         {hint && <span style={{ display: 'block', fontSize: '0.72rem', color: 'var(--color-text-muted)', fontWeight: 400, marginTop: 1 }}>{hint}</span>}
       </span>
-      <span style={{ display: 'flex', gap: '0.45rem', alignItems: 'baseline', flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-        <span style={{ fontWeight: 500 }}>{value}</span>
-        {pct != null && (
-          <span style={{ fontSize: '0.73rem', fontWeight: 600, color: pct >= 0 ? '#16a34a' : '#dc2626' }}>
-            {pct >= 0 ? '+' : ''}{pct.toFixed(1)} %
-          </span>
-        )}
-        {sub != null && <span style={pnlStyle(sub)}>{fmtPnl(sub)}</span>}
-      </span>
+      <span style={COL_VAL}>{value}</span>
+      {showRight && <>
+        <span style={{ ...COL_PCT, color: (pct ?? 0) >= 0 ? '#16a34a' : '#dc2626' }}>
+          {pct != null ? `${pct >= 0 ? '+' : ''}${pct.toFixed(1)} %` : ''}
+        </span>
+        <span style={{ ...COL_CHG, color: (sub ?? 0) >= 0 ? '#16a34a' : '#dc2626' }}>
+          {sub != null ? fmtPnl(sub) : ''}
+        </span>
+      </>}
     </div>
   )
 }
@@ -151,27 +157,30 @@ export default function Dashboard() {
     return [...list].sort((a, b) => new Date(b.date) - new Date(a.date))[0].value
   }
 
+  const INCOME_TYPES_DASH = new Set(['dividend', 'interest'])
   const depotData = depots.map(depot => {
     const trans = depotTrans.filter(t => t.depotId === depot.id)
     const pos = {}
     trans.forEach(t => {
-      if (!pos[t.securityId]) pos[t.securityId] = { qty: 0, cost: 0 }
+      if (!pos[t.securityId]) pos[t.securityId] = { qty: 0, cost: 0, income: 0 }
       if (t.type === 'buy') {
-        pos[t.securityId].qty  += t.quantity
-        pos[t.securityId].cost += t.quantity * t.price + (t.fees || 0)
+        pos[t.securityId].qty    += t.quantity
+        pos[t.securityId].cost   += t.quantity * t.price + (t.fees || 0)
       } else if (t.type === 'sell') {
-        pos[t.securityId].qty  -= t.quantity
-        pos[t.securityId].cost -= t.quantity * t.price - (t.fees || 0)
+        pos[t.securityId].qty    -= t.quantity
+        pos[t.securityId].cost   -= t.quantity * t.price - (t.fees || 0)
+      } else if (INCOME_TYPES_DASH.has(t.type)) {
+        pos[t.securityId].income += t.quantity * t.price - (t.fees || 0)
       }
     })
     const positions = Object.entries(pos)
-      .filter(([, p]) => p.qty > 0)
+      .filter(([, p]) => p.qty > 0 || p.income > 0)
       .map(([secId, p]) => {
-        const sec = securities.find(s => s.id == secId)
+        const sec      = securities.find(s => s.id == secId)
         const curPrice = getCurrentPrice(secId)
         const curValue = p.qty * curPrice
-        const pnl = curValue - p.cost
-        const pct = p.cost > 0 ? (pnl / p.cost) * 100 : null
+        const pnl      = curValue - p.cost + p.income
+        const pct      = p.cost > 0 ? (pnl / p.cost) * 100 : null
         return { secId, name: sec?.name || secId, qty: p.qty, cost: p.cost, curValue, pnl, pct }
       })
     const totalValue = positions.reduce((s, p) => s + p.curValue, 0)
