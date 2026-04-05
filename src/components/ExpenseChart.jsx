@@ -27,24 +27,33 @@ function DonutChart({ segments, size = 200, strokeWidth = 38 }) {
   const cx = size / 2
   const cy = size / 2
   const circumference = 2 * Math.PI * r
-  const gapCirc = 0
+
+  // Pre-compute arc lengths; last segment fills the exact remainder so
+  // floating-point rounding never leaves a visible gap.
+  let usedLen = 0
+  const arcs = segments.map((seg, i) => {
+    const isLast = i === segments.length - 1
+    const len = isLast
+      ? Math.max(0, circumference - usedLen)
+      : circumference * (seg.pct / 100)
+    usedLen += len
+    return len
+  })
+
   let offsetAngle = -90
 
   return (
     <svg width={size} height={size} style={{ display: 'block', flexShrink: 0 }}>
-      {segments.length === 0 && (
-        <circle
-          cx={cx} cy={cy} r={r} fill="none"
-          stroke="var(--color-border)" strokeWidth={strokeWidth}
-        />
-      )}
+      {/* Background ring – always present so any sub-pixel gap shows grey, not white */}
+      <circle
+        cx={cx} cy={cy} r={r} fill="none"
+        stroke="var(--color-border)" strokeWidth={strokeWidth}
+      />
       {segments.map((seg, i) => {
-        const fraction = seg.pct / 100
-        const arcLen = circumference * fraction
-        const dashArray = Math.max(0, arcLen - gapCirc)
+        const arcLen   = arcs[i]
         const rotation = offsetAngle
-        offsetAngle += fraction * 360
-        if (dashArray <= 0) return null
+        offsetAngle += (seg.pct / 100) * 360
+        if (arcLen <= 0) return null
         return (
           <circle
             key={i}
@@ -52,7 +61,7 @@ function DonutChart({ segments, size = 200, strokeWidth = 38 }) {
             fill="none"
             stroke={seg.color}
             strokeWidth={strokeWidth}
-            strokeDasharray={`${dashArray} ${circumference}`}
+            strokeDasharray={`${arcLen} ${circumference}`}
             strokeDashoffset={circumference / 4}
             style={{ transform: `rotate(${rotation + 90}deg)`, transformOrigin: `${cx}px ${cy}px` }}
           />

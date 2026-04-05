@@ -21,47 +21,46 @@ function DonutChart({ segments, size = 220, strokeWidth = 42 }) {
   const cx = size / 2
   const cy = size / 2
   const circumference = 2 * Math.PI * r
-  // Gap in px between segments
-  const gapCirc = 0
 
-  let offsetAngle = -90 // start at top
+  // Pre-compute arc lengths; the last segment fills the exact remainder so
+  // floating-point rounding never leaves a visible gap.
+  let usedLen = 0
+  const arcs = segments.map((seg, i) => {
+    const isLast = i === segments.length - 1
+    const len = isLast
+      ? Math.max(0, circumference - usedLen)
+      : circumference * (seg.pct / 100)
+    usedLen += len
+    return len
+  })
+
+  let offsetAngle = -90 // start at top (12 o'clock)
 
   return (
     <svg width={size} height={size} style={{ display: 'block' }}>
+      {/* Background ring – always present so any sub-pixel gap shows grey, not white */}
+      <circle
+        cx={cx} cy={cy} r={r} fill="none"
+        stroke="var(--color-border)" strokeWidth={strokeWidth}
+      />
       {segments.map((seg, i) => {
-        const fraction = seg.pct / 100
-        const arcLen = circumference * fraction
-        const dashArray = Math.max(0, arcLen - gapCirc)
-        const dashOffset = -(offsetAngle / 360) * circumference
-
-        // rotation: start from current angle offset
+        const arcLen   = arcs[i]
         const rotation = offsetAngle
-
-        offsetAngle += fraction * 360
-
-        if (dashArray <= 0) return null
+        offsetAngle += (seg.pct / 100) * 360
+        if (arcLen <= 0) return null
         return (
           <circle
             key={i}
-            cx={cx}
-            cy={cy}
-            r={r}
+            cx={cx} cy={cy} r={r}
             fill="none"
             stroke={seg.color}
             strokeWidth={strokeWidth}
-            strokeDasharray={`${dashArray} ${circumference}`}
+            strokeDasharray={`${arcLen} ${circumference}`}
             strokeDashoffset={circumference / 4}
             style={{ transform: `rotate(${rotation + 90}deg)`, transformOrigin: `${cx}px ${cy}px` }}
           />
         )
       })}
-      {/* Background ring when no data */}
-      {segments.length === 0 && (
-        <circle
-          cx={cx} cy={cy} r={r} fill="none"
-          stroke="var(--color-border)" strokeWidth={strokeWidth}
-        />
-      )}
     </svg>
   )
 }
