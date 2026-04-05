@@ -21,53 +21,38 @@ function recIsIncome(r, catById) {
   return type === 'Einnahme'
 }
 
-// DonutChart using stroke-dasharray trick
-function DonutChart({ segments, size = 200, strokeWidth = 38 }) {
-  const r = (size - strokeWidth) / 2
-  const cx = size / 2
-  const cy = size / 2
-  const circumference = 2 * Math.PI * r
+// DonutChart via CSS conic-gradient – always exactly 360°, no SVG rendering gaps.
+function DonutChart({ segments, size = 200, strokeWidth = 38, centerLabel, centerValue }) {
+  if (segments.length === 0) return null
 
-  // Pre-compute arc lengths; last segment fills the exact remainder so
-  // floating-point rounding never leaves a visible gap.
-  let usedLen = 0
-  const arcs = segments.map((seg, i) => {
-    const isLast = i === segments.length - 1
-    const len = isLast
-      ? Math.max(0, circumference - usedLen)
-      : circumference * (seg.pct / 100)
-    usedLen += len
-    return len
+  let angle = 0
+  const stops = segments.map((seg, i) => {
+    const start = angle
+    angle = i === segments.length - 1 ? 360 : +(angle + seg.pct / 100 * 360).toFixed(4)
+    return `${seg.color} ${start}deg ${angle}deg`
   })
 
-  let offsetAngle = -90
-
   return (
-    <svg width={size} height={size} style={{ display: 'block', flexShrink: 0 }}>
-      {/* Background ring – always present so any sub-pixel gap shows grey, not white */}
-      <circle
-        cx={cx} cy={cy} r={r} fill="none"
-        stroke="var(--color-border)" strokeWidth={strokeWidth}
-      />
-      {segments.map((seg, i) => {
-        const arcLen   = arcs[i]
-        const rotation = offsetAngle
-        offsetAngle += (seg.pct / 100) * 360
-        if (arcLen <= 0) return null
-        return (
-          <circle
-            key={i}
-            cx={cx} cy={cy} r={r}
-            fill="none"
-            stroke={seg.color}
-            strokeWidth={strokeWidth}
-            strokeDasharray={`${arcLen} ${circumference}`}
-            strokeDashoffset={circumference / 4}
-            style={{ transform: `rotate(${rotation + 90}deg)`, transformOrigin: `${cx}px ${cy}px` }}
-          />
-        )
-      })}
-    </svg>
+    <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
+      <div style={{
+        width: size, height: size, borderRadius: '50%',
+        background: `conic-gradient(from -90deg, ${stops.join(', ')})`,
+      }} />
+      <div style={{
+        position: 'absolute',
+        top: strokeWidth, left: strokeWidth, right: strokeWidth, bottom: strokeWidth,
+        borderRadius: '50%',
+        background: 'var(--color-surface)',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      }}>
+        {centerValue != null && (
+          <>
+            <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#dc2626', lineHeight: 1.1 }}>{centerValue}</span>
+            {centerLabel && <span style={{ fontSize: '0.6rem', color: 'var(--color-text-muted)', marginTop: 2 }}>{centerLabel}</span>}
+          </>
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -84,16 +69,7 @@ export default function ExpenseChart() {
     return r.amount * (factors[r.frequency] ?? 1)
   }
 
-  if (recurrings.length === 0) {
-    return (
-      <div className="module">
-        <h2>Ausgaben &amp; Einnahmen – Grafik</h2>
-        <p style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '2rem 0', margin: 0 }}>
-          Noch keine Daueraufträge angelegt.
-        </p>
-      </div>
-    )
-  }
+  if (recurrings.length === 0) return null
 
   const totalExpense = recurrings
     .filter(r => !recIsIncome(r, catById))
@@ -242,7 +218,11 @@ export default function ExpenseChart() {
             Ausgaben nach Kategorie
           </div>
           <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
-            <DonutChart segments={donutSegments} size={200} strokeWidth={38} />
+            <DonutChart
+              segments={donutSegments} size={200} strokeWidth={38}
+              centerValue={fmt(donutTotal)}
+              centerLabel={PERIOD_SHORT[period]}
+            />
             {/* Legend */}
             <div style={{ flex: 1, minWidth: 140, display: 'flex', flexDirection: 'column', gap: '0.45rem', justifyContent: 'center' }}>
               {donutSegments.map(seg => (

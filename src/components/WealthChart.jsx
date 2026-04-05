@@ -14,54 +14,49 @@ function getCurrentPrice(secId, prices) {
   return [...list].sort((a, b) => new Date(b.date) - new Date(a.date))[0].value
 }
 
-// DonutChart: renders multiple overlapping SVG circles, each offset/clipped to its arc
-// Uses the stroke-dasharray trick: each circle shows only its segment via dasharray + dashoffset
-function DonutChart({ segments, size = 220, strokeWidth = 42 }) {
-  const r = (size - strokeWidth) / 2
-  const cx = size / 2
-  const cy = size / 2
-  const circumference = 2 * Math.PI * r
+// DonutChart via CSS conic-gradient – always exactly 360°, no SVG rendering gaps.
+// 'from -90deg' starts at 12 o'clock. Last stop is forced to 360 so the ring is closed.
+function DonutChart({ segments, size = 220, strokeWidth = 42, centerLabel, centerValue }) {
+  if (segments.length === 0) return null
 
-  // Pre-compute arc lengths; the last segment fills the exact remainder so
-  // floating-point rounding never leaves a visible gap.
-  let usedLen = 0
-  const arcs = segments.map((seg, i) => {
-    const isLast = i === segments.length - 1
-    const len = isLast
-      ? Math.max(0, circumference - usedLen)
-      : circumference * (seg.pct / 100)
-    usedLen += len
-    return len
+  let angle = 0
+  const stops = segments.map((seg, i) => {
+    const start = angle
+    angle = i === segments.length - 1 ? 360 : +(angle + seg.pct / 100 * 360).toFixed(4)
+    return `${seg.color} ${start}deg ${angle}deg`
   })
 
-  let offsetAngle = -90 // start at top (12 o'clock)
-
   return (
-    <svg width={size} height={size} style={{ display: 'block' }}>
-      {/* Background ring – always present so any sub-pixel gap shows grey, not white */}
-      <circle
-        cx={cx} cy={cy} r={r} fill="none"
-        stroke="var(--color-border)" strokeWidth={strokeWidth}
-      />
-      {segments.map((seg, i) => {
-        const arcLen   = arcs[i]
-        const rotation = offsetAngle
-        offsetAngle += (seg.pct / 100) * 360
-        if (arcLen <= 0) return null
-        return (
-          <circle
-            key={i}
-            cx={cx} cy={cy} r={r}
-            fill="none"
-            stroke={seg.color}
-            strokeWidth={strokeWidth}
-            strokeDasharray={`${arcLen} ${circumference}`}
-            strokeDashoffset={circumference / 4}
-            style={{ transform: `rotate(${rotation + 90}deg)`, transformOrigin: `${cx}px ${cy}px` }}
-          />
-        )
-      })}
-    </svg>
+    <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
+      {/* Outer ring */}
+      <div style={{
+        width: size, height: size, borderRadius: '50%',
+        background: `conic-gradient(from -90deg, ${stops.join(', ')})`,
+      }} />
+      {/* Donut hole – covers the center, matching the card background */}
+      <div style={{
+        position: 'absolute',
+        top: strokeWidth, left: strokeWidth,
+        right: strokeWidth, bottom: strokeWidth,
+        borderRadius: '50%',
+        background: 'var(--color-surface)',
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+      }}>
+        {centerValue != null && (
+          <>
+            <span style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--color-primary)', letterSpacing: '-0.01em', lineHeight: 1.1 }}>
+              {centerValue}
+            </span>
+            {centerLabel && (
+              <span style={{ fontSize: '0.6rem', color: 'var(--color-text-muted)', marginTop: 2 }}>
+                {centerLabel}
+              </span>
+            )}
+          </>
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -74,10 +69,8 @@ export default function WealthChart() {
   const realEstate = JSON.parse(localStorage.getItem('realEstate'))         || []
   const shares     = JSON.parse(localStorage.getItem('companyShares'))      || []
 
-  // Bank
   const totalBank = accounts.reduce((s, a) => s + (a.balance || 0), 0)
 
-  // Securities via depots
   const totalSecurities = depots.reduce((sum, depot) => {
     const trans = depotTrans.filter(t => t.depotId === depot.id)
     const qty = {}
@@ -86,127 +79,68 @@ export default function WealthChart() {
       if (t.type === 'buy')  qty[t.securityId] += t.quantity
       if (t.type === 'sell') qty[t.securityId] -= t.quantity
     })
-    const depotValue = Object.entries(qty)
+    return sum + Object.entries(qty)
       .filter(([, q]) => q > 0)
       .reduce((s, [secId, q]) => s + q * getCurrentPrice(secId, prices), 0)
-    return sum + depotValue
   }, 0)
 
-  // Insurance
-  const totalInsurance = insurance.reduce((s, c) => s + (c.value || 0), 0)
-
-  // Real Estate
+  const totalInsurance  = insurance.reduce((s, c) => s + (c.value || 0), 0)
   const totalRealEstate = realEstate.reduce((s, p) => s + (p.current || 0), 0)
-
-  // Company shares
-  const totalShares = shares.reduce((s, sh) => s + (sh.value || 0), 0)
+  const totalShares     = shares.reduce((s, sh) => s + (sh.value || 0), 0)
 
   const values = {
-    bank:       totalBank,
-    securities: totalSecurities,
-    insurance:  totalInsurance,
-    realEstate: totalRealEstate,
-    shares:     totalShares,
+    bank: totalBank, securities: totalSecurities, insurance: totalInsurance,
+    realEstate: totalRealEstate, shares: totalShares,
   }
-
   const total = Object.values(values).reduce((s, v) => s + v, 0)
 
-  // Build segments for donut (only assets with value > 0)
+  if (total === 0) return null  // keine Daten → nicht anzeigen
+
   const activeAssets = ASSETS.filter(a => values[a.key] > 0)
   const segments = activeAssets.map(a => ({
     color: a.color,
-    pct: total > 0 ? (values[a.key] / total) * 100 : 0,
+    pct: (values[a.key] / total) * 100,
   }))
 
   return (
     <div className="module">
       <h2>Vermögensübersicht</h2>
 
-      {total === 0 ? (
-        <p style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '2rem 0', margin: 0 }}>
-          Keine Vermögensdaten vorhanden
-        </p>
-      ) : (
-        <>
-          {/* Donut centered */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '1.5rem' }}>
-            <DonutChart segments={segments} size={220} strokeWidth={42} />
-            {/* Total below donut */}
-            <div style={{
-              marginTop: '0.75rem',
-              fontSize: '1.6rem',
-              fontWeight: 700,
-              color: 'var(--color-primary)',
-              letterSpacing: '-0.01em',
-            }}>
-              {fmt(total)}
-            </div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '0.15rem' }}>
-              Gesamtvermögen
-            </div>
-          </div>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '1.5rem' }}>
+        <DonutChart
+          segments={segments}
+          size={220} strokeWidth={42}
+          centerValue={fmt(total)}
+          centerLabel="Gesamtvermögen"
+        />
+      </div>
 
-          {/* Asset rows */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            {ASSETS.filter(a => values[a.key] > 0).map(a => {
-              const val = values[a.key]
-              const pct = total > 0 ? (val / total) * 100 : 0
-              return (
-                <div key={a.key}>
-                  {/* Row: label left, amount+pct right */}
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    marginBottom: '0.25rem',
-                  }}>
-                    {/* Left: dot + icon + label */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                      <span style={{
-                        width: 12,
-                        height: 12,
-                        borderRadius: '50%',
-                        background: a.color,
-                        flexShrink: 0,
-                        display: 'inline-block',
-                      }} />
-                      <span style={{ fontSize: '1rem' }}>{a.icon}</span>
-                      <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>{a.label}</span>
-                    </div>
-                    {/* Right: amount + pct */}
-                    <div style={{ textAlign: 'right' }}>
-                      <span style={{ fontSize: '0.88rem', fontWeight: 600 }}>{fmt(val)}</span>
-                      <span style={{
-                        fontSize: '0.72rem',
-                        color: 'var(--color-text-muted)',
-                        marginLeft: '0.4rem',
-                      }}>
-                        {pct.toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} %
-                      </span>
-                    </div>
-                  </div>
-                  {/* Percentage bar */}
-                  <div style={{
-                    width: '100%',
-                    height: 4,
-                    borderRadius: 9999,
-                    background: 'var(--color-border)',
-                    overflow: 'hidden',
-                  }}>
-                    <div style={{
-                      width: `${pct}%`,
-                      height: '100%',
-                      borderRadius: 9999,
-                      background: a.color,
-                      transition: 'width 0.4s ease',
-                    }} />
-                  </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+        {activeAssets.map(a => {
+          const val = values[a.key]
+          const pct = (val / total) * 100
+          return (
+            <div key={a.key}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                  <span style={{ width: 12, height: 12, borderRadius: '50%', background: a.color, flexShrink: 0, display: 'inline-block' }} />
+                  <span style={{ fontSize: '1rem' }}>{a.icon}</span>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>{a.label}</span>
                 </div>
-              )
-            })}
-          </div>
-        </>
-      )}
+                <div style={{ textAlign: 'right' }}>
+                  <span style={{ fontSize: '0.88rem', fontWeight: 600 }}>{fmt(val)}</span>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', marginLeft: '0.4rem' }}>
+                    {pct.toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} %
+                  </span>
+                </div>
+              </div>
+              <div style={{ width: '100%', height: 4, borderRadius: 9999, background: 'var(--color-border)', overflow: 'hidden' }}>
+                <div style={{ width: `${pct}%`, height: '100%', borderRadius: 9999, background: a.color, transition: 'width 0.4s ease' }} />
+              </div>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }

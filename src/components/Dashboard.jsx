@@ -250,8 +250,8 @@ export default function Dashboard() {
         <div style={{ fontSize: '0.8rem', opacity: 0.75, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Gesamtvermögen</div>
         <div style={{ fontSize: '2.25rem', fontWeight: 700, margin: '0.25rem 0 0.75rem' }}>{fmt(totalAssets)}</div>
 
-        {/* Vermögensklassen */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '0.5rem' }}>
+        {/* Vermögensklassen – feste Kachelbreite, alle gleich groß */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
           {[
             ['Bankkonten',     totalBank],
             ['Wertpapiere',    totalSecurities],
@@ -259,7 +259,7 @@ export default function Dashboard() {
             ['Immobilien',     totalRealEstate],
             ['Beteiligungen',  totalShares],
           ].map(([label, val]) => (
-            <div key={label} style={{ background: 'rgba(255,255,255,0.15)', borderRadius: 8, padding: '0.5rem 0.75rem' }}>
+            <div key={label} style={{ background: 'rgba(255,255,255,0.15)', borderRadius: 8, padding: '0.5rem 0.75rem', flex: '1 1 120px' }}>
               <div style={{ fontSize: '0.75rem', opacity: 0.8 }}>{label}</div>
               <div style={{ fontWeight: 600 }}>{fmt(val)}</div>
             </div>
@@ -273,25 +273,23 @@ export default function Dashboard() {
             <div style={{ fontSize: '0.72rem', opacity: 0.75, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>
               Liquidität
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
               {LIQUIDITY_ORDER.map(level => {
                 const lDef  = LIQUIDITY_LEVELS[level]
                 const items = assignedItems.filter(a => liquidityLevels[a.key] === level)
                 if (items.length === 0) return null
-                const total = items.reduce((s, a) => s + a.value, 0)
-                const pct   = totalAssets > 0 ? (total / totalAssets) * 100 : 0
+                const lvlTotal = items.reduce((s, a) => s + a.value, 0)
+                const pct      = totalAssets > 0 ? (lvlTotal / totalAssets) * 100 : 0
                 return (
-                  <div key={level} style={{ background: 'rgba(255,255,255,0.12)', borderRadius: 8, padding: '0.5rem 0.75rem', borderLeft: `3px solid ${lDef.color}` }}>
-                    <div style={{ fontSize: '0.68rem', opacity: 0.8 }}>
-                      {lDef.label} · {lDef.desc}
-                    </div>
-                    <div style={{ fontWeight: 700 }}>{fmt(total)}</div>
+                  <div key={level} style={{ background: 'rgba(255,255,255,0.12)', borderRadius: 8, padding: '0.5rem 0.75rem', borderLeft: `3px solid ${lDef.color}`, flex: '1 1 120px' }}>
+                    <div style={{ fontSize: '0.68rem', opacity: 0.8 }}>{lDef.label} · {lDef.desc}</div>
+                    <div style={{ fontWeight: 700 }}>{fmt(lvlTotal)}</div>
                     <div style={{ fontSize: '0.68rem', opacity: 0.65 }}>{pct.toFixed(1)} %</div>
                   </div>
                 )
               })}
               {unassignedItems.length > 0 && (
-                <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 8, padding: '0.5rem 0.75rem', borderLeft: '3px solid rgba(255,255,255,0.3)' }}>
+                <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 8, padding: '0.5rem 0.75rem', borderLeft: '3px solid rgba(255,255,255,0.3)', flex: '1 1 120px' }}>
                   <div style={{ fontSize: '0.68rem', opacity: 0.7 }}>Nicht zugeordnet</div>
                   <div style={{ fontWeight: 600 }}>{fmt(unassignedItems.reduce((s, a) => s + a.value, 0))}</div>
                   <div style={{ fontSize: '0.68rem', opacity: 0.55 }}>{unassignedItems.length} Position{unassignedItems.length > 1 ? 'en' : ''}</div>
