@@ -362,7 +362,7 @@ export default function RecurringPayments() {
                       paddingLeft: group.label ? '1.75rem' : '0.75rem',
                       borderBottom: isLast ? 'none' : '1px solid var(--color-border)',
                       fontSize: '0.85rem',
-                      background: r.insuranceId ? '#f0fdf4' : undefined,
+                      background: r.insuranceId ? '#f0fdf4' : r.subscriptionId ? '#f5f3ff' : undefined,
                     }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -370,6 +370,11 @@ export default function RecurringPayments() {
                           {r.insuranceId && (
                             <span style={{ marginLeft: '0.4rem', fontSize: '0.65rem', background: '#dcfce7', color: '#15803d', borderRadius: 3, padding: '0.1rem 0.3rem', fontWeight: 600 }}>
                               Versicherung
+                            </span>
+                          )}
+                          {r.subscriptionId && (
+                            <span style={{ marginLeft: '0.4rem', fontSize: '0.65rem', background: '#ede9fe', color: '#6d28d9', borderRadius: 3, padding: '0.1rem 0.3rem', fontWeight: 600 }}>
+                              Abonnement
                             </span>
                           )}
                         </div>
@@ -385,13 +390,15 @@ export default function RecurringPayments() {
                           {groupBy !== 'frequency' && (
                             <span style={{ marginLeft: '0.5rem', opacity: 0.7 }}>{FREQ_LABELS[r.frequency]}</span>
                           )}
-                          {r.insuranceId && (
-                            <span style={{ marginLeft: '0.4rem', opacity: 0.6 }}>– wird von Versicherungsvertrag gesteuert</span>
+                          {(r.insuranceId || r.subscriptionId) && (
+                            <span style={{ marginLeft: '0.4rem', opacity: 0.6 }}>
+                              – wird von {r.insuranceId ? 'Versicherungsvertrag' : 'Abonnement'} gesteuert
+                            </span>
                           )}
                         </div>
                       </div>
                       <span style={{ fontWeight: 600, flexShrink: 0 }}>{fmt(r.amount)}</span>
-                      {!r.insuranceId && <>
+                      {!r.insuranceId && !r.subscriptionId && <>
                         <button onClick={() => startEdit(r)}
                           style={{ ...btnSmall, background: '#e5e7eb', color: '#374151' }} title="Bearbeiten">✎</button>
                         <button onClick={() => removeRecurring(r.id)}
