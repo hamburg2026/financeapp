@@ -10,20 +10,6 @@ function useLocalStorage(key, initial) {
   return [value, set]
 }
 
-const CATEGORIES = [
-  'Haftpflicht',
-  'KFZ',
-  'Leben',
-  'Kranken / Zusatz',
-  'Hausrat',
-  'Gebäude',
-  'Unfall',
-  'Berufsunfähigkeit',
-  'Rechtsschutz',
-  'Reise',
-  'Sonstige',
-]
-
 const FREQ_LABELS = {
   monthly:    'Monatlich',
   quarterly:  'Vierteljährlich',
@@ -53,7 +39,7 @@ function syncRecurringPayment(contract) {
       amount:      contract.premium,
       frequency:   contract.premiumFrequency || 'monthly',
       type:        'Ausgabe',
-      categoryId:  null,
+      categoryId:  contract.categoryId || null,
     }]
   }
   localStorage.setItem('recurringPayments', JSON.stringify(next))
@@ -65,12 +51,14 @@ function removeRecurringPayment(contractId) {
 }
 
 const EMPTY_FORM = {
-  name: '', provider: '', category: '', value: '', premium: '', premiumFrequency: 'monthly',
+  name: '', provider: '', categoryId: '', value: '', premium: '', premiumFrequency: 'monthly',
   start: '', end: '', notes: '', comment: '', active: true,
 }
 
 export default function InsuranceContracts() {
   const [contracts, setContracts] = useLocalStorage('insuranceContracts', [])
+  const [allCategories] = useLocalStorage('categories', [])
+  const expenseCategories = allCategories.filter(c => c.type === 'Ausgabe')
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState(EMPTY_FORM)
   const [editId, setEditId] = useState(null)
@@ -88,7 +76,7 @@ export default function InsuranceContracts() {
       id:               editId || Date.now(),
       name:             form.name,
       provider:         form.provider,
-      category:         form.category,
+      categoryId:       form.categoryId ? parseInt(form.categoryId) : null,
       value:            form.value !== '' ? parseFloat(form.value) : null,
       premium:          form.premium !== '' ? parseFloat(form.premium) : 0,
       premiumFrequency: form.premiumFrequency,
@@ -112,7 +100,7 @@ export default function InsuranceContracts() {
     setForm({
       name:             c.name || '',
       provider:         c.provider || '',
-      category:         c.category || '',
+      categoryId:       c.categoryId ? String(c.categoryId) : '',
       value:            c.value != null ? String(c.value) : '',
       premium:          c.premium ? String(c.premium) : '',
       premiumFrequency: c.premiumFrequency || 'monthly',
@@ -173,10 +161,10 @@ export default function InsuranceContracts() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
             <div>
               <label style={labelStyle}>Kategorie</label>
-              <select {...field('category')} style={{ ...inputStyle, width: '100%' }}>
+              <select {...field('categoryId')} style={{ ...inputStyle, width: '100%' }}>
                 <option value="">– keine –</option>
-                {CATEGORIES.map(cat => (
-                  <option key={cat} value={cat}>{cat}</option>
+                {expenseCategories.map(cat => (
+                  <option key={cat.id} value={cat.id}>{cat.name}</option>
                 ))}
               </select>
             </div>
@@ -280,9 +268,7 @@ export default function InsuranceContracts() {
                     background: c.active !== false ? '#16a34a' : '#9ca3af',
                   }} />
                   <span style={{ fontWeight: 600, fontSize: '0.9rem', flex: 1 }}>{c.name}</span>
-                  {c.category && (
-                    <span style={{ fontSize: '0.72rem', color: '#0369a1', background: '#e0f2fe', borderRadius: 4, padding: '0.1rem 0.4rem' }}>{c.category}</span>
-                  )}
+                  {c.categoryId && (() => { const cat = allCategories.find(x => x.id === c.categoryId); return cat ? <span style={{ fontSize: '0.72rem', color: '#0369a1', background: '#e0f2fe', borderRadius: 4, padding: '0.1rem 0.4rem' }}>{cat.name}</span> : null })()}
                   {c.provider && (
                     <span style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>{c.provider}</span>
                   )}
