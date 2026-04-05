@@ -66,6 +66,11 @@ export default function ExpenseTree() {
   const [expandedCats,  setExpandedCats]  = useState(new Set())
   const [expandedFreqs, setExpandedFreqs] = useState(new Set(FREQ_ORDER))
 
+  // Filter state
+  const [filterType,      setFilterType]      = useState('all') // 'all' | 'income' | 'expense'
+  const [filterFrequency, setFilterFrequency] = useState('')
+  const [filterSearch,    setFilterSearch]    = useState('')
+
   const recurrings = JSON.parse(localStorage.getItem('recurringPayments')) || []
   const categories = JSON.parse(localStorage.getItem('categories'))        || []
 
@@ -81,23 +86,41 @@ export default function ExpenseTree() {
     return recIsIncome(rec, catById) ? proj(rec) : -proj(rec)
   }
 
-  // Net value for a subtree (income positive, expense negative)
+  // Summary totals always from unfiltered data
+  const totalIncome  = recurrings.filter(r =>  recIsIncome(r, catById)).reduce((s, r) => s + proj(r), 0)
+  const totalExpense = recurrings.filter(r => !recIsIncome(r, catById)).reduce((s, r) => s + proj(r), 0)
+  const totalBalance = totalIncome - totalExpense
+
+  // Apply filters for the tree view
+  const filtered = recurrings.filter(r => {
+    if (filterType === 'income'  && !recIsIncome(r, catById)) return false
+    if (filterType === 'expense' &&  recIsIncome(r, catById)) return false
+    if (filterFrequency && r.frequency !== filterFrequency) return false
+    if (filterSearch && !r.description.toLowerCase().includes(filterSearch.toLowerCase())) return false
+    return true
+  })
+
+  const hasActiveFilter = filterType !== 'all' || filterFrequency || filterSearch
+
+  function resetFilters() {
+    setFilterType('all')
+    setFilterFrequency('')
+    setFilterSearch('')
+  }
+
+  // Net value for a subtree (based on filtered data)
   function subtreeNet(catId) {
-    const direct   = recurrings.filter(r => r.categoryId === catId).reduce((s, r) => s + projSigned(r), 0)
+    const direct   = filtered.filter(r => r.categoryId === catId).reduce((s, r) => s + projSigned(r), 0)
     const children = categories.filter(c => c.parent == catId).reduce((s, c) => s + subtreeNet(c.id), 0)
     return direct + children
   }
 
   // Absolute total for filtering (to detect non-empty subtrees)
   function subtreeAbs(catId) {
-    const direct   = recurrings.filter(r => r.categoryId === catId).reduce((s, r) => s + proj(r), 0)
+    const direct   = filtered.filter(r => r.categoryId === catId).reduce((s, r) => s + proj(r), 0)
     const children = categories.filter(c => c.parent == catId).reduce((s, c) => s + subtreeAbs(c.id), 0)
     return direct + children
   }
-
-  const totalIncome  = recurrings.filter(r =>  recIsIncome(r, catById)).reduce((s, r) => s + proj(r), 0)
-  const totalExpense = recurrings.filter(r => !recIsIncome(r, catById)).reduce((s, r) => s + proj(r), 0)
-  const totalBalance = totalIncome - totalExpense
 
   function toggleCat(id) {
     setExpandedCats(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
@@ -108,7 +131,7 @@ export default function ExpenseTree() {
   }
 
   function expandAll() {
-    const allCatIds = categories.filter(c => categories.some(ch => ch.parent == c.id) || recurrings.some(r => r.categoryId === c.id)).map(c => c.id)
+    const allCatIds = categories.filter(c => categories.some(ch => ch.parent == c.id) || filtered.some(r => r.categoryId === c.id)).map(c => c.id)
     setExpandedCats(new Set(allCatIds))
     setExpandedFreqs(new Set(FREQ_ORDER))
   }
@@ -126,10 +149,10 @@ export default function ExpenseTree() {
       .sort((a, b) => Math.abs(b.net) - Math.abs(a.net))
 
     return nodes.map((c, ni) => {
-      const directItems = recurrings.filter(r => r.categoryId === c.id)
+      const directItems = filtered.filter(r => r.categoryId === c.id)
       const hasChildren = categories.some(ch => ch.parent == c.id && subtreeAbs(ch.id) > 0)
       const hasContent  = directItems.length > 0 || hasChildren
-      const isOpen      = expandedCats.has(c.id)           // ALL levels individually toggleable
+      const isOpen      = expandedCats.has(c.id)
       const isLast      = ni === nodes.length - 1
       const netPositive = c.net >= 0
       const amtColor    = netPositive ? '#16a34a' : '#dc2626'
@@ -179,10 +202,17 @@ export default function ExpenseTree() {
     })
   }
 
-  const uncategorised    = recurrings.filter(r => !r.categoryId)
+  const uncategorised    = filtered.filter(r => !r.categoryId)
   const uncatNet         = uncategorised.reduce((s, r) => s + projSigned(r), 0)
 
   const PERIOD_LABEL = { month: 'pro Monat', quarter: 'pro Quartal', year: 'pro Jahr' }
+
+  const filterBtnStyle = (active) => ({
+    background: active ? 'var(--color-primary)' : 'transparent',
+    border: '1px solid var(--color-primary)',
+    color: active ? '#fff' : 'var(--color-primary)',
+    borderRadius: 6, padding: '0.22rem 0.6rem', fontSize: '0.78rem', cursor: 'pointer',
+  })
 
   return (
     <div className="module">
@@ -195,12 +225,12 @@ export default function ExpenseTree() {
             background: period === val ? 'var(--color-primary)' : 'transparent',
             border: '1px solid var(--color-primary)',
             color: period === val ? '#fff' : 'var(--color-primary)',
-            borderRadius: 8, padding: '0.4rem 0.9rem', fontSize: '0.85rem',
+            borderRadius: 8, padding: '0.4rem 0.9rem', fontSize: '0.85rem', cursor: 'pointer',
           }}>{label}</button>
         ))}
       </div>
 
-      {/* Summary cards */}
+      {/* Summary cards (always from all data) */}
       <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: 110, background: '#dc2626', color: '#fff', borderRadius: 8, padding: '0.5rem 0.75rem' }}>
           <div style={{ fontSize: '0.72rem', opacity: 0.85 }}>Ausgaben {PERIOD_LABEL[period]}</div>
@@ -222,6 +252,36 @@ export default function ExpenseTree() {
         </div>
       </div>
 
+      {/* Filter controls */}
+      <div style={{ background: 'var(--color-bg)', borderRadius: 8, padding: '0.75rem', marginBottom: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <span style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', minWidth: '3.5rem' }}>Typ:</span>
+          {[['all', 'Alle'], ['expense', 'Ausgaben'], ['income', 'Einnahmen']].map(([v, l]) => (
+            <button key={v} onClick={() => setFilterType(v)} style={filterBtnStyle(filterType === v)}>{l}</button>
+          ))}
+        </div>
+        <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <span style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', minWidth: '3.5rem' }}>Frequenz:</span>
+          {[['', 'Alle'], ['monthly', 'Monatl.'], ['quarterly', 'Quartl.'], ['halfyearly', 'Halbj.'], ['yearly', 'Jährl.']].map(([v, l]) => (
+            <button key={v} onClick={() => setFilterFrequency(v)} style={filterBtnStyle(filterFrequency === v)}>{l}</button>
+          ))}
+        </div>
+        <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <span style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', minWidth: '3.5rem' }}>Suche:</span>
+          <input
+            value={filterSearch}
+            onChange={e => setFilterSearch(e.target.value)}
+            placeholder="Beschreibung suchen…"
+            style={{ fontSize: '0.82rem', padding: '0.22rem 0.5rem', flex: 1, minWidth: 160 }}
+          />
+          {hasActiveFilter && (
+            <button onClick={resetFilters} style={{ fontSize: '0.78rem', padding: '0.22rem 0.6rem', background: '#e5e7eb', border: 'none', borderRadius: 6, cursor: 'pointer', color: '#374151' }}>
+              Filter zurücksetzen
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* Grouping toggle + expand/collapse */}
       <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '0.75rem', alignItems: 'center' }}>
         <span style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>Gruppieren:</span>
@@ -230,17 +290,26 @@ export default function ExpenseTree() {
             background: groupBy === v ? 'var(--color-primary)' : 'transparent',
             border: '1px solid var(--color-primary)',
             color: groupBy === v ? '#fff' : 'var(--color-primary)',
-            borderRadius: 6, padding: '0.22rem 0.6rem', fontSize: '0.78rem',
+            borderRadius: 6, padding: '0.22rem 0.6rem', fontSize: '0.78rem', cursor: 'pointer',
           }}>{l}</button>
         ))}
         <span style={{ marginLeft: '0.25rem', color: 'var(--color-border)' }}>|</span>
-        <button onClick={expandAll}   style={{ fontSize: '0.78rem', padding: '0.22rem 0.6rem', background: 'transparent', border: '1px solid var(--color-border)', color: 'var(--color-text-muted)', borderRadius: 6 }}>Alle aufklappen</button>
-        <button onClick={collapseAll} style={{ fontSize: '0.78rem', padding: '0.22rem 0.6rem', background: 'transparent', border: '1px solid var(--color-border)', color: 'var(--color-text-muted)', borderRadius: 6 }}>Alle zuklappen</button>
+        <button onClick={expandAll}   style={{ fontSize: '0.78rem', padding: '0.22rem 0.6rem', background: 'transparent', border: '1px solid var(--color-border)', color: 'var(--color-text-muted)', borderRadius: 6, cursor: 'pointer' }}>Alle aufklappen</button>
+        <button onClick={collapseAll} style={{ fontSize: '0.78rem', padding: '0.22rem 0.6rem', background: 'transparent', border: '1px solid var(--color-border)', color: 'var(--color-text-muted)', borderRadius: 6, cursor: 'pointer' }}>Alle zuklappen</button>
+        {hasActiveFilter && (
+          <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginLeft: '0.25rem' }}>
+            ({filtered.length} von {recurrings.length} Einträgen)
+          </span>
+        )}
       </div>
 
       {recurrings.length === 0 ? (
         <p style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '2rem 0', margin: 0 }}>
           Noch keine Daueraufträge angelegt.
+        </p>
+      ) : filtered.length === 0 ? (
+        <p style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '2rem 0', margin: 0 }}>
+          Keine Einträge entsprechen den Filterkriterien.
         </p>
       ) : groupBy === 'category' ? (
         <div style={{ border: '1px solid var(--color-border)', borderRadius: 8, overflow: 'hidden' }}>
@@ -262,11 +331,11 @@ export default function ExpenseTree() {
       ) : (
         <div style={{ border: '1px solid var(--color-border)', borderRadius: 8, overflow: 'hidden' }}>
           {FREQ_ORDER.map((freq, fi) => {
-            const items  = recurrings.filter(r => r.frequency === freq)
+            const items  = filtered.filter(r => r.frequency === freq)
             if (items.length === 0) return null
             const net    = items.reduce((s, r) => s + projSigned(r), 0)
             const isOpen = expandedFreqs.has(freq)
-            const isLast = FREQ_ORDER.slice(fi + 1).every(f => recurrings.filter(r => r.frequency === f).length === 0)
+            const isLast = FREQ_ORDER.slice(fi + 1).every(f => filtered.filter(r => r.frequency === f).length === 0)
             return (
               <div key={freq}>
                 <div style={{

@@ -22,9 +22,7 @@ function DonutChart({ segments, size = 220, strokeWidth = 42 }) {
   const cy = size / 2
   const circumference = 2 * Math.PI * r
   // Gap in px between segments
-  const gapPx = 3
-  // Convert gap from px to circumference units
-  const gapCirc = gapPx
+  const gapCirc = 0
 
   let offsetAngle = -90 // start at top
 
