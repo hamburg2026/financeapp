@@ -362,10 +362,16 @@ export default function RecurringPayments() {
                       paddingLeft: group.label ? '1.75rem' : '0.75rem',
                       borderBottom: isLast ? 'none' : '1px solid var(--color-border)',
                       fontSize: '0.85rem',
+                      background: r.insuranceId ? '#f0fdf4' : undefined,
                     }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {r.description}
+                          {r.insuranceId && (
+                            <span style={{ marginLeft: '0.4rem', fontSize: '0.65rem', background: '#dcfce7', color: '#15803d', borderRadius: 3, padding: '0.1rem 0.3rem', fontWeight: 600 }}>
+                              Versicherung
+                            </span>
+                          )}
                         </div>
                         <div style={{ fontSize: '0.73rem', color: 'var(--color-text-muted)', marginTop: '0.1rem' }}>
                           {getCategoryLabel(r.categoryId)}
@@ -379,14 +385,19 @@ export default function RecurringPayments() {
                           {groupBy !== 'frequency' && (
                             <span style={{ marginLeft: '0.5rem', opacity: 0.7 }}>{FREQ_LABELS[r.frequency]}</span>
                           )}
+                          {r.insuranceId && (
+                            <span style={{ marginLeft: '0.4rem', opacity: 0.6 }}>– wird von Versicherungsvertrag gesteuert</span>
+                          )}
                         </div>
                       </div>
                       <span style={{ fontWeight: 600, flexShrink: 0 }}>{fmt(r.amount)}</span>
-                      <button onClick={() => startEdit(r)}
-                        style={{ ...btnSmall, background: '#e5e7eb', color: '#374151' }} title="Bearbeiten">✎</button>
-                      <button onClick={() => removeRecurring(r.id)}
-                        style={{ background: 'none', border: 'none', color: '#dc2626', padding: '0.15rem 0.3rem', fontSize: '0.8rem', cursor: 'pointer', flexShrink: 0 }}
-                        title="Löschen">✕</button>
+                      {!r.insuranceId && <>
+                        <button onClick={() => startEdit(r)}
+                          style={{ ...btnSmall, background: '#e5e7eb', color: '#374151' }} title="Bearbeiten">✎</button>
+                        <button onClick={() => removeRecurring(r.id)}
+                          style={{ background: 'none', border: 'none', color: '#dc2626', padding: '0.15rem 0.3rem', fontSize: '0.8rem', cursor: 'pointer', flexShrink: 0 }}
+                          title="Löschen">✕</button>
+                      </>}
                     </div>
                   )
                 })}
