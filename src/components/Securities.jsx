@@ -97,7 +97,8 @@ export default function Securities() {
 
   // ── Depot transactions (shared with Depots module) ──
   const [depotTransactions, setDepotTransactions] = useLocalStorage('depotTransactions', [])
-  const [depots] = useState(() => JSON.parse(localStorage.getItem('depots')) || [])
+  const [depots, setDepots] = useLocalStorage('depots', [])
+  const [newDepotName, setNewDepotName] = useState('')
 
   // ── Expanded sections ──
   const [expandedPrices, setExpandedPrices] = useState(new Set())
@@ -250,6 +251,47 @@ export default function Securities() {
     return depots.find(d => d.id === id)?.name || `Depot ${id}`
   }
 
+  // ─── Depot CRUD ──────────────────────────────────────────────────────────────
+  function addDepot(e) {
+    e.preventDefault()
+    const nd = [...depots, { id: Date.now(), name: newDepotName.trim() }]
+    setDepots(nd)
+    setNewDepotName('')
+  }
+
+  function removeDepotFn(id) {
+    if (!window.confirm('Depot und alle zugehörigen Transaktionen löschen?')) return
+    setDepots(depots.filter(d => d.id !== id))
+    setDepotTransactions(depotTransactions.filter(t => t.depotId !== id))
+  }
+
+  // ─── Depot position calculation ──────────────────────────────────────────────
+  function getDepotPositions(depotId) {
+    const pos = {}
+    depotTransactions.filter(t => String(t.depotId) === String(depotId)).forEach(t => {
+      if (!pos[t.securityId]) pos[t.securityId] = { quantity: 0, cost: 0, income: 0 }
+      if (t.type === 'buy') {
+        pos[t.securityId].quantity += t.quantity
+        pos[t.securityId].cost    += t.quantity * t.price + (t.fees || 0)
+      } else if (t.type === 'sell') {
+        pos[t.securityId].quantity -= t.quantity
+        pos[t.securityId].cost    -= t.quantity * t.price - (t.fees || 0)
+      } else if (INCOME_TX.has(t.type)) {
+        pos[t.securityId].income  += t.price - (t.fees || 0)
+      }
+    })
+    return Object.entries(pos)
+      .filter(([, p]) => p.quantity > 0.0001 || p.income > 0)
+      .map(([secId, p]) => {
+        const sec      = securities.find(s => String(s.id) === secId)
+        const curPrice = getCurrentPrice(secId)
+        const curValue = p.quantity * curPrice
+        const pnl      = curValue - p.cost + p.income
+        const pct      = p.cost > 0 ? (pnl / p.cost) * 100 : null
+        return { secId, sec, quantity: p.quantity, cost: p.cost, curValue, pnl, pct, income: p.income }
+      })
+  }
+
   // ─── API: Security price (Alpha Vantage) ────────────────────────────────────
   async function handleFetchApiPrice(sec) {
     if (!sec.symbol) {
@@ -333,9 +375,90 @@ export default function Securities() {
 
   const sectionHead = { fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-text-muted)', marginBottom: '0.5rem', marginTop: '1.5rem' }
 
+  const cellR = { padding: '0.3rem 0.5rem', textAlign: 'right', fontSize: '0.78rem' }
+  const cellL = { padding: '0.3rem 0.5rem', textAlign: 'left',  fontSize: '0.78rem' }
+
   return (
     <div className="module">
-      <h2>Wertpapiere</h2>
+      <h2>Wertpapiere &amp; Depots</h2>
+
+      {/* ── Depot-Positionen ── */}
+      <p style={sectionHead}>Depot-Positionen</p>
+      {depots.length === 0 && (
+        <p style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem', margin: '0 0 0.75rem' }}>
+          Noch keine Depots vorhanden. Legen Sie unten ein neues Depot an.
+        </p>
+      )}
+      {depots.map(depot => {
+        const positions  = getDepotPositions(depot.id)
+        const totalValue = positions.reduce((s, p) => s + p.curValue, 0)
+        const totalCost  = positions.reduce((s, p) => s + p.cost,     0)
+        const totalPnl   = positions.reduce((s, p) => s + p.pnl,      0)
+        const totalPct   = totalCost > 0 ? (totalPnl / totalCost) * 100 : null
+        return (
+          <div key={depot.id} style={{ border: '1px solid var(--color-border)', borderRadius: 8, overflow: 'hidden', marginBottom: '0.75rem' }}>
+            {/* Depot header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 0.75rem', background: 'var(--color-bg)', borderBottom: positions.length ? '1px solid var(--color-border)' : 'none', flexWrap: 'wrap' }}>
+              <span style={{ fontWeight: 700, fontSize: '0.92rem', flex: 1 }}>{depot.name}</span>
+              <span style={{ fontWeight: 700 }}>{fmt(totalValue)}</span>
+              {totalPct != null && (
+                <span style={{ fontSize: '0.78rem', fontWeight: 600, color: totalPct >= 0 ? '#16a34a' : '#dc2626' }}>
+                  {totalPct >= 0 ? '+' : ''}{totalPct.toFixed(1)} %
+                </span>
+              )}
+              {totalPnl !== 0 && (
+                <span style={{ fontSize: '0.82rem', fontWeight: 600, color: totalPnl >= 0 ? '#16a34a' : '#dc2626' }}>
+                  {totalPnl >= 0 ? '+' : ''}{fmt(totalPnl)}
+                </span>
+              )}
+              <button onClick={() => removeDepotFn(depot.id)}
+                style={{ ...btnBase, background: '#fee2e2', color: '#dc2626', fontSize: '0.7rem' }}>
+                Depot löschen
+              </button>
+            </div>
+            {/* Positions */}
+            {positions.length > 0 ? (
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
+                <thead>
+                  <tr style={{ background: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)' }}>
+                    {['Wertpapier', 'Anzahl', 'Ø Preis', 'Kurs', 'Wert', 'Erträge', 'G/V', '%'].map(h => (
+                      <th key={h} style={{ ...cellR, textAlign: h === 'Wertpapier' ? 'left' : 'right', fontWeight: 600, color: 'var(--color-text-muted)', fontSize: '0.7rem' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {positions.map(({ secId, sec, quantity, cost, curValue, pnl, pct, income }, i) => {
+                    const avgPrice = quantity > 0 ? cost / quantity : 0
+                    const curPrice = getCurrentPrice(secId)
+                    return (
+                      <tr key={secId} style={{ borderBottom: i < positions.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
+                        <td style={cellL}>{sec?.name || secId}</td>
+                        <td style={cellR}>{quantity.toLocaleString('de-DE', { maximumFractionDigits: 4 })}</td>
+                        <td style={{ ...cellR, color: 'var(--color-text-muted)' }}>{fmt(avgPrice)}</td>
+                        <td style={{ ...cellR, color: 'var(--color-text-muted)' }}>{curPrice ? fmt(curPrice) : '–'}</td>
+                        <td style={{ ...cellR, fontWeight: 600 }}>{fmt(curValue)}</td>
+                        <td style={{ ...cellR, color: income > 0 ? '#2563eb' : 'var(--color-text-muted)' }}>{income > 0 ? `+${fmt(income)}` : '–'}</td>
+                        <td style={{ ...cellR, fontWeight: 700, color: pnl >= 0 ? '#16a34a' : '#dc2626' }}>{pnl >= 0 ? '+' : ''}{fmt(pnl)}</td>
+                        <td style={{ ...cellR, color: (pct ?? 0) >= 0 ? '#16a34a' : '#dc2626', fontWeight: 600 }}>{pct != null ? `${pct >= 0 ? '+' : ''}${pct.toFixed(1)} %` : '–'}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            ) : (
+              <p style={{ color: 'var(--color-text-muted)', fontSize: '0.8rem', margin: '0.5rem 0.75rem' }}>Keine Positionen</p>
+            )}
+          </div>
+        )
+      })}
+      {/* New depot form */}
+      <form onSubmit={addDepot} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-end', marginBottom: '1.5rem' }}>
+        <label style={{ display: 'flex', flexDirection: 'column', flex: 1, maxWidth: 280 }}>
+          <span style={labelStyle}>Neues Depot</span>
+          <input value={newDepotName} onChange={e => setNewDepotName(e.target.value)} placeholder="Depotname" required />
+        </label>
+        <button type="submit" style={{ alignSelf: 'flex-end' }}>+ Depot anlegen</button>
+      </form>
 
       {/* ── Securities list ── */}
       {securities.length > 0 && (
