@@ -25,6 +25,18 @@ const BACKUP_KEYS = [
   'liquidityLevels',
 ]
 
+const BACKUP_SECTIONS = [
+  { label: 'Bankkonten & Umsätze',  keys: ['bankAccounts', 'transactions'] },
+  { label: 'Kategorien',            keys: ['categories'] },
+  { label: 'Daueraufträge',         keys: ['recurringPayments'] },
+  { label: 'Wertpapiere & Depots',  keys: ['securities', 'securityPrices', 'depots', 'depotTransactions', 'fxRates'] },
+  { label: 'Versicherungen',        keys: ['insuranceContracts'] },
+  { label: 'Abonnements',           keys: ['subscriptions'] },
+  { label: 'Immobilien',            keys: ['realEstate'] },
+  { label: 'Firmenbeteiligungen',   keys: ['companyShares'] },
+  { label: 'Einstellungen',         keys: ['liquidityLevels'] },
+]
+
 // ── Crypto helpers ──
 async function deriveKey(password, salt) {
   const enc = new TextEncoder()
@@ -41,9 +53,9 @@ async function deriveKey(password, salt) {
 function toBase64(buf) { return btoa(String.fromCharCode(...new Uint8Array(buf))) }
 function fromBase64(str) { return Uint8Array.from(atob(str), c => c.charCodeAt(0)) }
 
-async function exportBackup(password) {
+async function exportBackup(password, keysToExport = BACKUP_KEYS) {
   const data = {}
-  BACKUP_KEYS.forEach(key => {
+  keysToExport.forEach(key => {
     const raw = localStorage.getItem(key)
     if (raw) data[key] = JSON.parse(raw)
   })
@@ -156,6 +168,7 @@ export default function Dashboard({ onNavigate }) {
   const [backupPassword, setBackupPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [showLiqConfig, setShowLiqConfig] = useState(false)
+  const [selectedSections, setSelectedSections] = useState(() => new Set(BACKUP_SECTIONS.map((_, i) => i)))
   const [liquidityLevels, setLiquidityLevelsState] = useState(
     () => JSON.parse(localStorage.getItem('liquidityLevels')) || {}
   )
@@ -415,6 +428,56 @@ export default function Dashboard({ onNavigate }) {
       {/* ── Sicherung ── */}
       <div className="module" style={{ marginBottom: '1.25rem' }}>
         <h2 style={{ marginBottom: '0.75rem' }}>Datensicherung</h2>
+
+        {/* Section selection */}
+        <div style={{ background: 'var(--color-bg)', borderRadius: 8, padding: '0.75rem', marginBottom: '0.75rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+            <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              Bereiche für Export auswählen
+            </span>
+            <div style={{ display: 'flex', gap: '0.4rem' }}>
+              <button
+                onClick={() => setSelectedSections(new Set(BACKUP_SECTIONS.map((_, i) => i)))}
+                style={{ fontSize: '0.75rem', padding: '0.18rem 0.5rem', background: 'transparent', border: '1px solid var(--color-primary)', color: 'var(--color-primary)', borderRadius: 5, cursor: 'pointer' }}
+              >Alle</button>
+              <button
+                onClick={() => setSelectedSections(new Set())}
+                style={{ fontSize: '0.75rem', padding: '0.18rem 0.5rem', background: 'transparent', border: '1px solid var(--color-border)', color: 'var(--color-text-muted)', borderRadius: 5, cursor: 'pointer' }}
+              >Keine</button>
+            </div>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
+            {BACKUP_SECTIONS.map((sec, i) => {
+              const checked = selectedSections.has(i)
+              return (
+                <label key={i} style={{
+                  display: 'flex', alignItems: 'center', gap: '0.3rem',
+                  fontSize: '0.82rem', cursor: 'pointer',
+                  padding: '0.22rem 0.55rem',
+                  borderRadius: 6,
+                  border: `1px solid ${checked ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                  background: checked ? 'rgba(var(--color-primary-rgb, 37,99,235),0.07)' : 'transparent',
+                  userSelect: 'none',
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => {
+                      setSelectedSections(prev => {
+                        const next = new Set(prev)
+                        next.has(i) ? next.delete(i) : next.add(i)
+                        return next
+                      })
+                    }}
+                    style={{ margin: 0 }}
+                  />
+                  {sec.label}
+                </label>
+              )
+            })}
+          </div>
+        </div>
+
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.6rem', flexWrap: 'wrap' }}>
           <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
             <input
@@ -432,8 +495,16 @@ export default function Dashboard({ onNavigate }) {
           </div>
         </div>
         <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          <button onClick={() => exportBackup(backupPassword || null)} style={{ fontSize: '0.85rem', padding: '0.45rem 1rem' }}>
-            Sicherung herunterladen
+          <button
+            onClick={() => {
+              const keys = BACKUP_SECTIONS.filter((_, i) => selectedSections.has(i)).flatMap(s => s.keys)
+              if (keys.length === 0) { alert('Bitte mindestens einen Bereich auswählen.'); return }
+              exportBackup(backupPassword || null, keys)
+            }}
+            style={{ fontSize: '0.85rem', padding: '0.45rem 1rem' }}
+            title={`${selectedSections.size} Bereich${selectedSections.size !== 1 ? 'e' : ''} ausgewählt`}
+          >
+            Sicherung herunterladen {selectedSections.size < BACKUP_SECTIONS.length ? `(${selectedSections.size}/${BACKUP_SECTIONS.length})` : '(alles)'}
           </button>
           <button onClick={() => fileInputRef.current?.click()} style={{ fontSize: '0.85rem', padding: '0.45rem 1rem', background: '#6b7280' }}>
             Sicherung wiederherstellen
