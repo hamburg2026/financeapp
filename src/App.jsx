@@ -58,7 +58,7 @@ export default function App() {
 
       <div className="main-content">
         <div className="content-area">
-          <CurrentComponent />
+          <CurrentComponent onNavigate={setCurrentView} />
         </div>
       </div>
     </div>
