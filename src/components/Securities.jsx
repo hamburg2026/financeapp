@@ -16,6 +16,34 @@ const CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF', 'JPY', 'SEK', 'NOK', 'DKK', 'CAD
 const btnBase = { border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: '0.72rem', padding: '0.2rem 0.45rem', lineHeight: 1.4 }
 const labelStyle = { fontSize: '0.7rem', color: 'var(--color-text-muted)', marginBottom: 2, display: 'block' }
 
+const today = () => new Date().toISOString().slice(0, 10)
+
+// ── Yahoo Finance price fetch (symbol = Yahoo ticker, e.g. "AAPL", "SAP.DE") ──
+async function fetchYahooPrice(symbol) {
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d`
+  const res = await fetch(url)
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  const data = await res.json()
+  const result = data?.chart?.result?.[0]
+  const meta = result?.meta
+  if (!meta?.regularMarketPrice) throw new Error('Keine Kursdaten in der Antwort')
+  const price = meta.regularMarketPrice
+  const date = meta.regularMarketTime
+    ? new Date(meta.regularMarketTime * 1000).toISOString().slice(0, 10)
+    : today()
+  return { price, date }
+}
+
+// ── Frankfurter.app FX fetch (pair = e.g. "USD", result = how many EUR per 1 unit) ──
+async function fetchFrankfurterFx(pair) {
+  const res = await fetch(`https://api.frankfurter.app/latest?base=${encodeURIComponent(pair)}&symbols=EUR`)
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  const data = await res.json()
+  const rate = data?.rates?.EUR
+  if (rate == null) throw new Error('Kurs nicht verfügbar')
+  return { rate, date: data.date || today() }
+}
+
 export default function Securities() {
   const [securities,   setSecurities]   = useLocalStorage('securities', [])
   const [prices,       setPrices]       = useLocalStorage('securityPrices', {})
@@ -24,6 +52,7 @@ export default function Securities() {
   // ── Add security form ──
   const [secName,   setSecName]   = useState('')
   const [secSymbol, setSecSymbol] = useState('')
+  const [secIsin,   setSecIsin]   = useState('')
   const [secType,   setSecType]   = useState('Aktie')
   const [secCur,    setSecCur]    = useState('EUR')
 
@@ -31,50 +60,63 @@ export default function Securities() {
   const [editSecId,     setEditSecId]     = useState(null)
   const [editSecName,   setEditSecName]   = useState('')
   const [editSecSymbol, setEditSecSymbol] = useState('')
+  const [editSecIsin,   setEditSecIsin]   = useState('')
   const [editSecType,   setEditSecType]   = useState('Aktie')
   const [editSecCur,    setEditSecCur]    = useState('EUR')
 
   // ── Price form ──
   const [priceSecId,   setPriceSecId]   = useState('')
-  const [priceDate,    setPriceDate]    = useState('')
+  const [priceDate,    setPriceDate]    = useState(today)
   const [priceValue,   setPriceValue]   = useState('')
 
   // ── Edit price ──
-  const [editPriceKey, setEditPriceKey] = useState(null) // { secId, index }
-  const [editPriceDate, setEditPriceDate] = useState('')
+  const [editPriceKey,   setEditPriceKey]   = useState(null)
+  const [editPriceDate,  setEditPriceDate]  = useState('')
   const [editPriceValue, setEditPriceValue] = useState('')
 
   // ── FX rate form ──
   const [fxPair,  setFxPair]  = useState('USD')
-  const [fxDate,  setFxDate]  = useState('')
+  const [fxDate,  setFxDate]  = useState(today)
   const [fxValue, setFxValue] = useState('')
 
   // ── Edit FX rate ──
-  const [editFxKey, setEditFxKey] = useState(null) // { pair, index }
-  const [editFxDate, setEditFxDate] = useState('')
+  const [editFxKey,   setEditFxKey]   = useState(null)
+  const [editFxDate,  setEditFxDate]  = useState('')
   const [editFxValue, setEditFxValue] = useState('')
 
   // ── Expanded price lists ──
   const [expandedPrices, setExpandedPrices] = useState(new Set())
 
+  // ── API fetch state (per secId) ──
+  const [fetchingPrice, setFetchingPrice] = useState({}) // secId -> true/false
+  const [fetchPriceErr, setFetchPriceErr] = useState({}) // secId -> error string
+
+  // ── FX API fetch state (per pair) ──
+  const [fetchingFx, setFetchingFx] = useState({})
+  const [fetchFxErr, setFetchFxErr] = useState({})
+
   // ─── Security CRUD ───────────────────────────────────────────────────────────
   function addSecurity(e) {
     e.preventDefault()
-    setSecurities([...securities, { id: Date.now(), name: secName, symbol: secSymbol, type: secType, currency: secCur }])
-    setSecName(''); setSecSymbol(''); setSecType('Aktie'); setSecCur('EUR')
+    setSecurities([...securities, {
+      id: Date.now(), name: secName, symbol: secSymbol,
+      isin: secIsin, type: secType, currency: secCur,
+    }])
+    setSecName(''); setSecSymbol(''); setSecIsin(''); setSecType('Aktie'); setSecCur('EUR')
   }
 
   function startEditSec(s) {
     setEditSecId(s.id)
     setEditSecName(s.name)
     setEditSecSymbol(s.symbol)
+    setEditSecIsin(s.isin || '')
     setEditSecType(s.type || 'Aktie')
     setEditSecCur(s.currency || 'EUR')
   }
 
   function saveEditSec() {
     setSecurities(securities.map(s => s.id === editSecId
-      ? { ...s, name: editSecName, symbol: editSecSymbol, type: editSecType, currency: editSecCur }
+      ? { ...s, name: editSecName, symbol: editSecSymbol, isin: editSecIsin, type: editSecType, currency: editSecCur }
       : s
     ))
     setEditSecId(null)
@@ -94,7 +136,7 @@ export default function Securities() {
     const list = [...(prices[secId] || []), { date: priceDate, value: parseFloat(priceValue) }]
       .sort((a, b) => new Date(b.date) - new Date(a.date))
     setPrices({ ...prices, [secId]: list })
-    setPriceDate(''); setPriceValue('')
+    setPriceDate(today()); setPriceValue('')
   }
 
   function startEditPrice(secId, idx) {
@@ -127,16 +169,34 @@ export default function Securities() {
     setExpandedPrices(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
   }
 
-  // ─── FX Rates CRUD ───────────────────────────────────────────────────────────
-  // fxRates: { 'USD': [{date, value}, ...], 'GBP': [...] }
-  // value = wie viele EUR je 1 Fremdwährung
+  // ─── API: Security price fetch ───────────────────────────────────────────────
+  async function handleFetchApiPrice(sec) {
+    if (!sec.symbol) {
+      setFetchPriceErr(e => ({ ...e, [sec.id]: 'Kein Symbol/Ticker hinterlegt.' }))
+      return
+    }
+    setFetchingPrice(s => ({ ...s, [sec.id]: true }))
+    setFetchPriceErr(e => ({ ...e, [sec.id]: null }))
+    try {
+      const { price, date } = await fetchYahooPrice(sec.symbol)
+      const list = [...(prices[sec.id] || []), { date, value: price }]
+        .sort((a, b) => new Date(b.date) - new Date(a.date))
+      setPrices(prev => ({ ...prev, [sec.id]: list }))
+      setExpandedPrices(prev => { const n = new Set(prev); n.add(sec.id); return n })
+    } catch (err) {
+      setFetchPriceErr(e => ({ ...e, [sec.id]: `API-Fehler: ${err.message}` }))
+    } finally {
+      setFetchingPrice(s => ({ ...s, [sec.id]: false }))
+    }
+  }
 
+  // ─── FX Rates CRUD ───────────────────────────────────────────────────────────
   function addFxRate(e) {
     e.preventDefault()
     const list = [...(fxRates[fxPair] || []), { date: fxDate, value: parseFloat(fxValue) }]
       .sort((a, b) => new Date(b.date) - new Date(a.date))
     setFxRates({ ...fxRates, [fxPair]: list })
-    setFxDate(''); setFxValue('')
+    setFxDate(today()); setFxValue('')
   }
 
   function startEditFx(pair, idx) {
@@ -165,6 +225,22 @@ export default function Securities() {
     return [...list].sort((a, b) => new Date(b.date) - new Date(a.date))[0].value
   }
 
+  // ─── API: FX rate fetch ───────────────────────────────────────────────────────
+  async function handleFetchApiFx(pair) {
+    setFetchingFx(s => ({ ...s, [pair]: true }))
+    setFetchFxErr(e => ({ ...e, [pair]: null }))
+    try {
+      const { rate, date } = await fetchFrankfurterFx(pair)
+      const list = [...(fxRates[pair] || []), { date, value: rate }]
+        .sort((a, b) => new Date(b.date) - new Date(a.date))
+      setFxRates(prev => ({ ...prev, [pair]: list }))
+    } catch (err) {
+      setFetchFxErr(e => ({ ...e, [pair]: `API-Fehler: ${err.message}` }))
+    } finally {
+      setFetchingFx(s => ({ ...s, [pair]: false }))
+    }
+  }
+
   const usedFxPairs = [...new Set([
     ...Object.keys(fxRates),
     ...securities.filter(s => s.currency && s.currency !== 'EUR').map(s => s.currency),
@@ -184,8 +260,12 @@ export default function Securities() {
           <input value={secName} onChange={e => setSecName(e.target.value)} placeholder="z. B. Apple Inc." required />
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', minWidth: 90 }}>
-          <span style={labelStyle}>Symbol / ISIN</span>
+          <span style={labelStyle}>Ticker / Symbol</span>
           <input value={secSymbol} onChange={e => setSecSymbol(e.target.value)} placeholder="AAPL" required />
+        </label>
+        <label style={{ display: 'flex', flexDirection: 'column', minWidth: 120 }}>
+          <span style={labelStyle}>ISIN (optional)</span>
+          <input value={secIsin} onChange={e => setSecIsin(e.target.value)} placeholder="US0378331005" maxLength={12} />
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', minWidth: 120 }}>
           <span style={labelStyle}>Typ</span>
@@ -206,11 +286,14 @@ export default function Securities() {
       {securities.length > 0 && (
         <div style={{ border: '1px solid var(--color-border)', borderRadius: 8, overflow: 'hidden', marginBottom: '1.5rem' }}>
           {securities.map((s, si) => {
-            const price = getCurrentPrice(s.id)
+            const price      = getCurrentPrice(s.id)
             const pricesOpen = expandedPrices.has(s.id)
             const priceList  = (prices[s.id] || []).slice().sort((a, b) => new Date(b.date) - new Date(a.date))
             const isEditing  = editSecId === s.id
             const isLast     = si === securities.length - 1
+            const isFetching = fetchingPrice[s.id]
+            const fetchErr   = fetchPriceErr[s.id]
+            const isinVal    = s.isin?.trim()
 
             return (
               <div key={s.id}>
@@ -219,7 +302,9 @@ export default function Securities() {
                     <input value={editSecName} onChange={e => setEditSecName(e.target.value)}
                       style={{ flex: 2, minWidth: 120, fontSize: '0.82rem', padding: '0.25rem 0.4rem' }} placeholder="Name" />
                     <input value={editSecSymbol} onChange={e => setEditSecSymbol(e.target.value)}
-                      style={{ width: 90, fontSize: '0.82rem', padding: '0.25rem 0.4rem' }} placeholder="Symbol" />
+                      style={{ width: 90, fontSize: '0.82rem', padding: '0.25rem 0.4rem' }} placeholder="Ticker" />
+                    <input value={editSecIsin} onChange={e => setEditSecIsin(e.target.value)}
+                      style={{ width: 110, fontSize: '0.82rem', padding: '0.25rem 0.4rem' }} placeholder="ISIN" maxLength={12} />
                     <select value={editSecType} onChange={e => setEditSecType(e.target.value)} style={{ fontSize: '0.82rem', padding: '0.25rem 0.4rem' }}>
                       {SEC_TYPES.map(t => <option key={t}>{t}</option>)}
                     </select>
@@ -230,17 +315,43 @@ export default function Securities() {
                     <button onClick={() => setEditSecId(null)} style={{ ...btnBase, background: '#e5e7eb', color: '#374151' }}>Abbrechen</button>
                   </div>
                 ) : (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.42rem 0.75rem', borderBottom: (!pricesOpen && isLast) ? 'none' : '1px solid var(--color-border)', background: 'var(--color-bg)', flexWrap: 'wrap' }}>
-                    <button onClick={() => togglePrices(s.id)} style={{ ...btnBase, background: 'none', padding: '0.1rem 0.3rem', color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>
-                      {pricesOpen ? '▾' : '▸'}
-                    </button>
-                    <span style={{ flex: 1, fontWeight: 600, fontSize: '0.9rem' }}>{s.name}</span>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{s.symbol}</span>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', background: 'var(--color-border)', borderRadius: 4, padding: '0.05rem 0.35rem' }}>{s.type}</span>
-                    <span style={{ fontSize: '0.72rem', fontWeight: 600, color: s.currency !== 'EUR' ? '#d97706' : 'var(--color-text-muted)' }}>{s.currency || 'EUR'}</span>
-                    <span style={{ fontWeight: 700, fontSize: '0.87rem', minWidth: 70, textAlign: 'right' }}>{price !== null ? fmt(price) : '–'}</span>
-                    <button onClick={() => startEditSec(s)} style={{ ...btnBase, background: '#e5e7eb', color: '#374151' }} title="Bearbeiten">✎</button>
-                    <button onClick={() => removeSecurity(s.id)} style={{ ...btnBase, background: '#fee2e2', color: '#dc2626' }} title="Löschen">✕</button>
+                  <div style={{ borderBottom: (!pricesOpen && isLast) ? 'none' : '1px solid var(--color-border)', background: 'var(--color-bg)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.42rem 0.75rem', flexWrap: 'wrap' }}>
+                      <button onClick={() => togglePrices(s.id)} style={{ ...btnBase, background: 'none', padding: '0.1rem 0.3rem', color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>
+                        {pricesOpen ? '▾' : '▸'}
+                      </button>
+                      <span style={{ flex: 1, fontWeight: 600, fontSize: '0.9rem' }}>{s.name}</span>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{s.symbol}</span>
+                      {isinVal && (
+                        <a
+                          href={`https://finance.yahoo.com/quote/${isinVal}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ fontSize: '0.72rem', color: 'var(--color-primary)', textDecoration: 'underline', fontFamily: 'monospace' }}
+                          title="ISIN auf Yahoo Finance öffnen"
+                        >
+                          {isinVal}
+                        </a>
+                      )}
+                      <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', background: 'var(--color-border)', borderRadius: 4, padding: '0.05rem 0.35rem' }}>{s.type}</span>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 600, color: s.currency !== 'EUR' ? '#d97706' : 'var(--color-text-muted)' }}>{s.currency || 'EUR'}</span>
+                      <span style={{ fontWeight: 700, fontSize: '0.87rem', minWidth: 70, textAlign: 'right' }}>{price !== null ? fmt(price) : '–'}</span>
+                      <button
+                        onClick={() => handleFetchApiPrice(s)}
+                        disabled={isFetching}
+                        style={{ ...btnBase, background: '#dbeafe', color: '#1d4ed8', minWidth: 70 }}
+                        title="Aktuellen Kurs von Yahoo Finance abrufen"
+                      >
+                        {isFetching ? '…' : '↓ API-Kurs'}
+                      </button>
+                      <button onClick={() => startEditSec(s)} style={{ ...btnBase, background: '#e5e7eb', color: '#374151' }} title="Bearbeiten">✎</button>
+                      <button onClick={() => removeSecurity(s.id)} style={{ ...btnBase, background: '#fee2e2', color: '#dc2626' }} title="Löschen">✕</button>
+                    </div>
+                    {fetchErr && (
+                      <div style={{ fontSize: '0.72rem', color: '#dc2626', padding: '0.2rem 0.75rem 0.3rem 2.2rem' }}>
+                        {fetchErr}
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -270,7 +381,17 @@ export default function Securities() {
                       )
                     })}
                     {/* Add price inline */}
-                    <form onSubmit={e => { e.preventDefault(); const id = s.id; const list = [...(prices[id] || []), { date: priceDate, value: parseFloat(priceValue) }].sort((a, b) => new Date(b.date) - new Date(a.date)); setPrices({ ...prices, [id]: list }); setPriceDate(''); setPriceValue('') }} style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', padding: '0.35rem 0.75rem', paddingLeft: '2.2rem', borderTop: priceList.length ? '1px dashed var(--color-border)' : 'none' }}>
+                    <form
+                      onSubmit={e => {
+                        e.preventDefault()
+                        const id = s.id
+                        const list = [...(prices[id] || []), { date: priceDate, value: parseFloat(priceValue) }]
+                          .sort((a, b) => new Date(b.date) - new Date(a.date))
+                        setPrices({ ...prices, [id]: list })
+                        setPriceDate(today()); setPriceValue('')
+                      }}
+                      style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', padding: '0.35rem 0.75rem', paddingLeft: '2.2rem', borderTop: priceList.length ? '1px dashed var(--color-border)' : 'none' }}
+                    >
                       <input type="date" value={priceDate} onChange={e => setPriceDate(e.target.value)} required style={{ fontSize: '0.78rem', padding: '0.18rem 0.35rem' }} />
                       <input type="number" value={priceValue} onChange={e => setPriceValue(e.target.value)} placeholder="Kurs" step="0.0001" min="0" required style={{ width: 100, fontSize: '0.78rem', padding: '0.18rem 0.35rem' }} />
                       <button type="submit" style={{ ...btnBase, fontSize: '0.68rem', background: 'var(--color-primary)', color: '#fff' }}>+ Kurs</button>
@@ -306,15 +427,30 @@ export default function Securities() {
       {usedFxPairs.length > 0 && (
         <div style={{ border: '1px solid var(--color-border)', borderRadius: 8, overflow: 'hidden' }}>
           {usedFxPairs.map((pair, pi) => {
-            const list = (fxRates[pair] || []).slice().sort((a, b) => new Date(b.date) - new Date(a.date))
-            const latest = getLatestFx(pair)
+            const list       = (fxRates[pair] || []).slice().sort((a, b) => new Date(b.date) - new Date(a.date))
+            const latest     = getLatestFx(pair)
+            const isFetching = fetchingFx[pair]
+            const fetchErr   = fetchFxErr[pair]
             return (
               <div key={pair} style={{ borderBottom: pi < usedFxPairs.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.42rem 0.75rem', background: 'var(--color-bg)', fontSize: '0.85rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.42rem 0.75rem', background: 'var(--color-bg)', fontSize: '0.85rem', flexWrap: 'wrap' }}>
                   <span style={{ fontWeight: 700, minWidth: 40 }}>{pair}</span>
                   <span style={{ color: 'var(--color-text-muted)', fontSize: '0.78rem', flex: 1 }}>→ EUR</span>
                   <span style={{ fontWeight: 600 }}>{latest !== null ? latest.toFixed(4) : '–'}</span>
+                  <button
+                    onClick={() => handleFetchApiFx(pair)}
+                    disabled={isFetching}
+                    style={{ ...btnBase, background: '#dbeafe', color: '#1d4ed8' }}
+                    title={`Aktuellen ${pair}/EUR Kurs von Frankfurter.app abrufen`}
+                  >
+                    {isFetching ? '…' : '↓ API-Kurs'}
+                  </button>
                 </div>
+                {fetchErr && (
+                  <div style={{ fontSize: '0.72rem', color: '#dc2626', padding: '0.15rem 0.75rem 0.25rem 1.6rem' }}>
+                    {fetchErr}
+                  </div>
+                )}
                 {list.map((r, ri) => {
                   const isEditingFx = editFxKey?.pair === pair && editFxKey?.idx === ri
                   return (

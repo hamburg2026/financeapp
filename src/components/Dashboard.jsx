@@ -143,7 +143,15 @@ function MiniRow({ label, value, sub, pct, hint, muted }) {
   )
 }
 
-export default function Dashboard() {
+const TILE_NAV = {
+  'Bankkonten':     'bankAccounts',
+  'Wertpapiere':    'securities',
+  'Versicherungen': 'insuranceContracts',
+  'Immobilien':     'realEstate',
+  'Beteiligungen':  'companyShares',
+}
+
+export default function Dashboard({ onNavigate }) {
   const fileInputRef = useRef(null)
   const [backupPassword, setBackupPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -258,12 +266,27 @@ export default function Dashboard() {
             ['Versicherungen', totalInsurance],
             ['Immobilien',     totalRealEstate],
             ['Beteiligungen',  totalShares],
-          ].map(([label, val]) => (
-            <div key={label} style={{ background: 'rgba(255,255,255,0.15)', borderRadius: 8, padding: '0.5rem 0.75rem', flex: '1 1 120px' }}>
-              <div style={{ fontSize: '0.75rem', opacity: 0.8 }}>{label}</div>
-              <div style={{ fontWeight: 600 }}>{fmt(val)}</div>
-            </div>
-          ))}
+          ].map(([label, val]) => {
+            const navId = TILE_NAV[label]
+            return (
+              <div
+                key={label}
+                onClick={() => navId && onNavigate && onNavigate(navId)}
+                style={{
+                  background: 'rgba(255,255,255,0.15)', borderRadius: 8,
+                  padding: '0.5rem 0.75rem', flex: '1 1 120px',
+                  cursor: navId && onNavigate ? 'pointer' : 'default',
+                  transition: 'background 0.15s',
+                }}
+                onMouseEnter={e => { if (navId && onNavigate) e.currentTarget.style.background = 'rgba(255,255,255,0.25)' }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.15)' }}
+                title={navId ? `Zu ${label} wechseln` : undefined}
+              >
+                <div style={{ fontSize: '0.75rem', opacity: 0.8 }}>{label}</div>
+                <div style={{ fontWeight: 600 }}>{fmt(val)}</div>
+              </div>
+            )
+          })}
         </div>
 
         {/* Liquiditätsstufen-Zusammenfassung */}
