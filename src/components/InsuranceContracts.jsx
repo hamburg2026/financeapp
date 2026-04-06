@@ -142,109 +142,6 @@ export default function InsuranceContracts() {
         </button>
       </div>
 
-      {showForm && (
-        <form onSubmit={saveContract} style={{
-          background: 'var(--color-bg)', borderRadius: 8, padding: '1rem',
-          marginBottom: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem',
-        }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
-            <div>
-              <label style={labelStyle}>Vertragsname *</label>
-              <input {...field('name')} placeholder="z. B. Haftpflicht" required style={{ ...inputStyle, width: '100%' }} />
-            </div>
-            <div>
-              <label style={labelStyle}>Anbieter</label>
-              <input {...field('provider')} placeholder="z. B. Allianz" style={{ ...inputStyle, width: '100%' }} />
-            </div>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
-            <div>
-              <label style={labelStyle}>Kategorie</label>
-              <select {...field('categoryId')} style={{ ...inputStyle, width: '100%' }}>
-                <option value="">– keine –</option>
-                {expenseCategories.map(cat => (
-                  <option key={cat.id} value={cat.id}>{cat.name}</option>
-                ))}
-              </select>
-            </div>
-            <div />
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
-            <div>
-              <label style={labelStyle}>Aktueller Wert (€) – optional</label>
-              <input type="number" {...field('value')} placeholder="z. B. 5000" step="0.01" min="0" style={{ ...inputStyle, width: '100%' }} />
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
-              <label style={{ ...labelStyle, marginBottom: '0.5rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <input type="checkbox" {...check('active')} />
-                <span>Aktiv (erzeugt Dauerauftrag)</span>
-              </label>
-            </div>
-          </div>
-
-          {/* Beitrag */}
-          <div style={{ border: '1px solid var(--color-border)', borderRadius: 6, padding: '0.65rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              Beitrag
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
-              <div>
-                <label style={labelStyle}>Betrag (€)</label>
-                <input type="number" {...field('premium')} placeholder="z. B. 120" step="0.01" min="0" style={{ ...inputStyle, width: '100%' }} />
-              </div>
-              <div>
-                <label style={labelStyle}>Periodizität</label>
-                <select {...field('premiumFrequency')} style={{ ...inputStyle, width: '100%' }}>
-                  <option value="monthly">Monatlich</option>
-                  <option value="quarterly">Vierteljährlich</option>
-                  <option value="halfyearly">Halbjährlich</option>
-                  <option value="yearly">Jährlich</option>
-                </select>
-              </div>
-            </div>
-            {form.active && form.premium > 0 && (
-              <div style={{ fontSize: '0.75rem', color: '#16a34a', background: '#dcfce7', borderRadius: 4, padding: '0.25rem 0.5rem' }}>
-                Wird als Dauerauftrag „{form.name || '…'}" angelegt
-              </div>
-            )}
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
-            <div>
-              <label style={labelStyle}>Vertragsbeginn</label>
-              <input type="date" {...field('start')} style={{ ...inputStyle, width: '100%' }} />
-            </div>
-            <div>
-              <label style={labelStyle}>Vertragsende</label>
-              <input type="date" {...field('end')} style={{ ...inputStyle, width: '100%' }} />
-            </div>
-          </div>
-
-          <div>
-            <label style={labelStyle}>Notizen</label>
-            <textarea {...field('notes')} placeholder="Allgemeine Notizen zum Vertrag…" rows={2}
-              style={{ ...inputStyle, width: '100%', resize: 'vertical' }} />
-          </div>
-
-          <div>
-            <label style={labelStyle}>Kommentar</label>
-            <textarea {...field('comment')} placeholder="Weitere Anmerkungen, Bedingungen, Kontakte…" rows={2}
-              style={{ ...inputStyle, width: '100%', resize: 'vertical' }} />
-          </div>
-
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <button type="submit" style={{ flex: 1 }}>
-              {editId ? 'Änderungen speichern' : 'Vertrag hinzufügen'}
-            </button>
-            <button type="button" onClick={cancelForm} style={{ background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: 6, padding: '0.4rem 0.9rem', cursor: 'pointer' }}>
-              Abbrechen
-            </button>
-          </div>
-        </form>
-      )}
-
       {contracts.length === 0 ? (
         <p style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '2rem 0', margin: 0 }}>
           Noch keine Versicherungsverträge angelegt.
@@ -324,6 +221,109 @@ export default function InsuranceContracts() {
             </div>
           )}
         </>
+      )}
+
+      {/* Add/edit form (unterhalb der Liste) */}
+      {showForm && (
+        <form onSubmit={saveContract} style={{
+          background: 'var(--color-bg)', borderRadius: 8, padding: '1rem',
+          marginTop: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem',
+        }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+            <div>
+              <label style={labelStyle}>Vertragsname *</label>
+              <input {...field('name')} placeholder="z. B. Haftpflicht" required style={{ ...inputStyle, width: '100%' }} />
+            </div>
+            <div>
+              <label style={labelStyle}>Anbieter</label>
+              <input {...field('provider')} placeholder="z. B. Allianz" style={{ ...inputStyle, width: '100%' }} />
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+            <div>
+              <label style={labelStyle}>Kategorie</label>
+              <select {...field('categoryId')} style={{ ...inputStyle, width: '100%' }}>
+                <option value="">– keine –</option>
+                {expenseCategories.map(cat => (
+                  <option key={cat.id} value={cat.id}>{cat.name}</option>
+                ))}
+              </select>
+            </div>
+            <div />
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+            <div>
+              <label style={labelStyle}>Aktueller Wert (€) – optional</label>
+              <input type="number" {...field('value')} placeholder="z. B. 5000" step="0.01" min="0" style={{ ...inputStyle, width: '100%' }} />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+              <label style={{ ...labelStyle, marginBottom: '0.5rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <input type="checkbox" {...check('active')} />
+                <span>Aktiv (erzeugt Dauerauftrag)</span>
+              </label>
+            </div>
+          </div>
+
+          <div style={{ border: '1px solid var(--color-border)', borderRadius: 6, padding: '0.65rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              Beitrag
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+              <div>
+                <label style={labelStyle}>Betrag (€)</label>
+                <input type="number" {...field('premium')} placeholder="z. B. 120" step="0.01" min="0" style={{ ...inputStyle, width: '100%' }} />
+              </div>
+              <div>
+                <label style={labelStyle}>Periodizität</label>
+                <select {...field('premiumFrequency')} style={{ ...inputStyle, width: '100%' }}>
+                  <option value="monthly">Monatlich</option>
+                  <option value="quarterly">Vierteljährlich</option>
+                  <option value="halfyearly">Halbjährlich</option>
+                  <option value="yearly">Jährlich</option>
+                </select>
+              </div>
+            </div>
+            {form.active && form.premium > 0 && (
+              <div style={{ fontSize: '0.75rem', color: '#16a34a', background: '#dcfce7', borderRadius: 4, padding: '0.25rem 0.5rem' }}>
+                Wird als Dauerauftrag „{form.name || '…'}" angelegt
+              </div>
+            )}
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+            <div>
+              <label style={labelStyle}>Vertragsbeginn</label>
+              <input type="date" {...field('start')} style={{ ...inputStyle, width: '100%' }} />
+            </div>
+            <div>
+              <label style={labelStyle}>Vertragsende</label>
+              <input type="date" {...field('end')} style={{ ...inputStyle, width: '100%' }} />
+            </div>
+          </div>
+
+          <div>
+            <label style={labelStyle}>Notizen</label>
+            <textarea {...field('notes')} placeholder="Allgemeine Notizen zum Vertrag…" rows={2}
+              style={{ ...inputStyle, width: '100%', resize: 'vertical' }} />
+          </div>
+
+          <div>
+            <label style={labelStyle}>Kommentar</label>
+            <textarea {...field('comment')} placeholder="Weitere Anmerkungen, Bedingungen, Kontakte…" rows={2}
+              style={{ ...inputStyle, width: '100%', resize: 'vertical' }} />
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button type="submit" style={{ flex: 1 }}>
+              {editId ? 'Änderungen speichern' : 'Vertrag hinzufügen'}
+            </button>
+            <button type="button" onClick={cancelForm} style={{ background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: 6, padding: '0.4rem 0.9rem', cursor: 'pointer' }}>
+              Abbrechen
+            </button>
+          </div>
+        </form>
       )}
     </div>
   )

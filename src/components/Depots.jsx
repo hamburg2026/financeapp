@@ -306,65 +306,6 @@ export default function Depots() {
           {/* ── Transaktionen ── */}
           {tab === 'transactions' && (
             <>
-              {/* Add form — compact, labeled */}
-              <div style={{ background: 'var(--color-bg)', padding: '0.85rem 1rem', borderRadius: 8, marginBottom: '1rem', border: '1px solid var(--color-border)' }}>
-                <form onSubmit={addTransaction}>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.55rem', alignItems: 'flex-end' }}>
-                    <div style={fieldCol(undefined)}>
-                      <span style={labelSt}>Wertpapier</span>
-                      <select value={txSecurityId} onChange={e => setTxSecurityId(e.target.value)} required style={{ minWidth: 140 }}>
-                        <option value="">– wählen –</option>
-                        {securities.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                      </select>
-                    </div>
-                    <div style={fieldCol(110)}>
-                      <span style={labelSt}>Typ</span>
-                      <select value={txType} onChange={e => setTxType(e.target.value)}>
-                        <option value="buy">Kauf</option>
-                        <option value="sell">Verkauf</option>
-                        <option value="dividend">Dividende</option>
-                        <option value="interest">Zinsen</option>
-                      </select>
-                    </div>
-                    {isIncomeType(txType) ? (
-                      /* Income-only: just a total amount */
-                      <div style={fieldCol(110)}>
-                        <span style={labelSt}>Betrag (gesamt)</span>
-                        <input type="number" value={txTotal} onChange={e => setTxTotal(e.target.value)} step="0.01" min="0" required placeholder="0.00" />
-                      </div>
-                    ) : (
-                      <>
-                        <div style={fieldCol(85)}>
-                          <span style={labelSt}>Anzahl</span>
-                          <input type="number" value={txQuantity} onChange={e => setTxQuantity(e.target.value)} step="0.0001" min="0.0001" required />
-                        </div>
-                        <PriceModeToggle mode={txPriceMode} setMode={setTxPriceMode} />
-                        {txPriceMode === 'price' ? (
-                          <div style={fieldCol(95)}>
-                            <span style={labelSt}>Kurs/Stk.</span>
-                            <input type="number" value={txPrice} onChange={e => setTxPrice(e.target.value)} step="0.0001" min="0" required />
-                          </div>
-                        ) : (
-                          <div style={fieldCol(105)}>
-                            <span style={labelSt}>Einstandswert</span>
-                            <input type="number" value={txTotal} onChange={e => setTxTotal(e.target.value)} step="0.01" min="0" required placeholder="Gesamt" />
-                          </div>
-                        )}
-                      </>
-                    )}
-                    <div style={fieldCol(80)}>
-                      <span style={labelSt}>Gebühren</span>
-                      <input type="number" value={txFees} onChange={e => setTxFees(e.target.value)} step="0.01" min="0" placeholder="0" />
-                    </div>
-                    <div style={fieldCol(undefined)}>
-                      <span style={labelSt}>Datum</span>
-                      <input type="date" value={txDate} onChange={e => setTxDate(e.target.value)} required />
-                    </div>
-                    <button type="submit" style={{ alignSelf: 'flex-end' }}>+ Transaktion</button>
-                  </div>
-                </form>
-              </div>
-
               {/* Transaction history */}
               {depotTxs.length === 0
                 ? <p style={{ color: 'var(--color-text-muted)', textAlign: 'center', padding: '1.5rem 0' }}>Noch keine Transaktionen.</p>
@@ -449,6 +390,67 @@ export default function Depots() {
                   </div>
                 )
               }
+
+              {/* Add form — unterhalb der Liste */}
+              <div style={{ background: 'var(--color-bg)', padding: '0.85rem 1rem', borderRadius: 8, marginTop: '1rem', border: '1px solid var(--color-border)' }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '0.6rem' }}>
+                  Transaktion hinzufügen
+                </div>
+                <form onSubmit={addTransaction}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.55rem', alignItems: 'flex-end' }}>
+                    <div style={fieldCol(undefined)}>
+                      <span style={labelSt}>Wertpapier</span>
+                      <select value={txSecurityId} onChange={e => setTxSecurityId(e.target.value)} required style={{ minWidth: 140 }}>
+                        <option value="">– wählen –</option>
+                        {securities.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                      </select>
+                    </div>
+                    <div style={fieldCol(110)}>
+                      <span style={labelSt}>Typ</span>
+                      <select value={txType} onChange={e => setTxType(e.target.value)}>
+                        <option value="buy">Kauf</option>
+                        <option value="sell">Verkauf</option>
+                        <option value="dividend">Dividende</option>
+                        <option value="interest">Zinsen</option>
+                      </select>
+                    </div>
+                    {isIncomeType(txType) ? (
+                      <div style={fieldCol(110)}>
+                        <span style={labelSt}>Betrag (gesamt)</span>
+                        <input type="number" value={txTotal} onChange={e => setTxTotal(e.target.value)} step="0.01" min="0" required placeholder="0.00" />
+                      </div>
+                    ) : (
+                      <>
+                        <div style={fieldCol(85)}>
+                          <span style={labelSt}>Anzahl</span>
+                          <input type="number" value={txQuantity} onChange={e => setTxQuantity(e.target.value)} step="0.0001" min="0.0001" required />
+                        </div>
+                        <PriceModeToggle mode={txPriceMode} setMode={setTxPriceMode} />
+                        {txPriceMode === 'price' ? (
+                          <div style={fieldCol(95)}>
+                            <span style={labelSt}>Kurs/Stk.</span>
+                            <input type="number" value={txPrice} onChange={e => setTxPrice(e.target.value)} step="0.0001" min="0" required />
+                          </div>
+                        ) : (
+                          <div style={fieldCol(105)}>
+                            <span style={labelSt}>Einstandswert</span>
+                            <input type="number" value={txTotal} onChange={e => setTxTotal(e.target.value)} step="0.01" min="0" required placeholder="Gesamt" />
+                          </div>
+                        )}
+                      </>
+                    )}
+                    <div style={fieldCol(80)}>
+                      <span style={labelSt}>Gebühren</span>
+                      <input type="number" value={txFees} onChange={e => setTxFees(e.target.value)} step="0.01" min="0" placeholder="0" />
+                    </div>
+                    <div style={fieldCol(undefined)}>
+                      <span style={labelSt}>Datum</span>
+                      <input type="date" value={txDate} onChange={e => setTxDate(e.target.value)} required />
+                    </div>
+                    <button type="submit" style={{ alignSelf: 'flex-end' }}>+ Transaktion</button>
+                  </div>
+                </form>
+              </div>
             </>
           )}
         </>

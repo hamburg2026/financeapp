@@ -210,13 +210,7 @@ export default function BankAccounts() {
       {/* ── KONTEN TAB ── */}
       {tab === 'accounts' && (
         <>
-          <form onSubmit={addAccount}>
-            <input value={accountName} onChange={e => setAccountName(e.target.value)} placeholder="Kontoname" required />
-            <input type="number" value={accountBalance} onChange={e => setAccountBalance(e.target.value)} placeholder="Anfangsstand" step="0.01" required />
-            <button type="submit">Konto hinzufügen</button>
-          </form>
-
-          <div style={{ marginTop: '1rem', border: '1px solid var(--color-border)', borderRadius: 8, overflow: 'hidden' }}>
+          <div style={{ border: '1px solid var(--color-border)', borderRadius: 8, overflow: 'hidden' }}>
             {accounts.length === 0 ? (
               <p style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '2rem', fontSize: '0.875rem' }}>
                 Noch keine Konten angelegt
@@ -260,44 +254,19 @@ export default function BankAccounts() {
               </table>
             )}
           </div>
+
+          <h3 style={{ marginTop: '1.5rem', marginBottom: '0.5rem' }}>Konto hinzufügen</h3>
+          <form onSubmit={addAccount}>
+            <input value={accountName} onChange={e => setAccountName(e.target.value)} placeholder="Kontoname" required />
+            <input type="number" value={accountBalance} onChange={e => setAccountBalance(e.target.value)} placeholder="Anfangsstand" step="0.01" required />
+            <button type="submit">Konto hinzufügen</button>
+          </form>
         </>
       )}
 
       {/* ── UMSÄTZE TAB ── */}
       {tab === 'transactions' && (
         <>
-          {/* Add transaction form */}
-          <form onSubmit={addTransaction}>
-            <select value={txAccountId} onChange={e => setTxAccountId(e.target.value)} required>
-              <option value="">Konto wählen</option>
-              {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-            </select>
-            <input type="date" value={txDate} onChange={e => setTxDate(e.target.value)} required />
-            <input value={txDescription} onChange={e => setTxDescription(e.target.value)} placeholder="Beschreibung" required />
-            <input value={txRecipient} onChange={e => setTxRecipient(e.target.value)} placeholder="Empfänger" />
-            <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
-              <input
-                type="number" value={txAmount} onChange={e => setTxAmount(e.target.value)}
-                placeholder="Betrag (positiv)" step="0.01" min="0" required
-                style={{ flex: 1 }}
-              />
-              {newTxCatType && (
-                <span style={{
-                  fontSize: '0.75rem', fontWeight: 600, padding: '0.2rem 0.5rem', borderRadius: 5,
-                  background: newTxCatType === 'Ausgabe' ? '#fee2e2' : '#dcfce7',
-                  color: newTxCatType === 'Ausgabe' ? '#dc2626' : '#16a34a',
-                }}>
-                  {newTxCatType === 'Ausgabe' ? '− Ausgabe' : '+ Einnahme'}
-                </span>
-              )}
-            </div>
-            <select value={txCategory} onChange={e => setTxCategory(e.target.value)} required>
-              <option value="">Kategorie wählen</option>
-              {categories.map(c => <option key={c.id} value={c.name}>{c.name} ({c.type || '–'})</option>)}
-            </select>
-            <button type="submit">Umsatz hinzufügen</button>
-          </form>
-
           {/* Filter bar */}
           <div style={{
             background: 'var(--color-bg)', border: '1px solid var(--color-border)',
@@ -424,6 +393,39 @@ export default function BankAccounts() {
               </tbody>
             </table>
           </div>
+
+          {/* Add transaction form (unterhalb der Liste) */}
+          <h3 style={{ marginTop: '1.5rem', marginBottom: '0.5rem' }}>Umsatz hinzufügen</h3>
+          <form onSubmit={addTransaction}>
+            <select value={txAccountId} onChange={e => setTxAccountId(e.target.value)} required>
+              <option value="">Konto wählen</option>
+              {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+            </select>
+            <input type="date" value={txDate} onChange={e => setTxDate(e.target.value)} required />
+            <input value={txDescription} onChange={e => setTxDescription(e.target.value)} placeholder="Beschreibung" required />
+            <input value={txRecipient} onChange={e => setTxRecipient(e.target.value)} placeholder="Empfänger" />
+            <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+              <input
+                type="number" value={txAmount} onChange={e => setTxAmount(e.target.value)}
+                placeholder="Betrag (positiv)" step="0.01" min="0" required
+                style={{ flex: 1 }}
+              />
+              {newTxCatType && (
+                <span style={{
+                  fontSize: '0.75rem', fontWeight: 600, padding: '0.2rem 0.5rem', borderRadius: 5,
+                  background: newTxCatType === 'Ausgabe' ? '#fee2e2' : '#dcfce7',
+                  color: newTxCatType === 'Ausgabe' ? '#dc2626' : '#16a34a',
+                }}>
+                  {newTxCatType === 'Ausgabe' ? '− Ausgabe' : '+ Einnahme'}
+                </span>
+              )}
+            </div>
+            <select value={txCategory} onChange={e => setTxCategory(e.target.value)} required>
+              <option value="">Kategorie wählen</option>
+              {categories.map(c => <option key={c.id} value={c.name}>{c.name} ({c.type || '–'})</option>)}
+            </select>
+            <button type="submit">Umsatz hinzufügen</button>
+          </form>
         </>
       )}
     </div>

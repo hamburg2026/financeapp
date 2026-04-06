@@ -33,13 +33,7 @@ export default function CompanyShares() {
   return (
     <div className="module">
       <h2>Firmenbeteiligungen</h2>
-      <form onSubmit={addShare}>
-        <input value={company} onChange={e => setCompany(e.target.value)} placeholder="Firmenname" required />
-        <input type="number" value={percentage} onChange={e => setPercentage(e.target.value)} placeholder="Beteiligung %" step="0.01" required />
-        <input type="number" value={value} onChange={e => setValue(e.target.value)} placeholder="Wert" step="0.01" required />
-        <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Notizen" />
-        <button type="submit">Beteiligung hinzufügen</button>
-      </form>
+
       <h3>Beteiligungen</h3>
       <table>
         <thead><tr><th>Firma</th><th>Beteiligung</th><th>Wert</th><th>Aktionen</th></tr></thead>
@@ -54,6 +48,15 @@ export default function CompanyShares() {
           ))}
         </tbody>
       </table>
+
+      <h3 style={{ marginTop: '1.5rem' }}>Beteiligung hinzufügen</h3>
+      <form onSubmit={addShare}>
+        <input value={company} onChange={e => setCompany(e.target.value)} placeholder="Firmenname" required />
+        <input type="number" value={percentage} onChange={e => setPercentage(e.target.value)} placeholder="Beteiligung %" step="0.01" required />
+        <input type="number" value={value} onChange={e => setValue(e.target.value)} placeholder="Wert" step="0.01" required />
+        <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Notizen" />
+        <button type="submit">Beteiligung hinzufügen</button>
+      </form>
     </div>
   )
 }

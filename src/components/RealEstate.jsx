@@ -33,13 +33,7 @@ export default function RealEstate() {
   return (
     <div className="module">
       <h2>Immobilien</h2>
-      <form onSubmit={addProperty}>
-        <input value={name} onChange={e => setName(e.target.value)} placeholder="Name" required />
-        <input type="number" value={purchase} onChange={e => setPurchase(e.target.value)} placeholder="Anschaffungswert" step="0.01" required />
-        <input type="number" value={current} onChange={e => setCurrent(e.target.value)} placeholder="Zeitwert" step="0.01" required />
-        <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Notizen" />
-        <button type="submit">Immobilie hinzufügen</button>
-      </form>
+
       <h3>Immobilien</h3>
       <table>
         <thead><tr><th>Name</th><th>Anschaffungswert</th><th>Zeitwert</th><th>Gewinn/Verlust</th><th>Aktionen</th></tr></thead>
@@ -55,6 +49,15 @@ export default function RealEstate() {
           ))}
         </tbody>
       </table>
+
+      <h3 style={{ marginTop: '1.5rem' }}>Immobilie hinzufügen</h3>
+      <form onSubmit={addProperty}>
+        <input value={name} onChange={e => setName(e.target.value)} placeholder="Name" required />
+        <input type="number" value={purchase} onChange={e => setPurchase(e.target.value)} placeholder="Anschaffungswert" step="0.01" required />
+        <input type="number" value={current} onChange={e => setCurrent(e.target.value)} placeholder="Zeitwert" step="0.01" required />
+        <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Notizen" />
+        <button type="submit">Immobilie hinzufügen</button>
+      </form>
     </div>
   )
 }

@@ -221,25 +221,6 @@ export default function RecurringPayments() {
         </button>
       </div>
 
-      {showForm && (
-        <form onSubmit={addRecurring} style={{ marginBottom: '1.5rem', background: 'var(--color-bg)', padding: '1rem', borderRadius: 8, gap: '0.6rem' }}>
-          <input value={description} onChange={e => setDescription(e.target.value)} placeholder="Beschreibung" required />
-          <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="Betrag (€)" step="0.01" min="0.01" required />
-          <select value={frequency} onChange={e => setFrequency(e.target.value)}>
-            <option value="monthly">Monatlich</option>
-            <option value="quarterly">Vierteljährlich</option>
-            <option value="halfyearly">Halbjährlich</option>
-            <option value="yearly">Jährlich</option>
-          </select>
-          <CategorySelect value={categoryId} onChange={e => handleCategoryChange(e.target.value)} categories={categories} />
-          <select value={type} onChange={e => setType(e.target.value)}>
-            <option value="Ausgabe">Ausgabe</option>
-            <option value="Einnahme">Einnahme</option>
-          </select>
-          <button type="submit">Hinzufügen</button>
-        </form>
-      )}
-
       {/* Filter controls */}
       <div style={{ background: 'var(--color-bg)', borderRadius: 8, padding: '0.75rem', marginBottom: '0.9rem', display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
         <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -412,6 +393,26 @@ export default function RecurringPayments() {
             )
           })}
         </div>
+      )}
+
+      {/* Add form (unterhalb der Liste) */}
+      {showForm && (
+        <form onSubmit={addRecurring} style={{ marginTop: '1rem', background: 'var(--color-bg)', padding: '1rem', borderRadius: 8, gap: '0.6rem' }}>
+          <input value={description} onChange={e => setDescription(e.target.value)} placeholder="Beschreibung" required />
+          <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="Betrag (€)" step="0.01" min="0.01" required />
+          <select value={frequency} onChange={e => setFrequency(e.target.value)}>
+            <option value="monthly">Monatlich</option>
+            <option value="quarterly">Vierteljährlich</option>
+            <option value="halfyearly">Halbjährlich</option>
+            <option value="yearly">Jährlich</option>
+          </select>
+          <CategorySelect value={categoryId} onChange={e => handleCategoryChange(e.target.value)} categories={categories} />
+          <select value={type} onChange={e => setType(e.target.value)}>
+            <option value="Ausgabe">Ausgabe</option>
+            <option value="Einnahme">Einnahme</option>
+          </select>
+          <button type="submit">Hinzufügen</button>
+        </form>
       )}
     </div>
   )
