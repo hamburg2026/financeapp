@@ -18,14 +18,14 @@ const labelStyle = { fontSize: '0.7rem', color: 'var(--color-text-muted)', margi
 
 const today = () => new Date().toISOString().slice(0, 10)
 
-// ── Yahoo Finance price fetch (symbol = Yahoo ticker, e.g. "AAPL", "SAP.DE") ──
+// ── Yahoo Finance via corsproxy.io (CORS-fähig, kein API-Key nötig) ──
 async function fetchYahooPrice(symbol) {
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d`
-  const res = await fetch(url)
+  const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d`
+  const proxyUrl = `https://corsproxy.io/?url=${encodeURIComponent(yahooUrl)}`
+  const res = await fetch(proxyUrl)
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   const data = await res.json()
-  const result = data?.chart?.result?.[0]
-  const meta = result?.meta
+  const meta = data?.chart?.result?.[0]?.meta
   if (!meta?.regularMarketPrice) throw new Error('Keine Kursdaten in der Antwort')
   const price = meta.regularMarketPrice
   const date = meta.regularMarketTime
@@ -34,7 +34,7 @@ async function fetchYahooPrice(symbol) {
   return { price, date }
 }
 
-// ── Frankfurter.app FX fetch (pair = e.g. "USD", result = how many EUR per 1 unit) ──
+// ── Frankfurter.app FX (kostenlos, CORS-fähig) ──
 async function fetchFrankfurterFx(pair) {
   const res = await fetch(`https://api.frankfurter.app/latest?base=${encodeURIComponent(pair)}&symbols=EUR`)
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -64,8 +64,7 @@ export default function Securities() {
   const [editSecType,   setEditSecType]   = useState('Aktie')
   const [editSecCur,    setEditSecCur]    = useState('EUR')
 
-  // ── Price form ──
-  const [priceSecId,   setPriceSecId]   = useState('')
+  // ── Price form (shared date/value for inline add) ──
   const [priceDate,    setPriceDate]    = useState(today)
   const [priceValue,   setPriceValue]   = useState('')
 
@@ -87,20 +86,18 @@ export default function Securities() {
   // ── Expanded price lists ──
   const [expandedPrices, setExpandedPrices] = useState(new Set())
 
-  // ── API fetch state (per secId) ──
-  const [fetchingPrice, setFetchingPrice] = useState({}) // secId -> true/false
-  const [fetchPriceErr, setFetchPriceErr] = useState({}) // secId -> error string
-
-  // ── FX API fetch state (per pair) ──
-  const [fetchingFx, setFetchingFx] = useState({})
-  const [fetchFxErr, setFetchFxErr] = useState({})
+  // ── API fetch state ──
+  const [fetchingPrice, setFetchingPrice] = useState({})
+  const [fetchPriceErr, setFetchPriceErr] = useState({})
+  const [fetchingFx,    setFetchingFx]    = useState({})
+  const [fetchFxErr,    setFetchFxErr]    = useState({})
 
   // ─── Security CRUD ───────────────────────────────────────────────────────────
   function addSecurity(e) {
     e.preventDefault()
     setSecurities([...securities, {
       id: Date.now(), name: secName, symbol: secSymbol,
-      isin: secIsin, type: secType, currency: secCur,
+      isin: secIsin.trim(), type: secType, currency: secCur,
     }])
     setSecName(''); setSecSymbol(''); setSecIsin(''); setSecType('Aktie'); setSecCur('EUR')
   }
@@ -116,7 +113,7 @@ export default function Securities() {
 
   function saveEditSec() {
     setSecurities(securities.map(s => s.id === editSecId
-      ? { ...s, name: editSecName, symbol: editSecSymbol, isin: editSecIsin, type: editSecType, currency: editSecCur }
+      ? { ...s, name: editSecName, symbol: editSecSymbol, isin: editSecIsin.trim(), type: editSecType, currency: editSecCur }
       : s
     ))
     setEditSecId(null)
@@ -129,10 +126,7 @@ export default function Securities() {
   }
 
   // ─── Price CRUD ──────────────────────────────────────────────────────────────
-  function addPrice(e) {
-    e.preventDefault()
-    const secId = priceSecId || securities[0]?.id
-    if (!secId) return
+  function addPriceInline(secId) {
     const list = [...(prices[secId] || []), { date: priceDate, value: parseFloat(priceValue) }]
       .sort((a, b) => new Date(b.date) - new Date(a.date))
     setPrices({ ...prices, [secId]: list })
@@ -169,10 +163,10 @@ export default function Securities() {
     setExpandedPrices(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
   }
 
-  // ─── API: Security price fetch ───────────────────────────────────────────────
+  // ─── API: Security price ─────────────────────────────────────────────────────
   async function handleFetchApiPrice(sec) {
     if (!sec.symbol) {
-      setFetchPriceErr(e => ({ ...e, [sec.id]: 'Kein Symbol/Ticker hinterlegt.' }))
+      setFetchPriceErr(e => ({ ...e, [sec.id]: 'Kein Ticker/Symbol hinterlegt.' }))
       return
     }
     setFetchingPrice(s => ({ ...s, [sec.id]: true }))
@@ -225,7 +219,7 @@ export default function Securities() {
     return [...list].sort((a, b) => new Date(b.date) - new Date(a.date))[0].value
   }
 
-  // ─── API: FX rate fetch ───────────────────────────────────────────────────────
+  // ─── API: FX rate ────────────────────────────────────────────────────────────
   async function handleFetchApiFx(pair) {
     setFetchingFx(s => ({ ...s, [pair]: true }))
     setFetchFxErr(e => ({ ...e, [pair]: null }))
@@ -252,39 +246,9 @@ export default function Securities() {
     <div className="module">
       <h2>Wertpapiere</h2>
 
-      {/* ── Add security ── */}
-      <p style={sectionHead}>Wertpapier hinzufügen</p>
-      <form onSubmit={addSecurity} style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end', marginBottom: '1rem' }}>
-        <label style={{ display: 'flex', flexDirection: 'column', flex: 2, minWidth: 140 }}>
-          <span style={labelStyle}>Name</span>
-          <input value={secName} onChange={e => setSecName(e.target.value)} placeholder="z. B. Apple Inc." required />
-        </label>
-        <label style={{ display: 'flex', flexDirection: 'column', minWidth: 90 }}>
-          <span style={labelStyle}>Ticker / Symbol</span>
-          <input value={secSymbol} onChange={e => setSecSymbol(e.target.value)} placeholder="AAPL" required />
-        </label>
-        <label style={{ display: 'flex', flexDirection: 'column', minWidth: 120 }}>
-          <span style={labelStyle}>ISIN (optional)</span>
-          <input value={secIsin} onChange={e => setSecIsin(e.target.value)} placeholder="US0378331005" maxLength={12} />
-        </label>
-        <label style={{ display: 'flex', flexDirection: 'column', minWidth: 120 }}>
-          <span style={labelStyle}>Typ</span>
-          <select value={secType} onChange={e => setSecType(e.target.value)}>
-            {SEC_TYPES.map(t => <option key={t}>{t}</option>)}
-          </select>
-        </label>
-        <label style={{ display: 'flex', flexDirection: 'column', minWidth: 80 }}>
-          <span style={labelStyle}>Währung</span>
-          <select value={secCur} onChange={e => setSecCur(e.target.value)}>
-            {CURRENCIES.map(c => <option key={c}>{c}</option>)}
-          </select>
-        </label>
-        <button type="submit" style={{ alignSelf: 'flex-end' }}>+ Wertpapier</button>
-      </form>
-
       {/* ── Securities list ── */}
       {securities.length > 0 && (
-        <div style={{ border: '1px solid var(--color-border)', borderRadius: 8, overflow: 'hidden', marginBottom: '1.5rem' }}>
+        <div style={{ border: '1px solid var(--color-border)', borderRadius: 8, overflow: 'hidden', marginBottom: '0.5rem' }}>
           {securities.map((s, si) => {
             const price      = getCurrentPrice(s.id)
             const pricesOpen = expandedPrices.has(s.id)
@@ -304,7 +268,7 @@ export default function Securities() {
                     <input value={editSecSymbol} onChange={e => setEditSecSymbol(e.target.value)}
                       style={{ width: 90, fontSize: '0.82rem', padding: '0.25rem 0.4rem' }} placeholder="Ticker" />
                     <input value={editSecIsin} onChange={e => setEditSecIsin(e.target.value)}
-                      style={{ width: 110, fontSize: '0.82rem', padding: '0.25rem 0.4rem' }} placeholder="ISIN" maxLength={12} />
+                      style={{ width: 115, fontSize: '0.82rem', padding: '0.25rem 0.4rem' }} placeholder="ISIN" maxLength={12} />
                     <select value={editSecType} onChange={e => setEditSecType(e.target.value)} style={{ fontSize: '0.82rem', padding: '0.25rem 0.4rem' }}>
                       {SEC_TYPES.map(t => <option key={t}>{t}</option>)}
                     </select>
@@ -322,7 +286,7 @@ export default function Securities() {
                       </button>
                       <span style={{ flex: 1, fontWeight: 600, fontSize: '0.9rem' }}>{s.name}</span>
                       <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{s.symbol}</span>
-                      {isinVal && (
+                      {isinVal ? (
                         <a
                           href={`https://finance.yahoo.com/quote/${isinVal}`}
                           target="_blank"
@@ -332,6 +296,11 @@ export default function Securities() {
                         >
                           {isinVal}
                         </a>
+                      ) : (
+                        <span style={{ fontSize: '0.68rem', color: '#d97706', background: '#fef9c3', borderRadius: 4, padding: '0.05rem 0.35rem', cursor: 'pointer' }}
+                          onClick={() => startEditSec(s)} title="ISIN hinterlegen">
+                          + ISIN
+                        </span>
                       )}
                       <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', background: 'var(--color-border)', borderRadius: 4, padding: '0.05rem 0.35rem' }}>{s.type}</span>
                       <span style={{ fontSize: '0.72rem', fontWeight: 600, color: s.currency !== 'EUR' ? '#d97706' : 'var(--color-text-muted)' }}>{s.currency || 'EUR'}</span>
@@ -339,8 +308,8 @@ export default function Securities() {
                       <button
                         onClick={() => handleFetchApiPrice(s)}
                         disabled={isFetching}
-                        style={{ ...btnBase, background: '#dbeafe', color: '#1d4ed8', minWidth: 70 }}
-                        title="Aktuellen Kurs von Yahoo Finance abrufen"
+                        style={{ ...btnBase, background: '#dbeafe', color: '#1d4ed8', minWidth: 72 }}
+                        title={`Kurs für ${s.symbol} von Yahoo Finance abrufen`}
                       >
                         {isFetching ? '…' : '↓ API-Kurs'}
                       </button>
@@ -382,14 +351,7 @@ export default function Securities() {
                     })}
                     {/* Add price inline */}
                     <form
-                      onSubmit={e => {
-                        e.preventDefault()
-                        const id = s.id
-                        const list = [...(prices[id] || []), { date: priceDate, value: parseFloat(priceValue) }]
-                          .sort((a, b) => new Date(b.date) - new Date(a.date))
-                        setPrices({ ...prices, [id]: list })
-                        setPriceDate(today()); setPriceValue('')
-                      }}
+                      onSubmit={e => { e.preventDefault(); addPriceInline(s.id) }}
                       style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', padding: '0.35rem 0.75rem', paddingLeft: '2.2rem', borderTop: priceList.length ? '1px dashed var(--color-border)' : 'none' }}
                     >
                       <input type="date" value={priceDate} onChange={e => setPriceDate(e.target.value)} required style={{ fontSize: '0.78rem', padding: '0.18rem 0.35rem' }} />
@@ -404,28 +366,40 @@ export default function Securities() {
         </div>
       )}
 
-      {/* ── Devisenkurse ── */}
-      <p style={sectionHead}>Devisenkurse (je 1 Fremdwährung in EUR)</p>
-      <form onSubmit={addFxRate} style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end', marginBottom: '1rem' }}>
+      {/* ── Add security form (unterhalb der Liste) ── */}
+      <p style={sectionHead}>Wertpapier hinzufügen</p>
+      <form onSubmit={addSecurity} style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end', marginBottom: '1.5rem' }}>
+        <label style={{ display: 'flex', flexDirection: 'column', flex: 2, minWidth: 140 }}>
+          <span style={labelStyle}>Name</span>
+          <input value={secName} onChange={e => setSecName(e.target.value)} placeholder="z. B. Apple Inc." required />
+        </label>
         <label style={{ display: 'flex', flexDirection: 'column', minWidth: 90 }}>
-          <span style={labelStyle}>Währung</span>
-          <select value={fxPair} onChange={e => setFxPair(e.target.value)}>
-            {CURRENCIES.filter(c => c !== 'EUR').map(c => <option key={c}>{c}</option>)}
+          <span style={labelStyle}>Ticker / Symbol</span>
+          <input value={secSymbol} onChange={e => setSecSymbol(e.target.value)} placeholder="AAPL" required />
+        </label>
+        <label style={{ display: 'flex', flexDirection: 'column', minWidth: 120 }}>
+          <span style={labelStyle}>ISIN (optional)</span>
+          <input value={secIsin} onChange={e => setSecIsin(e.target.value)} placeholder="US0378331005" maxLength={12} />
+        </label>
+        <label style={{ display: 'flex', flexDirection: 'column', minWidth: 120 }}>
+          <span style={labelStyle}>Typ</span>
+          <select value={secType} onChange={e => setSecType(e.target.value)}>
+            {SEC_TYPES.map(t => <option key={t}>{t}</option>)}
           </select>
         </label>
-        <label style={{ display: 'flex', flexDirection: 'column' }}>
-          <span style={labelStyle}>Datum</span>
-          <input type="date" value={fxDate} onChange={e => setFxDate(e.target.value)} required />
+        <label style={{ display: 'flex', flexDirection: 'column', minWidth: 80 }}>
+          <span style={labelStyle}>Währung</span>
+          <select value={secCur} onChange={e => setSecCur(e.target.value)}>
+            {CURRENCIES.map(c => <option key={c}>{c}</option>)}
+          </select>
         </label>
-        <label style={{ display: 'flex', flexDirection: 'column', minWidth: 100 }}>
-          <span style={labelStyle}>Kurs (EUR)</span>
-          <input type="number" value={fxValue} onChange={e => setFxValue(e.target.value)} placeholder="0.9200" step="0.0001" min="0" required />
-        </label>
-        <button type="submit" style={{ alignSelf: 'flex-end' }}>+ Devisenkurs</button>
+        <button type="submit" style={{ alignSelf: 'flex-end' }}>+ Wertpapier</button>
       </form>
 
+      {/* ── Devisenkurse: Liste ── */}
+      <p style={{ ...sectionHead, marginTop: '0.5rem' }}>Devisenkurse (je 1 Fremdwährung in EUR)</p>
       {usedFxPairs.length > 0 && (
-        <div style={{ border: '1px solid var(--color-border)', borderRadius: 8, overflow: 'hidden' }}>
+        <div style={{ border: '1px solid var(--color-border)', borderRadius: 8, overflow: 'hidden', marginBottom: '0.5rem' }}>
           {usedFxPairs.map((pair, pi) => {
             const list       = (fxRates[pair] || []).slice().sort((a, b) => new Date(b.date) - new Date(a.date))
             const latest     = getLatestFx(pair)
@@ -478,6 +452,25 @@ export default function Securities() {
           })}
         </div>
       )}
+
+      {/* ── Devisenkurs hinzufügen (unterhalb der Liste) ── */}
+      <form onSubmit={addFxRate} style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end' }}>
+        <label style={{ display: 'flex', flexDirection: 'column', minWidth: 90 }}>
+          <span style={labelStyle}>Währung</span>
+          <select value={fxPair} onChange={e => setFxPair(e.target.value)}>
+            {CURRENCIES.filter(c => c !== 'EUR').map(c => <option key={c}>{c}</option>)}
+          </select>
+        </label>
+        <label style={{ display: 'flex', flexDirection: 'column' }}>
+          <span style={labelStyle}>Datum</span>
+          <input type="date" value={fxDate} onChange={e => setFxDate(e.target.value)} required />
+        </label>
+        <label style={{ display: 'flex', flexDirection: 'column', minWidth: 100 }}>
+          <span style={labelStyle}>Kurs (EUR)</span>
+          <input type="number" value={fxValue} onChange={e => setFxValue(e.target.value)} placeholder="0.9200" step="0.0001" min="0" required />
+        </label>
+        <button type="submit" style={{ alignSelf: 'flex-end' }}>+ Devisenkurs</button>
+      </form>
     </div>
   )
 }

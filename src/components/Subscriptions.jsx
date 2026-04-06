@@ -152,41 +152,8 @@ export default function Subscriptions() {
   return (
     <div className="module">
       <h2>Abonnements</h2>
-      <form onSubmit={addSubscription}>
-        <input value={name} onChange={e => setName(e.target.value)} placeholder="Name" required />
-        <input type="number" value={cost} onChange={e => setCost(e.target.value)} placeholder="Kosten" step="0.01" required />
-        <select value={frequency} onChange={e => setFrequency(e.target.value)} required>
-          <option value="monthly">Monatlich</option>
-          <option value="quarterly">Vierteljährlich</option>
-          <option value="halfyearly">Halbjährlich</option>
-          <option value="yearly">Jährlich</option>
-        </select>
-        <input list="cancel-options" value={cancel} onChange={e => setCancel(e.target.value)} placeholder="Kündigungsfrist" />
-        <datalist id="cancel-options">
-          <option value="1 Monat" />
-          <option value="2 Monate" />
-          <option value="3 Monate" />
-          <option value="6 Monate" />
-          <option value="12 Monate" />
-          <option value="quartalsweise" />
-          <option value="halbjährlich" />
-          <option value="jährlich" />
-          <option value="individuell" />
-        </datalist>
-        <input type="date" value={cancelDate} onChange={e => setCancelDate(e.target.value)} placeholder="Kündigungsdatum" />
-        <CategorySelect value={categoryId} onChange={e => handleCategoryChange(e.target.value)} categories={categories} />
-        <select value={type} onChange={e => setType(e.target.value)}>
-          <option value="Ausgabe">Ausgabe</option>
-          <option value="Einnahme">Einnahme</option>
-        </select>
-        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem' }}>
-          <input type="checkbox" checked={aktiv} onChange={e => setAktiv(e.target.checked)} />
-          Aktiv (als Dauerauftrag übernehmen)
-        </label>
-        <button type="submit">Abonnement hinzufügen</button>
-      </form>
 
-      <div style={{ marginTop: '1.25rem', border: '1px solid var(--color-border)', borderRadius: 8, overflow: 'hidden' }}>
+      <div style={{ border: '1px solid var(--color-border)', borderRadius: 8, overflow: 'hidden' }}>
         {subscriptions.length === 0 ? (
           <p style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '2rem', margin: 0, fontSize: '0.875rem' }}>
             Noch keine Abonnements angelegt
@@ -262,6 +229,41 @@ export default function Subscriptions() {
           )
         })}
       </div>
+
+      <h3 style={{ marginTop: '1.5rem', marginBottom: '0.5rem' }}>Abonnement hinzufügen</h3>
+      <form onSubmit={addSubscription}>
+        <input value={name} onChange={e => setName(e.target.value)} placeholder="Name" required />
+        <input type="number" value={cost} onChange={e => setCost(e.target.value)} placeholder="Kosten" step="0.01" required />
+        <select value={frequency} onChange={e => setFrequency(e.target.value)} required>
+          <option value="monthly">Monatlich</option>
+          <option value="quarterly">Vierteljährlich</option>
+          <option value="halfyearly">Halbjährlich</option>
+          <option value="yearly">Jährlich</option>
+        </select>
+        <input list="cancel-options" value={cancel} onChange={e => setCancel(e.target.value)} placeholder="Kündigungsfrist" />
+        <datalist id="cancel-options">
+          <option value="1 Monat" />
+          <option value="2 Monate" />
+          <option value="3 Monate" />
+          <option value="6 Monate" />
+          <option value="12 Monate" />
+          <option value="quartalsweise" />
+          <option value="halbjährlich" />
+          <option value="jährlich" />
+          <option value="individuell" />
+        </datalist>
+        <input type="date" value={cancelDate} onChange={e => setCancelDate(e.target.value)} placeholder="Kündigungsdatum" />
+        <CategorySelect value={categoryId} onChange={e => handleCategoryChange(e.target.value)} categories={categories} />
+        <select value={type} onChange={e => setType(e.target.value)}>
+          <option value="Ausgabe">Ausgabe</option>
+          <option value="Einnahme">Einnahme</option>
+        </select>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem' }}>
+          <input type="checkbox" checked={aktiv} onChange={e => setAktiv(e.target.checked)} />
+          Aktiv (als Dauerauftrag übernehmen)
+        </label>
+        <button type="submit">Abonnement hinzufügen</button>
+      </form>
     </div>
   )
 }
