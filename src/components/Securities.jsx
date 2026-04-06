@@ -13,6 +13,11 @@ function useLocalStorage(key, initial) {
 const SEC_TYPES = ['Aktie', 'ETF', 'Fonds', 'Anleihe', 'Rohstoff', 'Kryptowährung', 'Sonstiges']
 const CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF', 'JPY', 'SEK', 'NOK', 'DKK', 'CAD', 'AUD']
 
+const TX_LABELS = { buy: 'Kauf', sell: 'Verkauf', dividend: 'Dividende', interest: 'Zinsen' }
+const TX_COLORS = { buy: '#16a34a', sell: '#dc2626', dividend: '#2563eb', interest: '#7c3aed' }
+const TX_BG    = { buy: '#dcfce7', sell: '#fee2e2', dividend: '#dbeafe', interest: '#ede9fe' }
+const INCOME_TX = new Set(['dividend', 'interest'])
+
 const btnBase = { border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: '0.72rem', padding: '0.2rem 0.45rem', lineHeight: 1.4 }
 const labelStyle = { fontSize: '0.7rem', color: 'var(--color-text-muted)', marginBottom: 2, display: 'block' }
 
@@ -90,8 +95,30 @@ export default function Securities() {
   const [editFxDate,  setEditFxDate]  = useState('')
   const [editFxValue, setEditFxValue] = useState('')
 
-  // ── Expanded price lists ──
+  // ── Depot transactions (shared with Depots module) ──
+  const [depotTransactions, setDepotTransactions] = useLocalStorage('depotTransactions', [])
+  const [depots] = useState(() => JSON.parse(localStorage.getItem('depots')) || [])
+
+  // ── Expanded sections ──
   const [expandedPrices, setExpandedPrices] = useState(new Set())
+  const [expandedTx,     setExpandedTx]     = useState(new Set())
+
+  // ── Add transaction form (shared) ──
+  const [txDate,    setTxDate]    = useState(today)
+  const [txDepotId, setTxDepotId] = useState('')
+  const [txType,    setTxType]    = useState('buy')
+  const [txQty,     setTxQty]     = useState('')
+  const [txPrice,   setTxPrice]   = useState('')
+  const [txFees,    setTxFees]    = useState('')
+
+  // ── Edit transaction ──
+  const [editTxId,      setEditTxId]      = useState(null)
+  const [editTxDate,    setEditTxDate]    = useState('')
+  const [editTxDepotId, setEditTxDepotId] = useState('')
+  const [editTxType,    setEditTxType]    = useState('buy')
+  const [editTxQty,     setEditTxQty]     = useState('')
+  const [editTxPrice,   setEditTxPrice]   = useState('')
+  const [editTxFees,    setEditTxFees]    = useState('')
 
   // ── API fetch state ──
   const [fetchingPrice, setFetchingPrice] = useState({})
@@ -168,6 +195,59 @@ export default function Securities() {
 
   function togglePrices(id) {
     setExpandedPrices(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+  }
+
+  function toggleTx(id) {
+    setExpandedTx(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+  }
+
+  // ─── Depot Transaction CRUD ──────────────────────────────────────────────────
+  function addTxInline(secId) {
+    const depotId = txDepotId ? parseInt(txDepotId) : depots[0]?.id
+    if (!depotId) return
+    const isIncome = INCOME_TX.has(txType)
+    setDepotTransactions([...depotTransactions, {
+      id:         Date.now(),
+      depotId,
+      securityId: secId,
+      type:       txType,
+      quantity:   isIncome ? 1 : parseFloat(txQty),
+      price:      parseFloat(txPrice),
+      fees:       parseFloat(txFees) || 0,
+      date:       txDate,
+    }])
+    setTxQty(''); setTxPrice(''); setTxFees(''); setTxDate(today())
+  }
+
+  function startEditTx(t) {
+    setEditTxId(t.id)
+    setEditTxDate(t.date)
+    setEditTxDepotId(String(t.depotId))
+    setEditTxType(t.type)
+    setEditTxQty(INCOME_TX.has(t.type) ? '' : String(t.quantity))
+    setEditTxPrice(String(t.price))
+    setEditTxFees(String(t.fees || ''))
+  }
+
+  function saveEditTx() {
+    setDepotTransactions(depotTransactions.map(t => t.id === editTxId ? {
+      ...t,
+      date:     editTxDate,
+      depotId:  parseInt(editTxDepotId),
+      type:     editTxType,
+      quantity: INCOME_TX.has(editTxType) ? 1 : parseFloat(editTxQty),
+      price:    parseFloat(editTxPrice),
+      fees:     parseFloat(editTxFees) || 0,
+    } : t))
+    setEditTxId(null)
+  }
+
+  function removeTx(id) {
+    setDepotTransactions(depotTransactions.filter(t => t.id !== id))
+  }
+
+  function depotName(id) {
+    return depots.find(d => d.id === id)?.name || `Depot ${id}`
   }
 
   // ─── API: Security price (Alpha Vantage) ────────────────────────────────────
@@ -264,6 +344,9 @@ export default function Securities() {
             const price      = getCurrentPrice(s.id)
             const pricesOpen = expandedPrices.has(s.id)
             const priceList  = (prices[s.id] || []).slice().sort((a, b) => new Date(b.date) - new Date(a.date))
+            const txOpen     = expandedTx.has(s.id)
+            const secTxs     = depotTransactions.filter(t => String(t.securityId) === String(s.id))
+                                 .slice().sort((a, b) => new Date(b.date) - new Date(a.date))
             const isEditing  = editSecId === s.id
             const isLast     = si === securities.length - 1
             const isFetching = fetchingPrice[s.id]
@@ -290,10 +373,15 @@ export default function Securities() {
                     <button onClick={() => setEditSecId(null)} style={{ ...btnBase, background: '#e5e7eb', color: '#374151' }}>Abbrechen</button>
                   </div>
                 ) : (
-                  <div style={{ borderBottom: (!pricesOpen && isLast) ? 'none' : '1px solid var(--color-border)', background: 'var(--color-bg)' }}>
+                  <div style={{ borderBottom: (!pricesOpen && !txOpen && isLast) ? 'none' : '1px solid var(--color-border)', background: 'var(--color-bg)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.42rem 0.75rem', flexWrap: 'wrap' }}>
-                      <button onClick={() => togglePrices(s.id)} style={{ ...btnBase, background: 'none', padding: '0.1rem 0.3rem', color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>
-                        {pricesOpen ? '▾' : '▸'}
+                      <button onClick={() => togglePrices(s.id)} style={{ ...btnBase, background: pricesOpen ? '#e0f2fe' : 'none', padding: '0.1rem 0.35rem', color: pricesOpen ? '#0369a1' : 'var(--color-text-muted)', fontSize: '0.75rem' }}
+                        title="Kursverlauf">
+                        {pricesOpen ? '▾' : '▸'} Kurse
+                      </button>
+                      <button onClick={() => toggleTx(s.id)} style={{ ...btnBase, background: txOpen ? '#f0fdf4' : 'none', padding: '0.1rem 0.35rem', color: txOpen ? '#166534' : 'var(--color-text-muted)', fontSize: '0.75rem' }}
+                        title="Transaktionen">
+                        {txOpen ? '▾' : '▸'} Tx{secTxs.length > 0 ? ` (${secTxs.length})` : ''}
                       </button>
                       <span style={{ flex: 1, fontWeight: 600, fontSize: '0.9rem' }}>{s.name}</span>
                       <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{s.symbol}</span>
@@ -337,7 +425,7 @@ export default function Securities() {
 
                 {/* Price history */}
                 {pricesOpen && (
-                  <div style={{ borderBottom: isLast ? 'none' : '1px solid var(--color-border)', background: 'var(--color-surface)' }}>
+                  <div style={{ borderBottom: (isLast && !txOpen) ? 'none' : '1px solid var(--color-border)', background: 'var(--color-surface)' }}>
                     {priceList.map((p, pi) => {
                       const isEditingPrice = editPriceKey?.secId === s.id && editPriceKey?.idx === pi
                       return (
@@ -369,6 +457,98 @@ export default function Securities() {
                       <input type="number" value={priceValue} onChange={e => setPriceValue(e.target.value)} placeholder="Kurs" step="0.0001" min="0" required style={{ width: 100, fontSize: '0.78rem', padding: '0.18rem 0.35rem' }} />
                       <button type="submit" style={{ ...btnBase, fontSize: '0.68rem', background: 'var(--color-primary)', color: '#fff' }}>+ Kurs</button>
                     </form>
+                  </div>
+                )}
+
+                {/* ── Transactions ── */}
+                {txOpen && (
+                  <div style={{ borderBottom: isLast ? 'none' : '1px solid var(--color-border)', background: '#fafafa' }}>
+                    {/* Header row */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.28rem 0.75rem', paddingLeft: '1.5rem', background: '#f0fdf4', borderBottom: '1px solid #bbf7d0', fontSize: '0.7rem', fontWeight: 700, color: '#166534', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      Transaktionen
+                      {depots.length === 0 && <span style={{ fontWeight: 400, textTransform: 'none', color: '#dc2626', marginLeft: '0.5rem' }}>– Bitte zuerst ein Depot anlegen</span>}
+                    </div>
+
+                    {/* Existing transactions */}
+                    {secTxs.map((t, ti) => {
+                      const isEditingTx = editTxId === t.id
+                      const isIncome    = INCOME_TX.has(t.type)
+                      const total       = isIncome
+                        ? t.price - (t.fees || 0)
+                        : t.quantity * t.price + (t.type === 'buy' ? (t.fees || 0) : -(t.fees || 0))
+                      return (
+                        <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.28rem 0.75rem', paddingLeft: '1.5rem', borderBottom: ti < secTxs.length - 1 ? '1px solid var(--color-border)' : '1px dashed var(--color-border)', fontSize: '0.78rem', flexWrap: 'wrap' }}>
+                          {isEditingTx ? (
+                            <>
+                              <input type="date" value={editTxDate} onChange={e => setEditTxDate(e.target.value)} style={{ fontSize: '0.78rem', padding: '0.18rem 0.35rem', width: 120 }} />
+                              {depots.length > 1 && (
+                                <select value={editTxDepotId} onChange={e => setEditTxDepotId(e.target.value)} style={{ fontSize: '0.78rem', padding: '0.18rem 0.35rem' }}>
+                                  {depots.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                                </select>
+                              )}
+                              <select value={editTxType} onChange={e => setEditTxType(e.target.value)} style={{ fontSize: '0.78rem', padding: '0.18rem 0.35rem' }}>
+                                {Object.entries(TX_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                              </select>
+                              {!INCOME_TX.has(editTxType) && (
+                                <input type="number" value={editTxQty} onChange={e => setEditTxQty(e.target.value)} placeholder="Anzahl" step="0.0001" min="0" style={{ width: 75, fontSize: '0.78rem', padding: '0.18rem 0.35rem' }} />
+                              )}
+                              <input type="number" value={editTxPrice} onChange={e => setEditTxPrice(e.target.value)} placeholder={INCOME_TX.has(editTxType) ? 'Betrag' : 'Kurs/Stk.'} step="0.0001" min="0" style={{ width: 90, fontSize: '0.78rem', padding: '0.18rem 0.35rem' }} />
+                              <input type="number" value={editTxFees} onChange={e => setEditTxFees(e.target.value)} placeholder="Gebühren" step="0.01" min="0" style={{ width: 75, fontSize: '0.78rem', padding: '0.18rem 0.35rem' }} />
+                              <button onClick={saveEditTx} style={{ ...btnBase, fontSize: '0.68rem', background: '#16a34a', color: '#fff' }}>✓</button>
+                              <button onClick={() => setEditTxId(null)} style={{ ...btnBase, fontSize: '0.68rem', background: '#e5e7eb', color: '#374151' }}>✕</button>
+                            </>
+                          ) : (
+                            <>
+                              <span style={{ color: 'var(--color-text-muted)', minWidth: 80 }}>{t.date}</span>
+                              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: TX_COLORS[t.type], background: TX_BG[t.type], borderRadius: 4, padding: '0.05rem 0.3rem', flexShrink: 0 }}>
+                                {TX_LABELS[t.type]}
+                              </span>
+                              {depots.length > 1 && (
+                                <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', flexShrink: 0 }}>{depotName(t.depotId)}</span>
+                              )}
+                              {isIncome ? (
+                                <span style={{ flex: 1 }}>{fmt(t.price)}</span>
+                              ) : (
+                                <span style={{ flex: 1, color: 'var(--color-text-muted)' }}>
+                                  {t.quantity.toLocaleString('de-DE', { maximumFractionDigits: 4 })} × {fmt(t.price)}
+                                </span>
+                              )}
+                              {t.fees > 0 && <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>{fmt(t.fees)} Geb.</span>}
+                              <span style={{ fontWeight: 700, minWidth: 70, textAlign: 'right', color: isIncome ? '#2563eb' : t.type === 'sell' ? '#dc2626' : '#16a34a' }}>
+                                {isIncome ? '+' : t.type === 'sell' ? '' : ''}{fmt(total)}
+                              </span>
+                              <button onClick={() => startEditTx(t)} style={{ ...btnBase, fontSize: '0.68rem', background: '#e5e7eb', color: '#374151' }}>✎</button>
+                              <button onClick={() => removeTx(t.id)} style={{ ...btnBase, fontSize: '0.68rem', background: '#fee2e2', color: '#dc2626' }}>✕</button>
+                            </>
+                          )}
+                        </div>
+                      )
+                    })}
+
+                    {/* Add transaction inline */}
+                    {depots.length > 0 && (
+                      <form
+                        onSubmit={e => { e.preventDefault(); addTxInline(s.id) }}
+                        style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap', padding: '0.35rem 0.75rem', paddingLeft: '1.5rem', borderTop: secTxs.length ? '1px dashed var(--color-border)' : 'none' }}
+                      >
+                        <input type="date" value={txDate} onChange={e => setTxDate(e.target.value)} required style={{ fontSize: '0.78rem', padding: '0.18rem 0.35rem' }} />
+                        {depots.length > 1 && (
+                          <select value={txDepotId} onChange={e => setTxDepotId(e.target.value)} style={{ fontSize: '0.78rem', padding: '0.18rem 0.35rem' }}>
+                            <option value="">– Depot –</option>
+                            {depots.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                          </select>
+                        )}
+                        <select value={txType} onChange={e => setTxType(e.target.value)} style={{ fontSize: '0.78rem', padding: '0.18rem 0.35rem' }}>
+                          {Object.entries(TX_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                        </select>
+                        {!INCOME_TX.has(txType) && (
+                          <input type="number" value={txQty} onChange={e => setTxQty(e.target.value)} placeholder="Anzahl" step="0.0001" min="0.0001" required style={{ width: 75, fontSize: '0.78rem', padding: '0.18rem 0.35rem' }} />
+                        )}
+                        <input type="number" value={txPrice} onChange={e => setTxPrice(e.target.value)} placeholder={INCOME_TX.has(txType) ? 'Betrag' : 'Kurs/Stk.'} step="0.0001" min="0" required style={{ width: 90, fontSize: '0.78rem', padding: '0.18rem 0.35rem' }} />
+                        <input type="number" value={txFees} onChange={e => setTxFees(e.target.value)} placeholder="Gebühren" step="0.01" min="0" style={{ width: 75, fontSize: '0.78rem', padding: '0.18rem 0.35rem' }} />
+                        <button type="submit" style={{ ...btnBase, fontSize: '0.68rem', background: '#16a34a', color: '#fff' }}>+ Transaktion</button>
+                      </form>
+                    )}
                   </div>
                 )}
               </div>
