@@ -18,20 +18,21 @@ const labelStyle = { fontSize: '0.7rem', color: 'var(--color-text-muted)', margi
 
 const today = () => new Date().toISOString().slice(0, 10)
 
-// ── Yahoo Finance via corsproxy.io (CORS-fähig, kein API-Key nötig) ──
-async function fetchYahooPrice(symbol) {
-  const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d`
-  const proxyUrl = `https://corsproxy.io/?url=${encodeURIComponent(yahooUrl)}`
-  const res = await fetch(proxyUrl)
+// ── Alpha Vantage – kostenloser API-Key unter alphavantage.co ──
+// Symbolformat: US-Aktien = "AAPL", Deutsche Aktien = "SAP.FRA", ETFs = "VWCE.FRA"
+async function fetchAlphaVantagePrice(symbol, apiKey) {
+  const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(symbol)}&apikey=${encodeURIComponent(apiKey)}`
+  const res = await fetch(url)
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   const data = await res.json()
-  const meta = data?.chart?.result?.[0]?.meta
-  if (!meta?.regularMarketPrice) throw new Error('Keine Kursdaten in der Antwort')
-  const price = meta.regularMarketPrice
-  const date = meta.regularMarketTime
-    ? new Date(meta.regularMarketTime * 1000).toISOString().slice(0, 10)
-    : today()
-  return { price, date }
+  if (data.Note) throw new Error('Tageslimit (25 Abfragen) erreicht. Bitte morgen erneut versuchen.')
+  if (data.Information) throw new Error('API-Key ungültig oder Limit überschritten.')
+  const quote = data['Global Quote']
+  if (!quote?.['05. price']) throw new Error(`Symbol „${symbol}" nicht gefunden. Tipp: Deutsche Aktien als „SAP.FRA" eingeben.`)
+  return {
+    price: parseFloat(quote['05. price']),
+    date:  quote['07. latest trading day'] || today(),
+  }
 }
 
 // ── Frankfurter.app FX (kostenlos, CORS-fähig) ──
@@ -48,6 +49,12 @@ export default function Securities() {
   const [securities,   setSecurities]   = useLocalStorage('securities', [])
   const [prices,       setPrices]       = useLocalStorage('securityPrices', {})
   const [fxRates,      setFxRates]      = useLocalStorage('fxRates', {})
+  const [alphaKey,     setAlphaKeyState] = useState(() => localStorage.getItem('alphavantage_key') || '')
+
+  function saveAlphaKey(val) {
+    localStorage.setItem('alphavantage_key', val)
+    setAlphaKeyState(val)
+  }
 
   // ── Add security form ──
   const [secName,   setSecName]   = useState('')
@@ -163,16 +170,20 @@ export default function Securities() {
     setExpandedPrices(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
   }
 
-  // ─── API: Security price ─────────────────────────────────────────────────────
+  // ─── API: Security price (Alpha Vantage) ────────────────────────────────────
   async function handleFetchApiPrice(sec) {
     if (!sec.symbol) {
       setFetchPriceErr(e => ({ ...e, [sec.id]: 'Kein Ticker/Symbol hinterlegt.' }))
       return
     }
+    if (!alphaKey) {
+      setFetchPriceErr(e => ({ ...e, [sec.id]: 'Bitte zuerst den Alpha Vantage API-Schlüssel hinterlegen (siehe unten).' }))
+      return
+    }
     setFetchingPrice(s => ({ ...s, [sec.id]: true }))
     setFetchPriceErr(e => ({ ...e, [sec.id]: null }))
     try {
-      const { price, date } = await fetchYahooPrice(sec.symbol)
+      const { price, date } = await fetchAlphaVantagePrice(sec.symbol, alphaKey)
       const list = [...(prices[sec.id] || []), { date, value: price }]
         .sort((a, b) => new Date(b.date) - new Date(a.date))
       setPrices(prev => ({ ...prev, [sec.id]: list }))
@@ -365,6 +376,35 @@ export default function Securities() {
           })}
         </div>
       )}
+
+      {/* ── Alpha Vantage API-Schlüssel ── */}
+      <p style={sectionHead}>API-Konfiguration (Kursdaten)</p>
+      <div style={{ background: alphaKey ? '#f0fdf4' : '#fef9c3', border: `1px solid ${alphaKey ? '#bbf7d0' : '#fde68a'}`, borderRadius: 8, padding: '0.75rem 1rem', marginBottom: '1rem', fontSize: '0.82rem' }}>
+        {!alphaKey && (
+          <p style={{ margin: '0 0 0.5rem', color: '#92400e' }}>
+            Für automatische Kursdaten wird ein kostenloser API-Schlüssel von{' '}
+            <a href="https://www.alphavantage.co/support/#api-key" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-primary)' }}>
+              alphavantage.co
+            </a>{' '}
+            benötigt (kostenlos, kein Kreditkarte). Limit: 25 Abfragen/Tag.
+          </p>
+        )}
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <input
+            type="text"
+            value={alphaKey}
+            onChange={e => saveAlphaKey(e.target.value)}
+            placeholder="Alpha Vantage API-Schlüssel"
+            style={{ flex: 1, minWidth: 200, fontSize: '0.82rem', padding: '0.3rem 0.5rem', fontFamily: 'monospace' }}
+          />
+          {alphaKey && <span style={{ color: '#16a34a', fontSize: '0.78rem', fontWeight: 600 }}>✓ Gespeichert</span>}
+        </div>
+        {alphaKey && (
+          <p style={{ margin: '0.4rem 0 0', color: '#166534', fontSize: '0.75rem' }}>
+            Symbolformat: US-Aktien = <code>AAPL</code>, Deutsche Aktien = <code>SAP.FRA</code>, ETFs = <code>VWCE.FRA</code>
+          </p>
+        )}
+      </div>
 
       {/* ── Add security form (unterhalb der Liste) ── */}
       <p style={sectionHead}>Wertpapier hinzufügen</p>
