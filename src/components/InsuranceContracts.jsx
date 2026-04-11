@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { fmt } from '../fmt'
 
 function useLocalStorage(key, initial) {
@@ -103,8 +103,9 @@ function latestHistoryEntry(history) {
 }
 
 // Verrentungstyp helpers (backward compat with old nurVerrentung boolean)
-function isNurVerrentung(c) { return c.verrentungTyp === 'nurVerrentung' || (!!c.nurVerrentung && !c.verrentungTyp) }
-function isAnnuity(c)       { return c.verrentungTyp === 'verrentung' || isNurVerrentung(c) }
+function isNurVerrentung(c)  { return c.verrentungTyp === 'nurVerrentung' || (!!c.nurVerrentung && !c.verrentungTyp) }
+function isAnnuity(c)        { return c.verrentungTyp === 'verrentung' || isNurVerrentung(c) }
+function isNichtRelevant(c)  { return c.verrentungTyp === 'nichtRelevant' }
 
 const PERSON_COLORS = {
   Karin:   { border: '#f43f5e', badgeBg: '#ffe4e6', badgeColor: '#be123c' },
@@ -303,6 +304,7 @@ const EMPTY_FORM = {
 }
 
 export default function InsuranceContracts() {
+  const formRef = useRef(null)
   const [contracts, setContracts] = useLocalStorage('insuranceContracts', [])
   const [allCategories] = useLocalStorage('categories', [])
   const expenseCategories = allCategories.filter(c => c.type === 'Ausgabe')
@@ -310,6 +312,11 @@ export default function InsuranceContracts() {
   const [form, setForm] = useState(() => ({ ...EMPTY_FORM, annuityDate: todayIso() }))
   const [editId, setEditId] = useState(null)
   const [expandedHistory, setExpandedHistory] = useState(new Set())
+
+  const [filterPerson, setFilterPerson] = useState('')
+  const [filterProvider, setFilterProvider] = useState('')
+  const [filterCategory, setFilterCategory] = useState('')
+  const [groupBy, setGroupBy] = useState('none')
 
   function field(key) {
     return { value: form[key], onChange: e => setForm(f => ({ ...f, [key]: e.target.value })) }
@@ -387,6 +394,7 @@ export default function InsuranceContracts() {
     })
     setEditId(c.id)
     setShowForm(true)
+    setTimeout(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50)
   }
 
   function cancelForm() {
@@ -422,9 +430,36 @@ export default function InsuranceContracts() {
 
   const getDisplayValue = (c) => latestHistoryValue(c.valueHistory, c.value)
 
-  // "Nur Verrentung" not counted as asset; "Verrentung" IS counted
+  // Derived filter/group data
+  const providers = [...new Set(contracts.map(c => c.provider).filter(Boolean))].sort()
+  const filtered = contracts.filter(c => {
+    if (filterPerson && c.person !== filterPerson) return false
+    if (filterProvider && c.provider !== filterProvider) return false
+    if (filterCategory && String(c.categoryId) !== filterCategory) return false
+    return true
+  })
+  const hasActiveFilter = !!(filterPerson || filterProvider || filterCategory)
+
+  function getGroups(list) {
+    if (groupBy === 'none') return [{ label: null, items: list }]
+    const map = new Map()
+    list.forEach(c => {
+      let key
+      if (groupBy === 'person') key = c.person || '(Keine Person)'
+      else if (groupBy === 'provider') key = c.provider || '(Kein Anbieter)'
+      else if (groupBy === 'category') {
+        const cat = allCategories.find(x => x.id === c.categoryId)
+        key = cat ? cat.name : '(Keine Kategorie)'
+      }
+      if (!map.has(key)) map.set(key, [])
+      map.get(key).push(c)
+    })
+    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0], 'de')).map(([label, items]) => ({ label, items }))
+  }
+
+  // "Nur Verrentung" and "Nicht relevant" not counted as asset
   const totalValue = contracts
-    .filter(c => !isNurVerrentung(c))
+    .filter(c => !isNurVerrentung(c) && !isNichtRelevant(c))
     .reduce((s, c) => s + (getDisplayValue(c) || 0), 0)
 
   const inputStyle = { fontSize: '0.85rem', padding: '0.35rem 0.5rem' }
@@ -435,21 +470,242 @@ export default function InsuranceContracts() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
         <h2 style={{ margin: 0 }}>Versicherungsverträge</h2>
         <button
-          onClick={() => { showForm ? cancelForm() : setShowForm(true) }}
+          onClick={() => {
+            if (showForm) { cancelForm() } else {
+              setShowForm(true)
+              setTimeout(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50)
+            }
+          }}
           style={{ padding: '0.4rem 0.9rem', fontSize: '0.85rem' }}
         >
           {showForm ? 'Abbrechen' : '+ Neu'}
         </button>
       </div>
 
+      {/* ── Formular (oben, nicht am Ende der Liste) ── */}
+      {showForm && (
+        <form ref={formRef} onSubmit={saveContract} style={{
+          background: 'var(--color-bg)', borderRadius: 8, padding: '1rem',
+          marginBottom: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem',
+          border: '1px solid var(--color-border)',
+        }}>
+          <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--color-primary)' }}>
+            {editId ? 'Vertrag bearbeiten' : 'Neuer Vertrag'}
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+            <div>
+              <label style={labelStyle}>Vertragsname *</label>
+              <input {...field('name')} placeholder="z. B. Haftpflicht" required style={{ ...inputStyle, width: '100%' }} />
+            </div>
+            <div>
+              <label style={labelStyle}>Anbieter</label>
+              <input {...field('provider')} placeholder="z. B. Allianz" style={{ ...inputStyle, width: '100%' }} />
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+            <div>
+              <label style={labelStyle}>Kategorie</label>
+              <select {...field('categoryId')} style={{ ...inputStyle, width: '100%' }}>
+                <option value="">– keine –</option>
+                {expenseCategories.map(cat => (
+                  <option key={cat.id} value={cat.id}>{cat.name}</option>
+                ))}
+              </select>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+              <label style={{ ...labelStyle, marginBottom: '0.5rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <input type="checkbox" {...check('active')} />
+                <span>Aktiv (erzeugt Dauerauftrag)</span>
+              </label>
+            </div>
+          </div>
+
+          {/* Person + flags */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+            <div>
+              <label style={labelStyle}>Person</label>
+              <select value={form.person} onChange={e => setForm(f => ({ ...f, person: e.target.value }))} style={{ ...inputStyle, width: '100%' }}>
+                <option value="">– keine –</option>
+                <option value="Karin">Karin</option>
+                <option value="Jürgen">Jürgen</option>
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>Verrentung / Relevanz</label>
+              <select value={form.verrentungTyp} onChange={e => setForm(f => ({ ...f, verrentungTyp: e.target.value }))} style={{ ...inputStyle, width: '100%' }}>
+                <option value="">– keine –</option>
+                <option value="verrentung">Verrentung (Vermögenswert)</option>
+                <option value="nurVerrentung">Nur Verrentung (kein Vermögenswert)</option>
+                <option value="nichtRelevant">Nicht relevant (kein Vermögenswert)</option>
+              </select>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}>
+              <input type="checkbox" {...check('renteNachTodesfall')} />
+              <span>Rente nach Todesfall</span>
+            </label>
+          </div>
+
+          {form.verrentungTyp && form.verrentungTyp !== 'nichtRelevant' ? (
+            <div style={{ border: '1px solid #c4b5fd', borderRadius: 6, padding: '0.65rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', background: '#faf5ff' }}>
+              <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Verrentungswert je Stichtag
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+                <div>
+                  <label style={labelStyle}>Stichtag</label>
+                  <DateInput value={form.annuityDate} onChange={v => setForm(f => ({ ...f, annuityDate: v }))} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Wert (€)</label>
+                  <input type="number" {...field('value')} placeholder="z. B. 50000" step="0.01" min="0" style={{ ...inputStyle, width: '100%' }} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Multiplikator</label>
+                  <input type="number" {...field('multiplikator')} placeholder="z. B. 20" step="0.01" min="0" style={{ ...inputStyle, width: '100%' }} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Garantierte jährliche Rente (€)</label>
+                  <input type="number" {...field('garantierteJaehrlicheRente')} placeholder="z. B. 3000" step="0.01" min="0" style={{ ...inputStyle, width: '100%' }} />
+                </div>
+              </div>
+              {form.value !== '' && form.multiplikator !== '' && form.garantierteJaehrlicheRente !== '' && parseFloat(form.multiplikator) > 0 && (() => {
+                const jaehrl = (parseFloat(form.value) / parseFloat(form.multiplikator)) * parseFloat(form.garantierteJaehrlicheRente)
+                return (
+                  <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.82rem', padding: '0.35rem 0.5rem', background: '#ede9fe', borderRadius: 5 }}>
+                    <span style={{ color: 'var(--color-text-muted)' }}>
+                      Jährliche Rente: <strong style={{ color: '#7c3aed' }}>{fmt(jaehrl)}</strong>
+                    </span>
+                    <span style={{ color: 'var(--color-text-muted)' }}>
+                      Monatliche Rente: <strong style={{ color: '#7c3aed' }}>{fmt(jaehrl / 12)}</strong>
+                    </span>
+                  </div>
+                )
+              })()}
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+              <div>
+                <label style={labelStyle}>Aktueller Wert (€) – optional</label>
+                <input type="number" {...field('value')} placeholder="z. B. 5000" step="0.01" min="0" style={{ ...inputStyle, width: '100%' }} />
+              </div>
+            </div>
+          )}
+
+          <div style={{ border: '1px solid var(--color-border)', borderRadius: 6, padding: '0.65rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              Beitrag
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+              <div>
+                <label style={labelStyle}>Betrag (€)</label>
+                <input type="number" {...field('premium')} placeholder="z. B. 120" step="0.01" min="0" style={{ ...inputStyle, width: '100%' }} />
+              </div>
+              <div>
+                <label style={labelStyle}>Periodizität</label>
+                <select {...field('premiumFrequency')} style={{ ...inputStyle, width: '100%' }}>
+                  <option value="monthly">Monatlich</option>
+                  <option value="quarterly">Vierteljährlich</option>
+                  <option value="halfyearly">Halbjährlich</option>
+                  <option value="yearly">Jährlich</option>
+                </select>
+              </div>
+            </div>
+            {form.active && form.premium > 0 && (
+              <div style={{ fontSize: '0.75rem', color: '#16a34a', background: '#dcfce7', borderRadius: 4, padding: '0.25rem 0.5rem' }}>
+                Wird als Dauerauftrag „{form.name || '…'}" angelegt
+              </div>
+            )}
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+            <div>
+              <label style={labelStyle}>Vertragsbeginn</label>
+              <DateInput value={form.start} onChange={v => setForm(f => ({ ...f, start: v }))} />
+            </div>
+            <div>
+              <label style={labelStyle}>Vertragsende</label>
+              <DateInput value={form.end} onChange={v => setForm(f => ({ ...f, end: v }))} />
+            </div>
+          </div>
+
+          <div>
+            <label style={labelStyle}>Notizen</label>
+            <textarea {...field('notes')} placeholder="Allgemeine Notizen zum Vertrag…" rows={2}
+              style={{ ...inputStyle, width: '100%', resize: 'vertical' }} />
+          </div>
+
+          <div>
+            <label style={labelStyle}>Kommentar</label>
+            <textarea {...field('comment')} placeholder="Weitere Anmerkungen, Bedingungen, Kontakte…" rows={2}
+              style={{ ...inputStyle, width: '100%', resize: 'vertical' }} />
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button type="submit" style={{ flex: 1 }}>
+              {editId ? 'Änderungen speichern' : 'Vertrag hinzufügen'}
+            </button>
+            <button type="button" onClick={cancelForm} style={{ background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: 6, padding: '0.4rem 0.9rem', cursor: 'pointer' }}>
+              Abbrechen
+            </button>
+          </div>
+        </form>
+      )}
+
+      {/* ── Filter- und Gruppierungsleiste ── */}
+      {contracts.length > 0 && (
+        <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'center', marginBottom: '0.75rem' }}>
+          <select value={filterPerson} onChange={e => setFilterPerson(e.target.value)} style={{ fontSize: '0.78rem', padding: '0.22rem 0.4rem', border: '1px solid var(--color-border)', borderRadius: 5 }}>
+            <option value="">Alle Personen</option>
+            <option value="Karin">Karin</option>
+            <option value="Jürgen">Jürgen</option>
+          </select>
+          <select value={filterProvider} onChange={e => setFilterProvider(e.target.value)} style={{ fontSize: '0.78rem', padding: '0.22rem 0.4rem', border: '1px solid var(--color-border)', borderRadius: 5 }}>
+            <option value="">Alle Anbieter</option>
+            {providers.map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
+          <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)} style={{ fontSize: '0.78rem', padding: '0.22rem 0.4rem', border: '1px solid var(--color-border)', borderRadius: 5 }}>
+            <option value="">Alle Kategorien</option>
+            {expenseCategories.map(cat => <option key={cat.id} value={String(cat.id)}>{cat.name}</option>)}
+          </select>
+          {hasActiveFilter && (
+            <button onClick={() => { setFilterPerson(''); setFilterProvider(''); setFilterCategory('') }}
+              style={{ fontSize: '0.72rem', padding: '0.18rem 0.45rem', background: 'none', border: '1px solid var(--color-border)', borderRadius: 4, cursor: 'pointer', color: 'var(--color-text-muted)' }}>
+              ✕ Filter
+            </button>
+          )}
+          <span style={{ marginLeft: 'auto', fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>Gruppieren:</span>
+          <select value={groupBy} onChange={e => setGroupBy(e.target.value)} style={{ fontSize: '0.78rem', padding: '0.22rem 0.4rem', border: '1px solid var(--color-border)', borderRadius: 5 }}>
+            <option value="none">– keine –</option>
+            <option value="person">Person</option>
+            <option value="provider">Anbieter</option>
+            <option value="category">Kategorie</option>
+          </select>
+        </div>
+      )}
+
       {contracts.length === 0 ? (
         <p style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '2rem 0', margin: 0 }}>
           Noch keine Versicherungsverträge angelegt.
         </p>
+      ) : filtered.length === 0 ? (
+        <p style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '1rem 0', margin: 0 }}>
+          Keine Verträge entsprechen dem Filter.
+        </p>
       ) : (
         <>
+          {getGroups(filtered).map(({ label, items }) => (
+            <div key={label ?? '__all'} style={{ marginBottom: groupBy !== 'none' ? '1rem' : 0 }}>
+              {label !== null && (
+                <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', padding: '0.25rem 0.5rem', background: 'var(--color-bg)', borderRadius: 5, marginBottom: '0.4rem', borderLeft: '3px solid var(--color-border)' }}>
+                  {label}
+                </div>
+              )}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-            {contracts.map(c => {
+            {items.map(c => {
               const displayVal = getDisplayValue(c)
               const histOpen = expandedHistory.has(c.id)
               const latestEntry = latestHistoryEntry(c.valueHistory)
@@ -485,6 +741,11 @@ export default function InsuranceContracts() {
                     {annuity && (
                       <span style={{ fontSize: '0.68rem', color: '#7c3aed', background: '#ede9fe', borderRadius: 4, padding: '0.1rem 0.4rem', fontWeight: 600 }}>
                         {nurV ? 'Nur Verrentung' : 'Verrentung'}
+                      </span>
+                    )}
+                    {isNichtRelevant(c) && (
+                      <span style={{ fontSize: '0.68rem', color: '#6b7280', background: '#f3f4f6', borderRadius: 4, padding: '0.1rem 0.4rem', fontWeight: 600 }}>
+                        Nicht relevant
                       </span>
                     )}
                     {c.renteNachTodesfall && (
@@ -593,186 +854,16 @@ export default function InsuranceContracts() {
               )
             })}
           </div>
+            </div>
+          ))}
 
-          {contracts.length > 1 && (
+          {filtered.filter(c => !isNurVerrentung(c) && !isNichtRelevant(c)).length > 1 && (
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.75rem', padding: '0.4rem 0.75rem', background: 'var(--color-bg)', borderRadius: 6, fontSize: '0.85rem' }}>
-              <span style={{ color: 'var(--color-text-muted)' }}>Gesamt Wert</span>
-              <span style={{ fontWeight: 700 }}>{fmt(totalValue)}</span>
+              <span style={{ color: 'var(--color-text-muted)' }}>{hasActiveFilter ? 'Gesamt Wert (gefiltert)' : 'Gesamt Wert'}</span>
+              <span style={{ fontWeight: 700 }}>{fmt(filtered.filter(c => !isNurVerrentung(c) && !isNichtRelevant(c)).reduce((s, c) => s + (getDisplayValue(c) || 0), 0))}</span>
             </div>
           )}
         </>
-      )}
-
-      {/* Add/edit form */}
-      {showForm && (
-        <form onSubmit={saveContract} style={{
-          background: 'var(--color-bg)', borderRadius: 8, padding: '1rem',
-          marginTop: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem',
-          border: '1px solid var(--color-border)',
-        }}>
-          <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--color-primary)' }}>
-            {editId ? 'Vertrag bearbeiten' : 'Neuer Vertrag'}
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
-            <div>
-              <label style={labelStyle}>Vertragsname *</label>
-              <input {...field('name')} placeholder="z. B. Haftpflicht" required style={{ ...inputStyle, width: '100%' }} />
-            </div>
-            <div>
-              <label style={labelStyle}>Anbieter</label>
-              <input {...field('provider')} placeholder="z. B. Allianz" style={{ ...inputStyle, width: '100%' }} />
-            </div>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
-            <div>
-              <label style={labelStyle}>Kategorie</label>
-              <select {...field('categoryId')} style={{ ...inputStyle, width: '100%' }}>
-                <option value="">– keine –</option>
-                {expenseCategories.map(cat => (
-                  <option key={cat.id} value={cat.id}>{cat.name}</option>
-                ))}
-              </select>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
-              <label style={{ ...labelStyle, marginBottom: '0.5rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <input type="checkbox" {...check('active')} />
-                <span>Aktiv (erzeugt Dauerauftrag)</span>
-              </label>
-            </div>
-          </div>
-
-          {/* Person + flags */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
-            <div>
-              <label style={labelStyle}>Person</label>
-              <select value={form.person} onChange={e => setForm(f => ({ ...f, person: e.target.value }))} style={{ ...inputStyle, width: '100%' }}>
-                <option value="">– keine –</option>
-                <option value="Karin">Karin</option>
-                <option value="Jürgen">Jürgen</option>
-              </select>
-            </div>
-            <div>
-              <label style={labelStyle}>Verrentung</label>
-              <select value={form.verrentungTyp} onChange={e => setForm(f => ({ ...f, verrentungTyp: e.target.value }))} style={{ ...inputStyle, width: '100%' }}>
-                <option value="">– keine –</option>
-                <option value="verrentung">Verrentung (Vermögenswert)</option>
-                <option value="nurVerrentung">Nur Verrentung (kein Vermögenswert)</option>
-              </select>
-            </div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-            <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}>
-              <input type="checkbox" {...check('renteNachTodesfall')} />
-              <span>Rente nach Todesfall</span>
-            </label>
-          </div>
-
-          {form.verrentungTyp ? (
-            <div style={{ border: '1px solid #c4b5fd', borderRadius: 6, padding: '0.65rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', background: '#faf5ff' }}>
-              <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                Verrentungswert je Stichtag
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
-                <div>
-                  <label style={labelStyle}>Stichtag</label>
-                  <DateInput value={form.annuityDate} onChange={v => setForm(f => ({ ...f, annuityDate: v }))} />
-                </div>
-                <div>
-                  <label style={labelStyle}>Wert (€)</label>
-                  <input type="number" {...field('value')} placeholder="z. B. 50000" step="0.01" min="0" style={{ ...inputStyle, width: '100%' }} />
-                </div>
-                <div>
-                  <label style={labelStyle}>Multiplikator</label>
-                  <input type="number" {...field('multiplikator')} placeholder="z. B. 20" step="0.01" min="0" style={{ ...inputStyle, width: '100%' }} />
-                </div>
-                <div>
-                  <label style={labelStyle}>Garantierte jährliche Rente (€)</label>
-                  <input type="number" {...field('garantierteJaehrlicheRente')} placeholder="z. B. 3000" step="0.01" min="0" style={{ ...inputStyle, width: '100%' }} />
-                </div>
-              </div>
-              {form.value !== '' && form.multiplikator !== '' && form.garantierteJaehrlicheRente !== '' && parseFloat(form.multiplikator) > 0 && (() => {
-                const jaehrl = (parseFloat(form.value) / parseFloat(form.multiplikator)) * parseFloat(form.garantierteJaehrlicheRente)
-                return (
-                  <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.82rem', padding: '0.35rem 0.5rem', background: '#ede9fe', borderRadius: 5 }}>
-                    <span style={{ color: 'var(--color-text-muted)' }}>
-                      Jährliche Rente: <strong style={{ color: '#7c3aed' }}>{fmt(jaehrl)}</strong>
-                    </span>
-                    <span style={{ color: 'var(--color-text-muted)' }}>
-                      Monatliche Rente: <strong style={{ color: '#7c3aed' }}>{fmt(jaehrl / 12)}</strong>
-                    </span>
-                  </div>
-                )
-              })()}
-            </div>
-          ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
-              <div>
-                <label style={labelStyle}>Aktueller Wert (€) – optional</label>
-                <input type="number" {...field('value')} placeholder="z. B. 5000" step="0.01" min="0" style={{ ...inputStyle, width: '100%' }} />
-              </div>
-            </div>
-          )}
-
-          <div style={{ border: '1px solid var(--color-border)', borderRadius: 6, padding: '0.65rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              Beitrag
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
-              <div>
-                <label style={labelStyle}>Betrag (€)</label>
-                <input type="number" {...field('premium')} placeholder="z. B. 120" step="0.01" min="0" style={{ ...inputStyle, width: '100%' }} />
-              </div>
-              <div>
-                <label style={labelStyle}>Periodizität</label>
-                <select {...field('premiumFrequency')} style={{ ...inputStyle, width: '100%' }}>
-                  <option value="monthly">Monatlich</option>
-                  <option value="quarterly">Vierteljährlich</option>
-                  <option value="halfyearly">Halbjährlich</option>
-                  <option value="yearly">Jährlich</option>
-                </select>
-              </div>
-            </div>
-            {form.active && form.premium > 0 && (
-              <div style={{ fontSize: '0.75rem', color: '#16a34a', background: '#dcfce7', borderRadius: 4, padding: '0.25rem 0.5rem' }}>
-                Wird als Dauerauftrag „{form.name || '…'}" angelegt
-              </div>
-            )}
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
-            <div>
-              <label style={labelStyle}>Vertragsbeginn</label>
-              <DateInput value={form.start} onChange={v => setForm(f => ({ ...f, start: v }))} />
-            </div>
-            <div>
-              <label style={labelStyle}>Vertragsende</label>
-              <DateInput value={form.end} onChange={v => setForm(f => ({ ...f, end: v }))} />
-            </div>
-          </div>
-
-          <div>
-            <label style={labelStyle}>Notizen</label>
-            <textarea {...field('notes')} placeholder="Allgemeine Notizen zum Vertrag…" rows={2}
-              style={{ ...inputStyle, width: '100%', resize: 'vertical' }} />
-          </div>
-
-          <div>
-            <label style={labelStyle}>Kommentar</label>
-            <textarea {...field('comment')} placeholder="Weitere Anmerkungen, Bedingungen, Kontakte…" rows={2}
-              style={{ ...inputStyle, width: '100%', resize: 'vertical' }} />
-          </div>
-
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <button type="submit" style={{ flex: 1 }}>
-              {editId ? 'Änderungen speichern' : 'Vertrag hinzufügen'}
-            </button>
-            <button type="button" onClick={cancelForm} style={{ background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: 6, padding: '0.4rem 0.9rem', cursor: 'pointer' }}>
-              Abbrechen
-            </button>
-          </div>
-        </form>
       )}
     </div>
   )
