@@ -12,6 +12,7 @@ import CompanyShares from './components/CompanyShares'
 import ExpenseTree from './components/ExpenseTree'
 import WealthChart from './components/WealthChart'
 import ExpenseChart from './components/ExpenseChart'
+import PortfolioPerformance from './components/PortfolioPerformance'
 
 const NAV_ITEMS = [
   { id: 'dashboard',          label: 'Dashboard',           icon: '📊', component: Dashboard },
@@ -22,6 +23,7 @@ const NAV_ITEMS = [
   { id: 'recurringPayments',  label: 'Daueraufträge',       icon: '🔄', component: RecurringPayments },
   { id: 'insuranceContracts', label: 'Versicherungen',      icon: '🛡️', component: InsuranceContracts },
   { id: 'securities',         label: 'Wertpapiere & Depots', icon: '📈', component: Securities },
+  { id: 'portfolioPerf',      label: 'Wertentwicklung',      icon: '💹', component: PortfolioPerformance },
   { id: 'subscriptions',      label: 'Abonnements',         icon: '📱', component: Subscriptions },
   { id: 'realEstate',         label: 'Immobilien',          icon: '🏠', component: RealEstate },
   { id: 'companyShares',      label: 'Firmenbeteiligungen', icon: '🏢', component: CompanyShares },
