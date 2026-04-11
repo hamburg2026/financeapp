@@ -244,8 +244,15 @@ export default function Dashboard({ onNavigate }) {
   // ── Firmenbeteiligungen ──
   const totalShares = shares.reduce((s, sh) => s + sh.value, 0)
 
-  // ── Versicherungen ──
-  const totalInsurance = insurance.reduce((s, c) => s + c.value, 0)
+  // ── Versicherungen (nur Verrentung = kein Vermögenswert) ──
+  function latestInsuranceVal(c) {
+    const h = c.valueHistory
+    if (h?.length) return [...h].sort((a, b) => b.date.localeCompare(a.date))[0].value
+    return c.value || 0
+  }
+  const totalInsurance = insurance
+    .filter(c => c.verrentungTyp !== 'nurVerrentung' && !c.nurVerrentung)
+    .reduce((s, c) => s + latestInsuranceVal(c), 0)
 
   // ── Gesamtvermögen ──
   const totalAssets = totalBank + totalSecurities + totalInsurance + totalRealEstate + totalShares
@@ -254,7 +261,9 @@ export default function Dashboard({ onNavigate }) {
   const allAssetItems = [
     ...accounts.map(a => ({ key: `bank_${a.id}`, name: a.name, type: 'Bankkonto', value: a.balance })),
     ...depotData.map(({ depot, totalValue }) => ({ key: `depot_${depot.id}`, name: depot.name, type: 'Depot', value: totalValue })),
-    ...insurance.map(c => ({ key: `insurance_${c.id}`, name: c.name || c.company || '–', type: 'Versicherung', value: c.value || 0 })),
+    ...insurance
+      .filter(c => c.verrentungTyp !== 'nurVerrentung' && !c.nurVerrentung)
+      .map(c => ({ key: `insurance_${c.id}`, name: c.name || c.company || '–', type: 'Versicherung', value: latestInsuranceVal(c) })),
     ...realEstate.map(p => ({ key: `realestate_${p.id}`, name: p.name, type: 'Immobilie', value: p.current || 0 })),
     ...shares.map(s => ({ key: `shares_${s.id}`, name: s.company, type: 'Beteiligung', value: s.value || 0 })),
   ]
