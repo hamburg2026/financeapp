@@ -203,6 +203,7 @@ const EMPTY_FORM = {
   name: '', provider: '', categoryId: '', value: '', premium: '', premiumFrequency: 'monthly',
   start: '', end: '', notes: '', comment: '', active: true,
   renteNachTodesfall: false, nurVerrentung: false,
+  annuityDate: '', multiplikator: '',
 }
 
 export default function InsuranceContracts() {
@@ -210,7 +211,7 @@ export default function InsuranceContracts() {
   const [allCategories] = useLocalStorage('categories', [])
   const expenseCategories = allCategories.filter(c => c.type === 'Ausgabe')
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState(EMPTY_FORM)
+  const [form, setForm] = useState(() => ({ ...EMPTY_FORM, annuityDate: todayIso() }))
   const [editId, setEditId] = useState(null)
   const [expandedHistory, setExpandedHistory] = useState(new Set())
 
@@ -224,6 +225,19 @@ export default function InsuranceContracts() {
   function saveContract(e) {
     e.preventDefault()
     const existing = contracts.find(c => c.id === editId)
+    let valueHistory = existing?.valueHistory || []
+
+    if (form.nurVerrentung && form.value !== '' && form.multiplikator !== '' && form.annuityDate) {
+      const wert = parseFloat(form.value)
+      const mult = parseFloat(form.multiplikator)
+      const idx = valueHistory.findIndex(en => en.date === form.annuityDate)
+      if (idx >= 0) {
+        valueHistory = valueHistory.map((en, i) => i === idx ? { ...en, value: wert, multiplikator: mult } : en)
+      } else {
+        valueHistory = [...valueHistory, { id: Date.now(), date: form.annuityDate, value: wert, multiplikator: mult }]
+      }
+    }
+
     const contract = {
       id:                  editId || Date.now(),
       name:                form.name,
@@ -239,24 +253,25 @@ export default function InsuranceContracts() {
       active:              form.active,
       renteNachTodesfall:  form.renteNachTodesfall,
       nurVerrentung:       form.nurVerrentung,
-      valueHistory:        existing?.valueHistory || [],
+      valueHistory,
     }
     const updated = editId
       ? contracts.map(c => c.id === editId ? contract : c)
       : [...contracts, contract]
     setContracts(updated)
     syncRecurringPayment(contract)
-    setForm(EMPTY_FORM)
+    setForm({ ...EMPTY_FORM, annuityDate: todayIso() })
     setShowForm(false)
     setEditId(null)
   }
 
   function startEdit(c) {
+    const latestE = c.nurVerrentung ? latestHistoryEntry(c.valueHistory) : null
     setForm({
       name:                c.name || '',
       provider:            c.provider || '',
       categoryId:          c.categoryId ? String(c.categoryId) : '',
-      value:               c.value != null ? String(c.value) : '',
+      value:               latestE ? String(latestE.value) : (c.value != null ? String(c.value) : ''),
       premium:             c.premium ? String(c.premium) : '',
       premiumFrequency:    c.premiumFrequency || 'monthly',
       start:               c.start || '',
@@ -266,13 +281,15 @@ export default function InsuranceContracts() {
       active:              c.active !== false,
       renteNachTodesfall:  c.renteNachTodesfall || false,
       nurVerrentung:       c.nurVerrentung || false,
+      annuityDate:         latestE?.date || todayIso(),
+      multiplikator:       latestE?.multiplikator != null ? String(latestE.multiplikator) : '',
     })
     setEditId(c.id)
     setShowForm(true)
   }
 
   function cancelForm() {
-    setForm(EMPTY_FORM)
+    setForm({ ...EMPTY_FORM, annuityDate: todayIso() })
     setShowForm(false)
     setEditId(null)
   }
@@ -333,7 +350,8 @@ export default function InsuranceContracts() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
             {contracts.map(c => {
               const displayVal = getDisplayValue(c)
-              const histOpen = expandedHistory.has(c.id)
+              // nurVerrentung contracts default to open; regular contracts default to closed
+              const histOpen = c.nurVerrentung ? !expandedHistory.has(c.id) : expandedHistory.has(c.id)
               const latestEntry = latestHistoryEntry(c.valueHistory)
               const jaehrlicheRente = c.nurVerrentung && latestEntry?.multiplikator
                 ? latestEntry.value / latestEntry.multiplikator
@@ -452,7 +470,7 @@ export default function InsuranceContracts() {
                           display: 'flex', alignItems: 'center', gap: '0.25rem',
                         }}
                       >
-                        {histOpen ? '▾' : '▸'} Werthistorie
+                        {histOpen ? '▾' : '▸'} {c.nurVerrentung ? 'Zeitwerte' : 'Werthistorie'}
                       </button>
                     </div>
                   </div>
@@ -537,19 +555,49 @@ export default function InsuranceContracts() {
                 </span>
               )}
             </label>
-            {form.nurVerrentung && (
-              <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '0.1rem', paddingLeft: '1.2rem' }}>
-                Zeitwerte je Stichtag mit Multiplikator eingeben → Jährliche &amp; Monatliche Rente werden berechnet
-              </div>
-            )}
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
-            <div>
-              <label style={labelStyle}>Aktueller Wert (€) – optional</label>
-              <input type="number" {...field('value')} placeholder="z. B. 5000" step="0.01" min="0" style={{ ...inputStyle, width: '100%' }} />
+          {form.nurVerrentung ? (
+            <div style={{ border: '1px solid #c4b5fd', borderRadius: 6, padding: '0.65rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', background: '#faf5ff' }}>
+              <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Verrentungswert je Stichtag
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.6rem' }}>
+                <div>
+                  <label style={labelStyle}>Stichtag</label>
+                  <DateInput value={form.annuityDate} onChange={v => setForm(f => ({ ...f, annuityDate: v }))} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Wert (€)</label>
+                  <input type="number" {...field('value')} placeholder="z. B. 50000" step="0.01" min="0" style={{ ...inputStyle, width: '100%' }} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Multiplikator</label>
+                  <input type="number" {...field('multiplikator')} placeholder="z. B. 20" step="0.01" min="0" style={{ ...inputStyle, width: '100%' }} />
+                </div>
+              </div>
+              {form.value !== '' && form.multiplikator !== '' && parseFloat(form.multiplikator) > 0 && (() => {
+                const jaehrl = parseFloat(form.value) / parseFloat(form.multiplikator)
+                return (
+                  <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.82rem', padding: '0.35rem 0.5rem', background: '#ede9fe', borderRadius: 5 }}>
+                    <span style={{ color: 'var(--color-text-muted)' }}>
+                      Jährliche Rente: <strong style={{ color: '#7c3aed' }}>{fmt(jaehrl)}</strong>
+                    </span>
+                    <span style={{ color: 'var(--color-text-muted)' }}>
+                      Monatliche Rente: <strong style={{ color: '#7c3aed' }}>{fmt(jaehrl / 12)}</strong>
+                    </span>
+                  </div>
+                )
+              })()}
             </div>
-          </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+              <div>
+                <label style={labelStyle}>Aktueller Wert (€) – optional</label>
+                <input type="number" {...field('value')} placeholder="z. B. 5000" step="0.01" min="0" style={{ ...inputStyle, width: '100%' }} />
+              </div>
+            </div>
+          )}
 
           <div style={{ border: '1px solid var(--color-border)', borderRadius: 6, padding: '0.65rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
