@@ -84,9 +84,14 @@ export default function WealthChart() {
       .reduce((s, [secId, q]) => s + q * getCurrentPrice(secId, prices), 0)
   }, 0)
 
-  const totalInsurance  = insurance.reduce((s, c) => s + (c.value || 0), 0)
-  const totalRealEstate = realEstate.reduce((s, p) => s + (p.current || 0), 0)
-  const totalShares     = shares.reduce((s, sh) => s + (sh.value || 0), 0)
+  function latestHistVal(history, fallback) {
+    if (!history?.length) return fallback || 0
+    return [...history].sort((a, b) => b.date.localeCompare(a.date))[0].value
+  }
+
+  const totalInsurance  = insurance.reduce((s, c) => s + latestHistVal(c.valueHistory, c.value), 0)
+  const totalRealEstate = realEstate.reduce((s, p) => s + latestHistVal(p.currentHistory, p.current), 0)
+  const totalShares     = shares.reduce((s, sh) => s + latestHistVal(sh.valueHistory, sh.value), 0)
 
   const values = {
     bank: totalBank, securities: totalSecurities, insurance: totalInsurance,

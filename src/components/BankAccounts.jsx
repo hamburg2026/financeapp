@@ -21,12 +21,84 @@ const btnSm = {
   fontSize: '0.72rem', padding: '0.2rem 0.45rem', lineHeight: 1.4,
 }
 
+function todayIso() { return new Date().toISOString().slice(0, 10) }
+
+function isoToParts(iso) {
+  if (!iso || iso.length < 10) return { d: '', m: '', y: '' }
+  const [y, m, d] = iso.split('-')
+  return { d: d || '', m: m || '', y: y || '' }
+}
+function partsToIso(d, m, y) {
+  if (!d && !m && !y) return ''
+  return y && m && d ? `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}` : ''
+}
+
+function DateInputSmall({ value, onChange }) {
+  const { d, m, y } = isoToParts(value)
+  const st = { fontSize: '0.78rem', padding: '0.2rem 0.3rem', border: '1px solid var(--color-border)', borderRadius: 4, textAlign: 'center', width: 40, background: 'var(--color-surface)' }
+  const upd = (nd, nm, ny) => onChange(partsToIso(nd, nm, ny))
+  return (
+    <span style={{ display: 'inline-flex', gap: 2, alignItems: 'center' }}>
+      <input type="number" value={d} min="1" max="31" placeholder="TT" style={st} onChange={e => upd(e.target.value, m, y)} />
+      <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>.</span>
+      <input type="number" value={m} min="1" max="12" placeholder="MM" style={st} onChange={e => upd(d, e.target.value, y)} />
+      <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>.</span>
+      <input type="number" value={y} min="1900" max="2100" placeholder="JJJJ" style={{ ...st, width: 58 }} onChange={e => upd(d, m, e.target.value)} />
+    </span>
+  )
+}
+
+function BalanceHistory({ history = [], onChange }) {
+  const [adding, setAdding] = useState(false)
+  const [newDate, setNewDate] = useState(todayIso())
+  const [newVal, setNewVal] = useState('')
+  const sorted = [...history].sort((a, b) => b.date.localeCompare(a.date))
+  function add() {
+    if (!newDate || newVal === '') return
+    onChange([...history, { id: Date.now(), date: newDate, value: parseFloat(newVal) }])
+    setNewVal('')
+    setAdding(false)
+  }
+  function remove(id) { onChange(history.filter(e => e.id !== id)) }
+  return (
+    <div style={{ padding: '0.6rem 0.75rem', background: 'var(--color-bg)', borderTop: '1px solid var(--color-border)' }}>
+      <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.4rem' }}>
+        Saldenhistorie
+      </div>
+      {sorted.length === 0 && <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', marginBottom: '0.3rem' }}>Noch keine Einträge</div>}
+      {sorted.map((e, i) => (
+        <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.18rem 0', borderBottom: i < sorted.length - 1 ? '1px solid var(--color-border)' : 'none', fontSize: '0.8rem' }}>
+          <span style={{ color: 'var(--color-text-muted)', fontFamily: 'monospace', fontSize: '0.75rem', minWidth: 88 }}>{e.date}</span>
+          <span style={{ fontWeight: 700, flex: 1, color: e.value >= 0 ? '#16a34a' : '#dc2626' }}>{fmt(e.value)}</span>
+          {i === 0 && <span style={{ fontSize: '0.62rem', background: '#dcfce7', color: '#16a34a', borderRadius: 4, padding: '0.05rem 0.3rem', fontWeight: 600 }}>aktuell</span>}
+          <button onClick={() => remove(e.id)} style={{ ...btnSm, background: 'none', color: '#dc2626', padding: '0.1rem 0.25rem' }}>✕</button>
+        </div>
+      ))}
+      {adding ? (
+        <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', marginTop: '0.45rem', flexWrap: 'wrap' }}>
+          <DateInputSmall value={newDate} onChange={setNewDate} />
+          <input type="number" value={newVal} onChange={e => setNewVal(e.target.value)}
+            placeholder="Saldo (€)" step="0.01"
+            style={{ fontSize: '0.78rem', padding: '0.2rem 0.4rem', width: 100, border: '1px solid var(--color-border)', borderRadius: 4 }} />
+          <button onClick={add} style={{ ...btnSm, background: 'var(--color-primary)', color: '#fff', padding: '0.2rem 0.5rem' }}>Speichern</button>
+          <button onClick={() => setAdding(false)} style={{ ...btnSm, background: '#e5e7eb', color: '#374151', padding: '0.2rem 0.5rem' }}>Abbrechen</button>
+        </div>
+      ) : (
+        <button onClick={() => setAdding(true)} style={{ marginTop: '0.35rem', background: 'none', border: '1px dashed var(--color-border)', borderRadius: 4, cursor: 'pointer', fontSize: '0.75rem', padding: '0.15rem 0.5rem', color: 'var(--color-text-muted)', width: '100%', textAlign: 'left' }}>
+          + Stichtag hinzufügen
+        </button>
+      )}
+    </div>
+  )
+}
+
 export default function BankAccounts() {
   const [accounts, setAccounts] = useLocalStorage('bankAccounts', [])
   const [transactions, setTransactions] = useLocalStorage('transactions', [])
   const [categories, setCategories_] = useState(() => JSON.parse(localStorage.getItem('categories')) || [])
 
   const [tab, setTab] = useState('accounts')
+  const [expandedAccHistory, setExpandedAccHistory] = useState(new Set())
 
   // --- Accounts form ---
   const [accountName, setAccountName] = useState('')
@@ -101,6 +173,14 @@ export default function BankAccounts() {
 
   function removeAccount(id) {
     setAccounts(accounts.filter(a => a.id !== id))
+  }
+
+  function toggleAccHistory(id) {
+    setExpandedAccHistory(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next })
+  }
+
+  function updateAccountHistory(accountId, newHistory) {
+    setAccounts(accounts.map(a => a.id !== accountId ? a : { ...a, balanceHistory: newHistory }))
   }
 
   // --- Transactions CRUD ---
@@ -225,31 +305,55 @@ export default function BankAccounts() {
                   </tr>
                 </thead>
                 <tbody>
-                  {accounts.map(a => editAccId === a.id ? (
-                    <tr key={a.id} style={{ background: '#fefce8' }}>
-                      <td style={cell}>
-                        <input value={editAccName} onChange={e => setEditAccName(e.target.value)}
-                          style={{ fontSize: '0.8rem', padding: '0.2rem 0.4rem', width: '100%' }} />
-                      </td>
-                      <td style={cell}>
-                        <input type="number" value={editAccBalance} onChange={e => setEditAccBalance(e.target.value)}
-                          step="0.01" style={{ fontSize: '0.8rem', padding: '0.2rem 0.4rem', width: 90 }} />
-                      </td>
-                      <td style={{ ...cell, whiteSpace: 'nowrap' }}>
-                        <button onClick={saveEditAcc} style={{ ...btnSm, background: '#16a34a', color: '#fff', marginRight: 4 }}>Speichern</button>
-                        <button onClick={() => setEditAccId(null)} style={{ ...btnSm, background: '#e5e7eb', color: '#374151' }}>Abbrechen</button>
-                      </td>
-                    </tr>
-                  ) : (
-                    <tr key={a.id}>
-                      <td style={cell}>{a.name}</td>
-                      <td style={{ ...cell, fontWeight: 600, color: a.balance >= 0 ? '#16a34a' : '#dc2626' }}>{fmt(a.balance)}</td>
-                      <td style={{ ...cell, whiteSpace: 'nowrap' }}>
-                        <button onClick={() => startEditAcc(a)} style={{ ...btnSm, background: '#e5e7eb', color: '#374151', marginRight: 4 }}>✎</button>
-                        <button onClick={() => removeAccount(a.id)} style={{ ...btnSm, background: '#fee2e2', color: '#dc2626' }}>✕</button>
-                      </td>
-                    </tr>
-                  ))}
+                  {accounts.map(a => {
+                    const histOpen = expandedAccHistory.has(a.id)
+                    if (editAccId === a.id) return (
+                      <tr key={a.id} style={{ background: '#fefce8' }}>
+                        <td style={cell}>
+                          <input value={editAccName} onChange={e => setEditAccName(e.target.value)}
+                            style={{ fontSize: '0.8rem', padding: '0.2rem 0.4rem', width: '100%' }} />
+                        </td>
+                        <td style={cell}>
+                          <input type="number" value={editAccBalance} onChange={e => setEditAccBalance(e.target.value)}
+                            step="0.01" style={{ fontSize: '0.8rem', padding: '0.2rem 0.4rem', width: 90 }} />
+                        </td>
+                        <td style={{ ...cell, whiteSpace: 'nowrap' }}>
+                          <button onClick={saveEditAcc} style={{ ...btnSm, background: '#16a34a', color: '#fff', marginRight: 4 }}>Speichern</button>
+                          <button onClick={() => setEditAccId(null)} style={{ ...btnSm, background: '#e5e7eb', color: '#374151' }}>Abbrechen</button>
+                        </td>
+                      </tr>
+                    )
+                    return (
+                      <>
+                        <tr key={a.id} style={{ borderBottom: histOpen ? 'none' : undefined }}>
+                          <td style={cell}>{a.name}</td>
+                          <td style={{ ...cell, fontWeight: 600, color: a.balance >= 0 ? '#16a34a' : '#dc2626' }}>
+                            {fmt(a.balance)}
+                            {a.balanceHistory?.length > 0 && (
+                              <span style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)', marginLeft: 4 }}>({a.balanceHistory.length})</span>
+                            )}
+                          </td>
+                          <td style={{ ...cell, whiteSpace: 'nowrap' }}>
+                            <button onClick={() => startEditAcc(a)} style={{ ...btnSm, background: '#e5e7eb', color: '#374151', marginRight: 4 }}>✎</button>
+                            <button onClick={() => removeAccount(a.id)} style={{ ...btnSm, background: '#fee2e2', color: '#dc2626', marginRight: 4 }}>✕</button>
+                            <button onClick={() => toggleAccHistory(a.id)} style={{ ...btnSm, background: histOpen ? 'var(--color-primary)' : '#e5e7eb', color: histOpen ? '#fff' : '#374151' }} title="Saldenhistorie">
+                              {histOpen ? '▾' : '▸'} Verlauf
+                            </button>
+                          </td>
+                        </tr>
+                        {histOpen && (
+                          <tr key={`${a.id}-hist`}>
+                            <td colSpan={3} style={{ padding: 0 }}>
+                              <BalanceHistory
+                                history={a.balanceHistory || []}
+                                onChange={h => updateAccountHistory(a.id, h)}
+                              />
+                            </td>
+                          </tr>
+                        )}
+                      </>
+                    )
+                  })}
                 </tbody>
               </table>
             )}
