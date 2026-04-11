@@ -102,6 +102,15 @@ function latestHistoryEntry(history) {
   return [...history].sort((a, b) => b.date.localeCompare(a.date))[0]
 }
 
+// Verrentungstyp helpers (backward compat with old nurVerrentung boolean)
+function isNurVerrentung(c) { return c.verrentungTyp === 'nurVerrentung' || (!!c.nurVerrentung && !c.verrentungTyp) }
+function isAnnuity(c)       { return c.verrentungTyp === 'verrentung' || isNurVerrentung(c) }
+
+const PERSON_COLORS = {
+  Karin:   { border: '#f43f5e', badgeBg: '#ffe4e6', badgeColor: '#be123c' },
+  Jürgen:  { border: '#3b82f6', badgeBg: '#dbeafe', badgeColor: '#1d4ed8' },
+}
+
 function ValueHistory({ history = [], onChange, annuity = false }) {
   const [adding, setAdding] = useState(false)
   const [newDate, setNewDate] = useState(todayIso())
@@ -289,7 +298,7 @@ function ValueHistory({ history = [], onChange, annuity = false }) {
 const EMPTY_FORM = {
   name: '', provider: '', categoryId: '', value: '', premium: '', premiumFrequency: 'monthly',
   start: '', end: '', notes: '', comment: '', active: true,
-  renteNachTodesfall: false, nurVerrentung: false,
+  renteNachTodesfall: false, verrentungTyp: '', person: '',
   annuityDate: '', multiplikator: '', garantierteJaehrlicheRente: '',
 }
 
@@ -314,7 +323,7 @@ export default function InsuranceContracts() {
     const existing = contracts.find(c => c.id === editId)
     let valueHistory = existing?.valueHistory || []
 
-    if (form.nurVerrentung && form.value !== '' && form.annuityDate) {
+    if (form.verrentungTyp && form.value !== '' && form.annuityDate) {
       const wert = parseFloat(form.value)
       const entry = { id: Date.now(), date: form.annuityDate, value: wert }
       if (form.multiplikator !== '') entry.multiplikator = parseFloat(form.multiplikator)
@@ -339,7 +348,9 @@ export default function InsuranceContracts() {
       comment:             form.comment,
       active:              form.active,
       renteNachTodesfall:  form.renteNachTodesfall,
-      nurVerrentung:       form.nurVerrentung,
+      verrentungTyp:       form.verrentungTyp,
+      nurVerrentung:       form.verrentungTyp === 'nurVerrentung', // backward compat
+      person:              form.person,
       valueHistory,
     }
     const updated = editId
@@ -353,7 +364,8 @@ export default function InsuranceContracts() {
   }
 
   function startEdit(c) {
-    const latestE = c.nurVerrentung ? latestHistoryEntry(c.valueHistory) : null
+    const annuity = isAnnuity(c)
+    const latestE = annuity ? latestHistoryEntry(c.valueHistory) : null
     setForm({
       name:                c.name || '',
       provider:            c.provider || '',
@@ -367,7 +379,8 @@ export default function InsuranceContracts() {
       comment:             c.comment || '',
       active:              c.active !== false,
       renteNachTodesfall:  c.renteNachTodesfall || false,
-      nurVerrentung:       c.nurVerrentung || false,
+      verrentungTyp:       c.verrentungTyp || (c.nurVerrentung ? 'nurVerrentung' : ''),
+      person:              c.person || '',
       annuityDate:                latestE?.date || todayIso(),
       multiplikator:              latestE?.multiplikator != null ? String(latestE.multiplikator) : '',
       garantierteJaehrlicheRente: latestE?.garantierteJaehrlicheRente != null ? String(latestE.garantierteJaehrlicheRente) : '',
@@ -409,9 +422,9 @@ export default function InsuranceContracts() {
 
   const getDisplayValue = (c) => latestHistoryValue(c.valueHistory, c.value)
 
-  // "Nur Verrentung" contracts are not counted as assets
+  // "Nur Verrentung" not counted as asset; "Verrentung" IS counted
   const totalValue = contracts
-    .filter(c => !c.nurVerrentung)
+    .filter(c => !isNurVerrentung(c))
     .reduce((s, c) => s + (getDisplayValue(c) || 0), 0)
 
   const inputStyle = { fontSize: '0.85rem', padding: '0.35rem 0.5rem' }
@@ -438,17 +451,20 @@ export default function InsuranceContracts() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
             {contracts.map(c => {
               const displayVal = getDisplayValue(c)
-              // nurVerrentung contracts default to open; regular contracts default to closed
-              const histOpen = c.nurVerrentung ? !expandedHistory.has(c.id) : expandedHistory.has(c.id)
+              const histOpen = expandedHistory.has(c.id)
               const latestEntry = latestHistoryEntry(c.valueHistory)
-              const jaehrlicheRente = c.nurVerrentung && latestEntry?.multiplikator && latestEntry?.garantierteJaehrlicheRente
+              const annuity = isAnnuity(c)
+              const nurV    = isNurVerrentung(c)
+              const jaehrlicheRente = annuity && latestEntry?.multiplikator && latestEntry?.garantierteJaehrlicheRente
                 ? (latestEntry.value / latestEntry.multiplikator) * latestEntry.garantierteJaehrlicheRente
                 : null
               const monatlicheRente = jaehrlicheRente != null ? jaehrlicheRente / 12 : null
+              const personColor = PERSON_COLORS[c.person]
               return (
                 <div key={c.id} style={{
                   border: '1px solid var(--color-border)', borderRadius: 8,
                   overflow: 'hidden', opacity: c.active === false ? 0.6 : 1,
+                  borderLeft: personColor ? `3px solid ${personColor.border}` : undefined,
                 }}>
                   {/* Header row */}
                   <div style={{
@@ -461,9 +477,14 @@ export default function InsuranceContracts() {
                       background: c.active !== false ? '#16a34a' : '#9ca3af',
                     }} />
                     <span style={{ fontWeight: 600, fontSize: '0.9rem', flex: 1 }}>{c.name}</span>
-                    {c.nurVerrentung && (
+                    {c.person && personColor && (
+                      <span style={{ fontSize: '0.68rem', background: personColor.badgeBg, color: personColor.badgeColor, borderRadius: 4, padding: '0.1rem 0.4rem', fontWeight: 600 }}>
+                        {c.person}
+                      </span>
+                    )}
+                    {annuity && (
                       <span style={{ fontSize: '0.68rem', color: '#7c3aed', background: '#ede9fe', borderRadius: 4, padding: '0.1rem 0.4rem', fontWeight: 600 }}>
-                        Nur Verrentung
+                        {nurV ? 'Nur Verrentung' : 'Verrentung'}
                       </span>
                     )}
                     {c.renteNachTodesfall && (
@@ -492,33 +513,27 @@ export default function InsuranceContracts() {
                     {displayVal != null && (
                       <div style={{ padding: '0.4rem 0.75rem', borderRight: '1px solid var(--color-border)' }}>
                         <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>
-                          Wert{c.nurVerrentung ? ' (kein Vermögenswert)' : ''}
+                          {nurV ? 'Zeitwert' : 'Wert'}
                         </div>
                         <div style={{ fontWeight: 600 }}>{fmt(displayVal)}</div>
                         {c.valueHistory?.length > 0 && (
-                          <div style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)' }}>
-                            {c.valueHistory.length} Einträge
-                          </div>
+                          <div style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)' }}>{c.valueHistory.length} Einträge</div>
                         )}
                       </div>
                     )}
-                    {/* Annuity values (only for Nur Verrentung) */}
-                    {c.nurVerrentung && jaehrlicheRente != null && (
+                    {/* Annuity values */}
+                    {annuity && jaehrlicheRente != null && (
                       <>
-                        <div style={{ padding: '0.4rem 0.75rem', borderRight: '1px solid var(--color-border)' }}>
-                          <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>Multiplikator</div>
-                          <div style={{ fontWeight: 600 }}>{latestEntry.multiplikator.toLocaleString('de-DE')}</div>
-                        </div>
                         <div style={{ padding: '0.4rem 0.75rem', borderRight: '1px solid var(--color-border)' }}>
                           <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>Gar. jährl. Rente</div>
                           <div style={{ fontWeight: 600 }}>{fmt(latestEntry.garantierteJaehrlicheRente)}</div>
                         </div>
                         <div style={{ padding: '0.4rem 0.75rem', borderRight: '1px solid var(--color-border)' }}>
-                          <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>Jährliche Rente</div>
+                          <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>Jährl. Rente</div>
                           <div style={{ fontWeight: 600, color: '#16a34a' }}>{fmt(jaehrlicheRente)}</div>
                         </div>
                         <div style={{ padding: '0.4rem 0.75rem', borderRight: '1px solid var(--color-border)' }}>
-                          <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>Monatliche Rente</div>
+                          <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>Monatl. Rente</div>
                           <div style={{ fontWeight: 600, color: '#16a34a' }}>{fmt(monatlicheRente)}</div>
                         </div>
                       </>
@@ -540,7 +555,7 @@ export default function InsuranceContracts() {
                     {(c.start || c.end) && (
                       <div style={{ padding: '0.4rem 0.75rem', borderRight: '1px solid var(--color-border)' }}>
                         <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>Laufzeit</div>
-                        <div>{c.start || '–'} → {c.end || '∞'}</div>
+                        <div style={{ whiteSpace: 'nowrap' }}>{isoToGerman(c.start) || '–'} → {isoToGerman(c.end) || '∞'}</div>
                       </div>
                     )}
                     {/* Notizen (Kommentar nur im Formular, nicht in der Übersicht) */}
@@ -561,7 +576,7 @@ export default function InsuranceContracts() {
                           display: 'flex', alignItems: 'center', gap: '0.25rem',
                         }}
                       >
-                        {histOpen ? '▾' : '▸'} {c.nurVerrentung ? 'Zeitwerte' : 'Werthistorie'}
+                        {histOpen ? '▾' : '▸'} {annuity ? 'Zeitwerte' : 'Werthistorie'}
                       </button>
                     </div>
                   </div>
@@ -571,7 +586,7 @@ export default function InsuranceContracts() {
                     <ValueHistory
                       history={c.valueHistory || []}
                       onChange={h => updateHistory(c.id, h)}
-                      annuity={c.nurVerrentung || false}
+                      annuity={annuity}
                     />
                   )}
                 </div>
@@ -628,27 +643,33 @@ export default function InsuranceContracts() {
             </div>
           </div>
 
-          {/* Insurance flags */}
-          <div style={{ border: '1px solid var(--color-border)', borderRadius: 6, padding: '0.65rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-            <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '0.2rem' }}>
-              Besondere Merkmale
+          {/* Person + flags */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+            <div>
+              <label style={labelStyle}>Person</label>
+              <select value={form.person} onChange={e => setForm(f => ({ ...f, person: e.target.value }))} style={{ ...inputStyle, width: '100%' }}>
+                <option value="">– keine –</option>
+                <option value="Karin">Karin</option>
+                <option value="Jürgen">Jürgen</option>
+              </select>
             </div>
+            <div>
+              <label style={labelStyle}>Verrentung</label>
+              <select value={form.verrentungTyp} onChange={e => setForm(f => ({ ...f, verrentungTyp: e.target.value }))} style={{ ...inputStyle, width: '100%' }}>
+                <option value="">– keine –</option>
+                <option value="verrentung">Verrentung (Vermögenswert)</option>
+                <option value="nurVerrentung">Nur Verrentung (kein Vermögenswert)</option>
+              </select>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
             <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}>
               <input type="checkbox" {...check('renteNachTodesfall')} />
               <span>Rente nach Todesfall</span>
             </label>
-            <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}>
-              <input type="checkbox" {...check('nurVerrentung')} />
-              <span>Nur Verrentung</span>
-              {form.nurVerrentung && (
-                <span style={{ fontSize: '0.72rem', color: '#7c3aed', background: '#ede9fe', borderRadius: 4, padding: '0.1rem 0.35rem' }}>
-                  kein Vermögenswert
-                </span>
-              )}
-            </label>
           </div>
 
-          {form.nurVerrentung ? (
+          {form.verrentungTyp ? (
             <div style={{ border: '1px solid #c4b5fd', borderRadius: 6, padding: '0.65rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', background: '#faf5ff' }}>
               <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 Verrentungswert je Stichtag
