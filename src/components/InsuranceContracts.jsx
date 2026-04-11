@@ -106,83 +106,170 @@ function ValueHistory({ history = [], onChange, annuity = false }) {
   const [adding, setAdding] = useState(false)
   const [newDate, setNewDate] = useState(todayIso())
   const [newVal, setNewVal] = useState('')
-  const [newMultiplikator, setNewMultiplikator] = useState('')
+  const [newMult, setNewMult] = useState('')
+  const [newGar, setNewGar] = useState('')
+
+  const [editingId, setEditingId] = useState(null)
+  const [editDate, setEditDate] = useState('')
+  const [editVal, setEditVal] = useState('')
+  const [editMult, setEditMult] = useState('')
+  const [editGar, setEditGar] = useState('')
 
   const sorted = [...history].sort((a, b) => b.date.localeCompare(a.date))
 
   function add() {
     if (!newDate || newVal === '') return
     const entry = { id: Date.now(), date: newDate, value: parseFloat(newVal) }
-    if (annuity && newMultiplikator !== '') {
-      entry.multiplikator = parseFloat(newMultiplikator)
+    if (annuity) {
+      if (newMult !== '') entry.multiplikator = parseFloat(newMult)
+      if (newGar !== '') entry.garantierteJaehrlicheRente = parseFloat(newGar)
     }
     onChange([...history, entry])
-    setNewVal('')
-    setNewMultiplikator('')
+    setNewVal(''); setNewMult(''); setNewGar('')
     setAdding(false)
+  }
+
+  function startEdit(e) {
+    setEditingId(e.id)
+    setEditDate(e.date)
+    setEditVal(String(e.value))
+    setEditMult(e.multiplikator != null ? String(e.multiplikator) : '')
+    setEditGar(e.garantierteJaehrlicheRente != null ? String(e.garantierteJaehrlicheRente) : '')
+  }
+
+  function saveEdit(id) {
+    if (!editDate || editVal === '') return
+    onChange(history.map(e => {
+      if (e.id !== id) return e
+      const updated = { ...e, date: editDate, value: parseFloat(editVal) }
+      if (annuity) {
+        if (editMult !== '') updated.multiplikator = parseFloat(editMult); else delete updated.multiplikator
+        if (editGar !== '') updated.garantierteJaehrlicheRente = parseFloat(editGar); else delete updated.garantierteJaehrlicheRente
+      }
+      return updated
+    }))
+    setEditingId(null)
   }
 
   function remove(id) { onChange(history.filter(e => e.id !== id)) }
 
   const btn = { border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: '0.72rem', padding: '0.2rem 0.45rem' }
+  const inpSt = { fontSize: '0.8rem', padding: '0.25rem 0.4rem', border: '1px solid var(--color-border)', borderRadius: 4 }
+
+  function calcRente(val, mult, gar) {
+    if (!mult || !gar) return null
+    return (val / mult) * gar
+  }
 
   return (
     <div style={{ borderTop: '1px solid var(--color-border)', padding: '0.5rem 0.75rem', background: 'var(--color-bg)' }}>
       <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.4rem' }}>
-        Werthistorie
+        {annuity ? 'Zeitwerte je Stichtag' : 'Werthistorie'}
       </div>
-      {sorted.length === 0 && (
+      {sorted.length === 0 && !adding && (
         <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', marginBottom: '0.3rem' }}>
           Noch keine Einträge
         </div>
       )}
       {sorted.map((e, i) => {
-        const jaehrlicheRente = annuity && e.multiplikator ? e.value / e.multiplikator : null
-        const monatlicheRente = jaehrlicheRente != null ? jaehrlicheRente / 12 : null
+        const jaehrl = annuity ? calcRente(e.value, e.multiplikator, e.garantierteJaehrlicheRente) : null
+        const monatl = jaehrl != null ? jaehrl / 12 : null
+        const isEditing = editingId === e.id
         return (
           <div key={e.id} style={{
-            padding: '0.25rem 0',
+            padding: '0.3rem 0',
             borderBottom: i < sorted.length - 1 ? '1px solid var(--color-border)' : 'none',
             fontSize: '0.82rem',
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span style={{ color: 'var(--color-text-muted)', minWidth: 90, fontFamily: 'monospace', fontSize: '0.78rem' }}>{e.date}</span>
-              <span style={{ fontWeight: 700, flex: 1 }}>{fmt(e.value)}</span>
-              {annuity && e.multiplikator != null && (
-                <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>
-                  Mult.: {e.multiplikator.toLocaleString('de-DE')}
-                </span>
-              )}
-              {i === 0 && <span style={{ fontSize: '0.65rem', background: '#dcfce7', color: '#16a34a', borderRadius: 4, padding: '0.05rem 0.3rem', fontWeight: 600 }}>aktuell</span>}
-              <button onClick={() => remove(e.id)} style={{ ...btn, background: 'none', color: '#dc2626', padding: '0.1rem 0.3rem' }}>✕</button>
-            </div>
-            {annuity && jaehrlicheRente != null && (
-              <div style={{ display: 'flex', gap: '1.2rem', marginTop: '0.2rem', paddingLeft: 94, fontSize: '0.75rem' }}>
-                <span style={{ color: 'var(--color-text-muted)' }}>
-                  Jährl. Rente: <strong style={{ color: 'var(--color-text)' }}>{fmt(jaehrlicheRente)}</strong>
-                </span>
-                <span style={{ color: 'var(--color-text-muted)' }}>
-                  Monatl. Rente: <strong style={{ color: 'var(--color-text)' }}>{fmt(monatlicheRente)}</strong>
-                </span>
+            {isEditing ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <DateInput value={editDate} onChange={setEditDate} />
+                  <input type="number" value={editVal} onChange={ev => setEditVal(ev.target.value)}
+                    placeholder="Wert (€)" step="0.01" style={{ ...inpSt, width: 110 }} />
+                  {annuity && <>
+                    <input type="number" value={editMult} onChange={ev => setEditMult(ev.target.value)}
+                      placeholder="Multiplikator" step="0.01" min="0" style={{ ...inpSt, width: 110 }} />
+                    <input type="number" value={editGar} onChange={ev => setEditGar(ev.target.value)}
+                      placeholder="Gar. jährl. Rente (€)" step="0.01" min="0" style={{ ...inpSt, width: 150 }} />
+                  </>}
+                  <button onClick={() => saveEdit(e.id)}
+                    style={{ ...btn, background: 'var(--color-primary)', color: '#fff', padding: '0.25rem 0.5rem' }}>✓</button>
+                  <button onClick={() => setEditingId(null)}
+                    style={{ ...btn, background: '#e5e7eb', color: '#374151', padding: '0.25rem 0.5rem' }}>✕</button>
+                </div>
+                {annuity && editMult !== '' && editGar !== '' && parseFloat(editMult) > 0 && editVal !== '' && (() => {
+                  const r = calcRente(parseFloat(editVal), parseFloat(editMult), parseFloat(editGar))
+                  return r != null ? (
+                    <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', paddingLeft: 4 }}>
+                      Jährl.: <strong>{fmt(r)}</strong> / Monatl.: <strong>{fmt(r / 12)}</strong>
+                    </div>
+                  ) : null
+                })()}
               </div>
+            ) : (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ color: 'var(--color-text-muted)', minWidth: 90, fontFamily: 'monospace', fontSize: '0.78rem' }}>{e.date}</span>
+                  <span style={{ fontWeight: 700, flex: 1 }}>{fmt(e.value)}</span>
+                  {annuity && e.multiplikator != null && (
+                    <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>
+                      Mult.: {e.multiplikator.toLocaleString('de-DE')}
+                    </span>
+                  )}
+                  {annuity && e.garantierteJaehrlicheRente != null && (
+                    <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>
+                      Gar.: {fmt(e.garantierteJaehrlicheRente)}
+                    </span>
+                  )}
+                  {i === 0 && <span style={{ fontSize: '0.65rem', background: '#dcfce7', color: '#16a34a', borderRadius: 4, padding: '0.05rem 0.3rem', fontWeight: 600 }}>aktuell</span>}
+                  <button onClick={() => startEdit(e)}
+                    style={{ ...btn, background: '#e5e7eb', color: '#374151', padding: '0.1rem 0.3rem' }}>✎</button>
+                  <button onClick={() => remove(e.id)}
+                    style={{ ...btn, background: 'none', color: '#dc2626', padding: '0.1rem 0.3rem' }}>✕</button>
+                </div>
+                {annuity && jaehrl != null && (
+                  <div style={{ display: 'flex', gap: '1.2rem', marginTop: '0.2rem', paddingLeft: 94, fontSize: '0.75rem' }}>
+                    <span style={{ color: 'var(--color-text-muted)' }}>
+                      Jährl. Rente: <strong style={{ color: 'var(--color-text)' }}>{fmt(jaehrl)}</strong>
+                    </span>
+                    <span style={{ color: 'var(--color-text-muted)' }}>
+                      Monatl. Rente: <strong style={{ color: 'var(--color-text)' }}>{fmt(monatl)}</strong>
+                    </span>
+                  </div>
+                )}
+              </>
             )}
           </div>
         )
       })}
 
       {adding ? (
-        <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', marginTop: '0.5rem', flexWrap: 'wrap' }}>
-          <DateInput value={newDate} onChange={setNewDate} />
-          <input type="number" value={newVal} onChange={e => setNewVal(e.target.value)}
-            placeholder="Wert (€)" step="0.01" min="0"
-            style={{ fontSize: '0.83rem', padding: '0.33rem 0.5rem', width: 110, border: '1px solid var(--color-border)', borderRadius: 5 }} />
-          {annuity && (
-            <input type="number" value={newMultiplikator} onChange={e => setNewMultiplikator(e.target.value)}
-              placeholder="Multiplikator" step="0.01" min="0"
-              style={{ fontSize: '0.83rem', padding: '0.33rem 0.5rem', width: 120, border: '1px solid var(--color-border)', borderRadius: 5 }} />
-          )}
-          <button onClick={add} style={{ ...btn, background: 'var(--color-primary)', color: '#fff', padding: '0.3rem 0.6rem' }}>Speichern</button>
-          <button onClick={() => setAdding(false)} style={{ ...btn, background: '#e5e7eb', color: '#374151', padding: '0.3rem 0.6rem' }}>Abbrechen</button>
+        <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+          <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <DateInput value={newDate} onChange={setNewDate} />
+            <input type="number" value={newVal} onChange={e => setNewVal(e.target.value)}
+              placeholder="Wert (€)" step="0.01" min="0"
+              style={{ fontSize: '0.83rem', padding: '0.33rem 0.5rem', width: 110, border: '1px solid var(--color-border)', borderRadius: 5 }} />
+            {annuity && <>
+              <input type="number" value={newMult} onChange={e => setNewMult(e.target.value)}
+                placeholder="Multiplikator" step="0.01" min="0"
+                style={{ fontSize: '0.83rem', padding: '0.33rem 0.5rem', width: 110, border: '1px solid var(--color-border)', borderRadius: 5 }} />
+              <input type="number" value={newGar} onChange={e => setNewGar(e.target.value)}
+                placeholder="Gar. jährl. Rente (€)" step="0.01" min="0"
+                style={{ fontSize: '0.83rem', padding: '0.33rem 0.5rem', width: 150, border: '1px solid var(--color-border)', borderRadius: 5 }} />
+            </>}
+            <button onClick={add} style={{ ...btn, background: 'var(--color-primary)', color: '#fff', padding: '0.3rem 0.6rem' }}>Speichern</button>
+            <button onClick={() => setAdding(false)} style={{ ...btn, background: '#e5e7eb', color: '#374151', padding: '0.3rem 0.6rem' }}>Abbrechen</button>
+          </div>
+          {annuity && newMult !== '' && newGar !== '' && parseFloat(newMult) > 0 && newVal !== '' && (() => {
+            const r = calcRente(parseFloat(newVal), parseFloat(newMult), parseFloat(newGar))
+            return r != null ? (
+              <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', paddingLeft: 4 }}>
+                Jährl.: <strong>{fmt(r)}</strong> / Monatl.: <strong>{fmt(r / 12)}</strong>
+              </div>
+            ) : null
+          })()}
         </div>
       ) : (
         <button onClick={() => setAdding(true)} style={{
@@ -203,7 +290,7 @@ const EMPTY_FORM = {
   name: '', provider: '', categoryId: '', value: '', premium: '', premiumFrequency: 'monthly',
   start: '', end: '', notes: '', comment: '', active: true,
   renteNachTodesfall: false, nurVerrentung: false,
-  annuityDate: '', multiplikator: '',
+  annuityDate: '', multiplikator: '', garantierteJaehrlicheRente: '',
 }
 
 export default function InsuranceContracts() {
@@ -227,15 +314,15 @@ export default function InsuranceContracts() {
     const existing = contracts.find(c => c.id === editId)
     let valueHistory = existing?.valueHistory || []
 
-    if (form.nurVerrentung && form.value !== '' && form.multiplikator !== '' && form.annuityDate) {
+    if (form.nurVerrentung && form.value !== '' && form.annuityDate) {
       const wert = parseFloat(form.value)
-      const mult = parseFloat(form.multiplikator)
+      const entry = { id: Date.now(), date: form.annuityDate, value: wert }
+      if (form.multiplikator !== '') entry.multiplikator = parseFloat(form.multiplikator)
+      if (form.garantierteJaehrlicheRente !== '') entry.garantierteJaehrlicheRente = parseFloat(form.garantierteJaehrlicheRente)
       const idx = valueHistory.findIndex(en => en.date === form.annuityDate)
-      if (idx >= 0) {
-        valueHistory = valueHistory.map((en, i) => i === idx ? { ...en, value: wert, multiplikator: mult } : en)
-      } else {
-        valueHistory = [...valueHistory, { id: Date.now(), date: form.annuityDate, value: wert, multiplikator: mult }]
-      }
+      valueHistory = idx >= 0
+        ? valueHistory.map((en, i) => i === idx ? { ...en, value: wert, multiplikator: entry.multiplikator, garantierteJaehrlicheRente: entry.garantierteJaehrlicheRente } : en)
+        : [...valueHistory, entry]
     }
 
     const contract = {
@@ -281,8 +368,9 @@ export default function InsuranceContracts() {
       active:              c.active !== false,
       renteNachTodesfall:  c.renteNachTodesfall || false,
       nurVerrentung:       c.nurVerrentung || false,
-      annuityDate:         latestE?.date || todayIso(),
-      multiplikator:       latestE?.multiplikator != null ? String(latestE.multiplikator) : '',
+      annuityDate:                latestE?.date || todayIso(),
+      multiplikator:              latestE?.multiplikator != null ? String(latestE.multiplikator) : '',
+      garantierteJaehrlicheRente: latestE?.garantierteJaehrlicheRente != null ? String(latestE.garantierteJaehrlicheRente) : '',
     })
     setEditId(c.id)
     setShowForm(true)
@@ -353,8 +441,8 @@ export default function InsuranceContracts() {
               // nurVerrentung contracts default to open; regular contracts default to closed
               const histOpen = c.nurVerrentung ? !expandedHistory.has(c.id) : expandedHistory.has(c.id)
               const latestEntry = latestHistoryEntry(c.valueHistory)
-              const jaehrlicheRente = c.nurVerrentung && latestEntry?.multiplikator
-                ? latestEntry.value / latestEntry.multiplikator
+              const jaehrlicheRente = c.nurVerrentung && latestEntry?.multiplikator && latestEntry?.garantierteJaehrlicheRente
+                ? (latestEntry.value / latestEntry.multiplikator) * latestEntry.garantierteJaehrlicheRente
                 : null
               const monatlicheRente = jaehrlicheRente != null ? jaehrlicheRente / 12 : null
               return (
@@ -422,6 +510,10 @@ export default function InsuranceContracts() {
                           <div style={{ fontWeight: 600 }}>{latestEntry.multiplikator.toLocaleString('de-DE')}</div>
                         </div>
                         <div style={{ padding: '0.4rem 0.75rem', borderRight: '1px solid var(--color-border)' }}>
+                          <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>Gar. jährl. Rente</div>
+                          <div style={{ fontWeight: 600 }}>{fmt(latestEntry.garantierteJaehrlicheRente)}</div>
+                        </div>
+                        <div style={{ padding: '0.4rem 0.75rem', borderRight: '1px solid var(--color-border)' }}>
                           <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>Jährliche Rente</div>
                           <div style={{ fontWeight: 600, color: '#16a34a' }}>{fmt(jaehrlicheRente)}</div>
                         </div>
@@ -451,11 +543,10 @@ export default function InsuranceContracts() {
                         <div>{c.start || '–'} → {c.end || '∞'}</div>
                       </div>
                     )}
-                    {/* Notizen */}
-                    {(c.notes || c.comment) && (
+                    {/* Notizen (Kommentar nur im Formular, nicht in der Übersicht) */}
+                    {c.notes && (
                       <div style={{ padding: '0.4rem 0.75rem', flex: 1, minWidth: 120 }}>
-                        {c.notes && <div style={{ color: 'var(--color-text-muted)' }}>{c.notes}</div>}
-                        {c.comment && <div style={{ color: 'var(--color-text-muted)', borderTop: c.notes ? '1px solid var(--color-border)' : 'none', paddingTop: c.notes ? '0.2rem' : 0, marginTop: c.notes ? '0.2rem' : 0 }}>{c.comment}</div>}
+                        <div style={{ color: 'var(--color-text-muted)' }}>{c.notes}</div>
                       </div>
                     )}
                     {/* Werthistorie toggle */}
@@ -562,7 +653,7 @@ export default function InsuranceContracts() {
               <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 Verrentungswert je Stichtag
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.6rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
                 <div>
                   <label style={labelStyle}>Stichtag</label>
                   <DateInput value={form.annuityDate} onChange={v => setForm(f => ({ ...f, annuityDate: v }))} />
@@ -575,9 +666,13 @@ export default function InsuranceContracts() {
                   <label style={labelStyle}>Multiplikator</label>
                   <input type="number" {...field('multiplikator')} placeholder="z. B. 20" step="0.01" min="0" style={{ ...inputStyle, width: '100%' }} />
                 </div>
+                <div>
+                  <label style={labelStyle}>Garantierte jährliche Rente (€)</label>
+                  <input type="number" {...field('garantierteJaehrlicheRente')} placeholder="z. B. 3000" step="0.01" min="0" style={{ ...inputStyle, width: '100%' }} />
+                </div>
               </div>
-              {form.value !== '' && form.multiplikator !== '' && parseFloat(form.multiplikator) > 0 && (() => {
-                const jaehrl = parseFloat(form.value) / parseFloat(form.multiplikator)
+              {form.value !== '' && form.multiplikator !== '' && form.garantierteJaehrlicheRente !== '' && parseFloat(form.multiplikator) > 0 && (() => {
+                const jaehrl = (parseFloat(form.value) / parseFloat(form.multiplikator)) * parseFloat(form.garantierteJaehrlicheRente)
                 return (
                   <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.82rem', padding: '0.35rem 0.5rem', background: '#ede9fe', borderRadius: 5 }}>
                     <span style={{ color: 'var(--color-text-muted)' }}>
