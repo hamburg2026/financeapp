@@ -14,28 +14,42 @@ const btnSm = { border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: '0
 
 function todayIso() { return new Date().toISOString().slice(0, 10) }
 
-function isoToParts(iso) {
-  if (!iso || iso.length < 10) return { d: '', m: '', y: '' }
+function isoToGerman(iso) {
+  if (!iso || iso.length < 10) return ''
   const [y, m, d] = iso.split('-')
-  return { d: d || '', m: m || '', y: y || '' }
+  return `${d}.${m}.${y}`
 }
-function partsToIso(d, m, y) {
-  if (!d && !m && !y) return ''
-  return y && m && d ? `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}` : ''
+
+function parseGermanDate(text) {
+  const digits = text.replace(/\D/g, '')
+  if (digits.length === 8) {
+    const d = digits.slice(0, 2)
+    const m = digits.slice(2, 4)
+    const y = digits.slice(4, 8)
+    return `${y}-${m}-${d}`
+  }
+  return ''
 }
 
 function DateInput({ value, onChange }) {
-  const { d, m, y } = isoToParts(value)
-  const st = { fontSize: '0.83rem', padding: '0.33rem 0.4rem', border: '1px solid var(--color-border)', borderRadius: 5, textAlign: 'center', background: 'var(--color-surface)' }
-  const upd = (nd, nm, ny) => onChange(partsToIso(nd, nm, ny))
+  const [raw, setRaw] = useState('')
+  const [focused, setFocused] = useState(false)
+  function handleFocus() { setRaw(isoToGerman(value)); setFocused(true) }
+  function handleBlur() {
+    setFocused(false)
+    if (!raw.trim()) { onChange(''); return }
+    const iso = parseGermanDate(raw)
+    if (iso) onChange(iso)
+  }
   return (
-    <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-      <input type="number" value={d} min="1" max="31" placeholder="TT" style={{ ...st, width: 50 }} onChange={e => upd(e.target.value, m, y)} />
-      <span style={{ color: 'var(--color-text-muted)' }}>.</span>
-      <input type="number" value={m} min="1" max="12" placeholder="MM" style={{ ...st, width: 50 }} onChange={e => upd(d, e.target.value, y)} />
-      <span style={{ color: 'var(--color-text-muted)' }}>.</span>
-      <input type="number" value={y} min="1900" max="2100" placeholder="JJJJ" style={{ ...st, width: 70 }} onChange={e => upd(d, m, e.target.value)} />
-    </div>
+    <input type="text"
+      value={focused ? raw : isoToGerman(value)}
+      placeholder="TTMMJJJJ"
+      onFocus={handleFocus}
+      onBlur={handleBlur}
+      onChange={e => setRaw(e.target.value)}
+      style={{ fontSize: '0.83rem', padding: '0.33rem 0.5rem', border: '1px solid var(--color-border)', borderRadius: 5, background: 'var(--color-surface)', width: 110 }}
+    />
   )
 }
 
