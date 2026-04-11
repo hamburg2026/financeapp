@@ -51,35 +51,42 @@ function removeRecurringPayment(contractId) {
 
 function todayIso() { return new Date().toISOString().slice(0, 10) }
 
-function isoToParts(iso) {
-  if (!iso || iso.length < 10) return { d: '', m: '', y: '' }
+function isoToGerman(iso) {
+  if (!iso || iso.length < 10) return ''
   const [y, m, d] = iso.split('-')
-  return { d: d || '', m: m || '', y: y || '' }
+  return `${d}.${m}.${y}`
 }
 
-function partsToIso(d, m, y) {
-  if (!d && !m && !y) return ''
-  const dd = String(d).padStart(2, '0')
-  const mm = String(m).padStart(2, '0')
-  return y && mm && dd ? `${y}-${mm}-${dd}` : ''
+function parseGermanDate(text) {
+  const digits = text.replace(/\D/g, '')
+  if (digits.length === 8) {
+    const d = digits.slice(0, 2)
+    const m = digits.slice(2, 4)
+    const y = digits.slice(4, 8)
+    return `${y}-${m}-${d}`
+  }
+  return ''
 }
 
-// Three-field date input: TT / MM / JJJJ
 function DateInput({ value, onChange }) {
-  const { d, m, y } = isoToParts(value)
-  const st = { fontSize: '0.83rem', padding: '0.33rem 0.4rem', border: '1px solid var(--color-border)', borderRadius: 5, textAlign: 'center', background: 'var(--color-surface)' }
-  const upd = (nd, nm, ny) => onChange(partsToIso(nd, nm, ny))
+  const [raw, setRaw] = useState('')
+  const [focused, setFocused] = useState(false)
+  function handleFocus() { setRaw(isoToGerman(value)); setFocused(true) }
+  function handleBlur() {
+    setFocused(false)
+    if (!raw.trim()) { onChange(''); return }
+    const iso = parseGermanDate(raw)
+    if (iso) onChange(iso)
+  }
   return (
-    <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-      <input type="number" value={d} min="1" max="31" placeholder="TT"
-        style={{ ...st, width: 50 }} onChange={e => upd(e.target.value, m, y)} />
-      <span style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem' }}>.</span>
-      <input type="number" value={m} min="1" max="12" placeholder="MM"
-        style={{ ...st, width: 50 }} onChange={e => upd(d, e.target.value, y)} />
-      <span style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem' }}>.</span>
-      <input type="number" value={y} min="1900" max="2100" placeholder="JJJJ"
-        style={{ ...st, width: 70 }} onChange={e => upd(d, m, e.target.value)} />
-    </div>
+    <input type="text"
+      value={focused ? raw : isoToGerman(value)}
+      placeholder="TTMMJJJJ"
+      onFocus={handleFocus}
+      onBlur={handleBlur}
+      onChange={e => setRaw(e.target.value)}
+      style={{ fontSize: '0.83rem', padding: '0.33rem 0.5rem', border: '1px solid var(--color-border)', borderRadius: 5, background: 'var(--color-surface)', width: 110 }}
+    />
   )
 }
 
@@ -90,18 +97,28 @@ function latestHistoryValue(history, fallback) {
   return [...history].sort((a, b) => b.date.localeCompare(a.date))[0].value
 }
 
-function ValueHistory({ history = [], onChange }) {
+function latestHistoryEntry(history) {
+  if (!history?.length) return null
+  return [...history].sort((a, b) => b.date.localeCompare(a.date))[0]
+}
+
+function ValueHistory({ history = [], onChange, annuity = false }) {
   const [adding, setAdding] = useState(false)
   const [newDate, setNewDate] = useState(todayIso())
   const [newVal, setNewVal] = useState('')
+  const [newMultiplikator, setNewMultiplikator] = useState('')
 
   const sorted = [...history].sort((a, b) => b.date.localeCompare(a.date))
 
   function add() {
     if (!newDate || newVal === '') return
     const entry = { id: Date.now(), date: newDate, value: parseFloat(newVal) }
+    if (annuity && newMultiplikator !== '') {
+      entry.multiplikator = parseFloat(newMultiplikator)
+    }
     onChange([...history, entry])
     setNewVal('')
+    setNewMultiplikator('')
     setAdding(false)
   }
 
@@ -119,18 +136,39 @@ function ValueHistory({ history = [], onChange }) {
           Noch keine Einträge
         </div>
       )}
-      {sorted.map((e, i) => (
-        <div key={e.id} style={{
-          display: 'flex', alignItems: 'center', gap: '0.5rem',
-          padding: '0.2rem 0', borderBottom: i < sorted.length - 1 ? '1px solid var(--color-border)' : 'none',
-          fontSize: '0.82rem',
-        }}>
-          <span style={{ color: 'var(--color-text-muted)', minWidth: 90, fontFamily: 'monospace', fontSize: '0.78rem' }}>{e.date}</span>
-          <span style={{ fontWeight: 700, flex: 1 }}>{fmt(e.value)}</span>
-          {i === 0 && <span style={{ fontSize: '0.65rem', background: '#dcfce7', color: '#16a34a', borderRadius: 4, padding: '0.05rem 0.3rem', fontWeight: 600 }}>aktuell</span>}
-          <button onClick={() => remove(e.id)} style={{ ...btn, background: 'none', color: '#dc2626', padding: '0.1rem 0.3rem' }}>✕</button>
-        </div>
-      ))}
+      {sorted.map((e, i) => {
+        const jaehrlicheRente = annuity && e.multiplikator ? e.value / e.multiplikator : null
+        const monatlicheRente = jaehrlicheRente != null ? jaehrlicheRente / 12 : null
+        return (
+          <div key={e.id} style={{
+            padding: '0.25rem 0',
+            borderBottom: i < sorted.length - 1 ? '1px solid var(--color-border)' : 'none',
+            fontSize: '0.82rem',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ color: 'var(--color-text-muted)', minWidth: 90, fontFamily: 'monospace', fontSize: '0.78rem' }}>{e.date}</span>
+              <span style={{ fontWeight: 700, flex: 1 }}>{fmt(e.value)}</span>
+              {annuity && e.multiplikator != null && (
+                <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>
+                  Mult.: {e.multiplikator.toLocaleString('de-DE')}
+                </span>
+              )}
+              {i === 0 && <span style={{ fontSize: '0.65rem', background: '#dcfce7', color: '#16a34a', borderRadius: 4, padding: '0.05rem 0.3rem', fontWeight: 600 }}>aktuell</span>}
+              <button onClick={() => remove(e.id)} style={{ ...btn, background: 'none', color: '#dc2626', padding: '0.1rem 0.3rem' }}>✕</button>
+            </div>
+            {annuity && jaehrlicheRente != null && (
+              <div style={{ display: 'flex', gap: '1.2rem', marginTop: '0.2rem', paddingLeft: 94, fontSize: '0.75rem' }}>
+                <span style={{ color: 'var(--color-text-muted)' }}>
+                  Jährl. Rente: <strong style={{ color: 'var(--color-text)' }}>{fmt(jaehrlicheRente)}</strong>
+                </span>
+                <span style={{ color: 'var(--color-text-muted)' }}>
+                  Monatl. Rente: <strong style={{ color: 'var(--color-text)' }}>{fmt(monatlicheRente)}</strong>
+                </span>
+              </div>
+            )}
+          </div>
+        )
+      })}
 
       {adding ? (
         <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', marginTop: '0.5rem', flexWrap: 'wrap' }}>
@@ -138,6 +176,11 @@ function ValueHistory({ history = [], onChange }) {
           <input type="number" value={newVal} onChange={e => setNewVal(e.target.value)}
             placeholder="Wert (€)" step="0.01" min="0"
             style={{ fontSize: '0.83rem', padding: '0.33rem 0.5rem', width: 110, border: '1px solid var(--color-border)', borderRadius: 5 }} />
+          {annuity && (
+            <input type="number" value={newMultiplikator} onChange={e => setNewMultiplikator(e.target.value)}
+              placeholder="Multiplikator" step="0.01" min="0"
+              style={{ fontSize: '0.83rem', padding: '0.33rem 0.5rem', width: 120, border: '1px solid var(--color-border)', borderRadius: 5 }} />
+          )}
           <button onClick={add} style={{ ...btn, background: 'var(--color-primary)', color: '#fff', padding: '0.3rem 0.6rem' }}>Speichern</button>
           <button onClick={() => setAdding(false)} style={{ ...btn, background: '#e5e7eb', color: '#374151', padding: '0.3rem 0.6rem' }}>Abbrechen</button>
         </div>
@@ -159,6 +202,7 @@ function ValueHistory({ history = [], onChange }) {
 const EMPTY_FORM = {
   name: '', provider: '', categoryId: '', value: '', premium: '', premiumFrequency: 'monthly',
   start: '', end: '', notes: '', comment: '', active: true,
+  renteNachTodesfall: false, nurVerrentung: false,
 }
 
 export default function InsuranceContracts() {
@@ -181,19 +225,21 @@ export default function InsuranceContracts() {
     e.preventDefault()
     const existing = contracts.find(c => c.id === editId)
     const contract = {
-      id:               editId || Date.now(),
-      name:             form.name,
-      provider:         form.provider,
-      categoryId:       form.categoryId ? parseInt(form.categoryId) : null,
-      value:            form.value !== '' ? parseFloat(form.value) : null,
-      premium:          form.premium !== '' ? parseFloat(form.premium) : 0,
-      premiumFrequency: form.premiumFrequency,
-      start:            form.start,
-      end:              form.end,
-      notes:            form.notes,
-      comment:          form.comment,
-      active:           form.active,
-      valueHistory:     existing?.valueHistory || [],
+      id:                  editId || Date.now(),
+      name:                form.name,
+      provider:            form.provider,
+      categoryId:          form.categoryId ? parseInt(form.categoryId) : null,
+      value:               form.value !== '' ? parseFloat(form.value) : null,
+      premium:             form.premium !== '' ? parseFloat(form.premium) : 0,
+      premiumFrequency:    form.premiumFrequency,
+      start:               form.start,
+      end:                 form.end,
+      notes:               form.notes,
+      comment:             form.comment,
+      active:              form.active,
+      renteNachTodesfall:  form.renteNachTodesfall,
+      nurVerrentung:       form.nurVerrentung,
+      valueHistory:        existing?.valueHistory || [],
     }
     const updated = editId
       ? contracts.map(c => c.id === editId ? contract : c)
@@ -207,17 +253,19 @@ export default function InsuranceContracts() {
 
   function startEdit(c) {
     setForm({
-      name:             c.name || '',
-      provider:         c.provider || '',
-      categoryId:       c.categoryId ? String(c.categoryId) : '',
-      value:            c.value != null ? String(c.value) : '',
-      premium:          c.premium ? String(c.premium) : '',
-      premiumFrequency: c.premiumFrequency || 'monthly',
-      start:            c.start || '',
-      end:              c.end || '',
-      notes:            c.notes || '',
-      comment:          c.comment || '',
-      active:           c.active !== false,
+      name:                c.name || '',
+      provider:            c.provider || '',
+      categoryId:          c.categoryId ? String(c.categoryId) : '',
+      value:               c.value != null ? String(c.value) : '',
+      premium:             c.premium ? String(c.premium) : '',
+      premiumFrequency:    c.premiumFrequency || 'monthly',
+      start:               c.start || '',
+      end:                 c.end || '',
+      notes:               c.notes || '',
+      comment:             c.comment || '',
+      active:              c.active !== false,
+      renteNachTodesfall:  c.renteNachTodesfall || false,
+      nurVerrentung:       c.nurVerrentung || false,
     })
     setEditId(c.id)
     setShowForm(true)
@@ -256,7 +304,10 @@ export default function InsuranceContracts() {
 
   const getDisplayValue = (c) => latestHistoryValue(c.valueHistory, c.value)
 
-  const totalValue = contracts.reduce((s, c) => s + (getDisplayValue(c) || 0), 0)
+  // "Nur Verrentung" contracts are not counted as assets
+  const totalValue = contracts
+    .filter(c => !c.nurVerrentung)
+    .reduce((s, c) => s + (getDisplayValue(c) || 0), 0)
 
   const inputStyle = { fontSize: '0.85rem', padding: '0.35rem 0.5rem' }
   const labelStyle = { fontSize: '0.78rem', color: 'var(--color-text-muted)', marginBottom: '0.2rem', display: 'block' }
@@ -283,6 +334,11 @@ export default function InsuranceContracts() {
             {contracts.map(c => {
               const displayVal = getDisplayValue(c)
               const histOpen = expandedHistory.has(c.id)
+              const latestEntry = latestHistoryEntry(c.valueHistory)
+              const jaehrlicheRente = c.nurVerrentung && latestEntry?.multiplikator
+                ? latestEntry.value / latestEntry.multiplikator
+                : null
+              const monatlicheRente = jaehrlicheRente != null ? jaehrlicheRente / 12 : null
               return (
                 <div key={c.id} style={{
                   border: '1px solid var(--color-border)', borderRadius: 8,
@@ -299,6 +355,16 @@ export default function InsuranceContracts() {
                       background: c.active !== false ? '#16a34a' : '#9ca3af',
                     }} />
                     <span style={{ fontWeight: 600, fontSize: '0.9rem', flex: 1 }}>{c.name}</span>
+                    {c.nurVerrentung && (
+                      <span style={{ fontSize: '0.68rem', color: '#7c3aed', background: '#ede9fe', borderRadius: 4, padding: '0.1rem 0.4rem', fontWeight: 600 }}>
+                        Nur Verrentung
+                      </span>
+                    )}
+                    {c.renteNachTodesfall && (
+                      <span style={{ fontSize: '0.68rem', color: '#b45309', background: '#fef3c7', borderRadius: 4, padding: '0.1rem 0.4rem', fontWeight: 600 }}>
+                        Rente nach Todesfall
+                      </span>
+                    )}
                     {c.categoryId && (() => {
                       const cat = allCategories.find(x => x.id === c.categoryId)
                       return cat ? <span style={{ fontSize: '0.72rem', color: '#0369a1', background: '#e0f2fe', borderRadius: 4, padding: '0.1rem 0.4rem' }}>{cat.name}</span> : null
@@ -319,7 +385,9 @@ export default function InsuranceContracts() {
                     {/* Wert */}
                     {displayVal != null && (
                       <div style={{ padding: '0.4rem 0.75rem', borderRight: '1px solid var(--color-border)' }}>
-                        <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>Wert</div>
+                        <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>
+                          Wert{c.nurVerrentung ? ' (kein Vermögenswert)' : ''}
+                        </div>
                         <div style={{ fontWeight: 600 }}>{fmt(displayVal)}</div>
                         {c.valueHistory?.length > 0 && (
                           <div style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)' }}>
@@ -327,6 +395,23 @@ export default function InsuranceContracts() {
                           </div>
                         )}
                       </div>
+                    )}
+                    {/* Annuity values (only for Nur Verrentung) */}
+                    {c.nurVerrentung && jaehrlicheRente != null && (
+                      <>
+                        <div style={{ padding: '0.4rem 0.75rem', borderRight: '1px solid var(--color-border)' }}>
+                          <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>Multiplikator</div>
+                          <div style={{ fontWeight: 600 }}>{latestEntry.multiplikator.toLocaleString('de-DE')}</div>
+                        </div>
+                        <div style={{ padding: '0.4rem 0.75rem', borderRight: '1px solid var(--color-border)' }}>
+                          <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>Jährliche Rente</div>
+                          <div style={{ fontWeight: 600, color: '#16a34a' }}>{fmt(jaehrlicheRente)}</div>
+                        </div>
+                        <div style={{ padding: '0.4rem 0.75rem', borderRight: '1px solid var(--color-border)' }}>
+                          <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>Monatliche Rente</div>
+                          <div style={{ fontWeight: 600, color: '#16a34a' }}>{fmt(monatlicheRente)}</div>
+                        </div>
+                      </>
                     )}
                     {/* Beitrag */}
                     {c.premium > 0 && (
@@ -377,6 +462,7 @@ export default function InsuranceContracts() {
                     <ValueHistory
                       history={c.valueHistory || []}
                       onChange={h => updateHistory(c.id, h)}
+                      annuity={c.nurVerrentung || false}
                     />
                   )}
                 </div>
@@ -431,6 +517,31 @@ export default function InsuranceContracts() {
                 <span>Aktiv (erzeugt Dauerauftrag)</span>
               </label>
             </div>
+          </div>
+
+          {/* Insurance flags */}
+          <div style={{ border: '1px solid var(--color-border)', borderRadius: 6, padding: '0.65rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+            <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '0.2rem' }}>
+              Besondere Merkmale
+            </div>
+            <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}>
+              <input type="checkbox" {...check('renteNachTodesfall')} />
+              <span>Rente nach Todesfall</span>
+            </label>
+            <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}>
+              <input type="checkbox" {...check('nurVerrentung')} />
+              <span>Nur Verrentung</span>
+              {form.nurVerrentung && (
+                <span style={{ fontSize: '0.72rem', color: '#7c3aed', background: '#ede9fe', borderRadius: 4, padding: '0.1rem 0.35rem' }}>
+                  kein Vermögenswert
+                </span>
+              )}
+            </label>
+            {form.nurVerrentung && (
+              <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '0.1rem', paddingLeft: '1.2rem' }}>
+                Zeitwerte je Stichtag mit Multiplikator eingeben → Jährliche &amp; Monatliche Rente werden berechnet
+              </div>
+            )}
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>

@@ -89,7 +89,7 @@ export default function WealthChart() {
     return [...history].sort((a, b) => b.date.localeCompare(a.date))[0].value
   }
 
-  const totalInsurance  = insurance.reduce((s, c) => s + latestHistVal(c.valueHistory, c.value), 0)
+  const totalInsurance  = insurance.filter(c => !c.nurVerrentung).reduce((s, c) => s + latestHistVal(c.valueHistory, c.value), 0)
   const totalRealEstate = realEstate.reduce((s, p) => s + latestHistVal(p.currentHistory, p.current), 0)
   const totalShares     = shares.reduce((s, sh) => s + latestHistVal(sh.valueHistory, sh.value), 0)
 
