@@ -251,7 +251,7 @@ export default function Dashboard({ onNavigate }) {
     return c.value || 0
   }
   const totalInsurance = insurance
-    .filter(c => c.verrentungTyp !== 'nurVerrentung' && !c.nurVerrentung)
+    .filter(c => c.verrentungTyp !== 'nurVerrentung' && !c.nurVerrentung && c.verrentungTyp !== 'nichtRelevant')
     .reduce((s, c) => s + latestInsuranceVal(c), 0)
 
   // ── Gesamtvermögen ──
@@ -262,7 +262,7 @@ export default function Dashboard({ onNavigate }) {
     ...accounts.map(a => ({ key: `bank_${a.id}`, name: a.name, type: 'Bankkonto', value: a.balance })),
     ...depotData.map(({ depot, totalValue }) => ({ key: `depot_${depot.id}`, name: depot.name, type: 'Depot', value: totalValue })),
     ...insurance
-      .filter(c => c.verrentungTyp !== 'nurVerrentung' && !c.nurVerrentung)
+      .filter(c => c.verrentungTyp !== 'nurVerrentung' && !c.nurVerrentung && c.verrentungTyp !== 'nichtRelevant')
       .map(c => ({ key: `insurance_${c.id}`, name: c.name || c.company || '–', type: 'Versicherung', value: latestInsuranceVal(c) })),
     ...realEstate.map(p => ({ key: `realestate_${p.id}`, name: p.name, type: 'Immobilie', value: p.current || 0 })),
     ...shares.map(s => ({ key: `shares_${s.id}`, name: s.company, type: 'Beteiligung', value: s.value || 0 })),
@@ -557,15 +557,79 @@ export default function Dashboard({ onNavigate }) {
       {/* ── Versicherungen ── */}
       {insurance.length > 0 && (
         <Section title="Versicherungen">
-          {insurance.map(c => (
-            <MiniRow
-              key={c.id}
-              label={c.name || c.company || '–'}
-              value={fmt(c.value || 0)}
-            />
-          ))}
-          {insurance.length > 1 && (
-            <MiniRow label="Gesamt" value={fmt(totalInsurance)} muted />
+          {/* Alle relevanten Verträge */}
+          {insurance.filter(c => c.verrentungTyp !== 'nichtRelevant').map(c => {
+            const isNurV = c.verrentungTyp === 'nurVerrentung' || (!!c.nurVerrentung && !c.verrentungTyp)
+            const latestH = c.valueHistory?.length
+              ? [...c.valueHistory].sort((a, b) => b.date.localeCompare(a.date))[0]
+              : null
+            const jaehrl = latestH?.multiplikator && latestH?.garantierteJaehrlicheRente
+              ? (latestH.value / latestH.multiplikator) * latestH.garantierteJaehrlicheRente
+              : null
+            const label = c.person ? `${c.name || c.company || '–'} (${c.person})` : (c.name || c.company || '–')
+            const hint = jaehrl != null
+              ? `Rente: ${fmt(jaehrl)}/J · ${fmt(jaehrl / 12)}/M`
+              : isNurV ? 'Nur Verrentung' : null
+            return (
+              <MiniRow
+                key={c.id}
+                label={label}
+                value={isNurV ? (jaehrl != null ? fmt(jaehrl) : '–') : fmt(latestInsuranceVal(c))}
+                hint={hint}
+                muted={isNurV}
+              />
+            )
+          })}
+
+          {/* Renten-Zusammenfassung je Person */}
+          {(() => {
+            function calcJaehrl(c) {
+              const h = c.valueHistory?.length
+                ? [...c.valueHistory].sort((a, b) => b.date.localeCompare(a.date))[0]
+                : null
+              if (!h?.multiplikator || !h?.garantierteJaehrlicheRente) return 0
+              return (h.value / h.multiplikator) * h.garantierteJaehrlicheRente
+            }
+            const annuities = insurance.filter(c =>
+              c.verrentungTyp !== 'nichtRelevant' &&
+              (c.verrentungTyp === 'verrentung' || c.verrentungTyp === 'nurVerrentung' || (!!c.nurVerrentung && !c.verrentungTyp))
+            )
+            if (annuities.length === 0) return null
+            const personData = ['Karin', 'Jürgen']
+              .map(p => ({ person: p, jaehrl: annuities.filter(c => c.person === p).reduce((s, c) => s + calcJaehrl(c), 0) }))
+              .filter(p => p.jaehrl > 0)
+            const totalRente = personData.reduce((s, p) => s + p.jaehrl, 0)
+            if (totalRente === 0) return null
+            return (
+              <div style={{ borderTop: '1px solid var(--color-border)', marginTop: '0.2rem', paddingTop: '0.2rem' }}>
+                <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.04em', padding: '0.2rem 0' }}>
+                  Renten je Person
+                </div>
+                {personData.map(p => (
+                  <MiniRow key={p.person} label={p.person} value={fmt(p.jaehrl)} hint={`${fmt(p.jaehrl / 12)}/Monat`} />
+                ))}
+                {personData.length > 1 && (
+                  <MiniRow label="Rente gesamt" value={fmt(totalRente)} hint={`${fmt(totalRente / 12)}/Monat`} muted />
+                )}
+              </div>
+            )
+          })()}
+
+          {/* Gesamt-Vermögenswert (ohne nurVerrentung und nichtRelevant) */}
+          {insurance.filter(c => c.verrentungTyp !== 'nurVerrentung' && !c.nurVerrentung && c.verrentungTyp !== 'nichtRelevant').length > 1 && (
+            <MiniRow label="Gesamt Vermögenswert" value={fmt(totalInsurance)} muted />
+          )}
+
+          {/* Nicht relevant – am Ende, kein Vermögenswert */}
+          {insurance.some(c => c.verrentungTyp === 'nichtRelevant') && (
+            <div style={{ borderTop: '1px dashed var(--color-border)', marginTop: '0.3rem', paddingTop: '0.3rem' }}>
+              <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', padding: '0.2rem 0' }}>
+                Nicht relevant
+              </div>
+              {insurance.filter(c => c.verrentungTyp === 'nichtRelevant').map(c => (
+                <MiniRow key={c.id} label={c.name || c.company || '–'} value="–" muted />
+              ))}
+            </div>
           )}
         </Section>
       )}
