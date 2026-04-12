@@ -107,10 +107,14 @@ function isNurVerrentung(c)  { return c.verrentungTyp === 'nurVerrentung' || (!!
 function isAnnuity(c)        { return c.verrentungTyp === 'verrentung' || isNurVerrentung(c) }
 function isNichtRelevant(c)  { return c.verrentungTyp === 'nichtRelevant' }
 
-const PERSON_COLORS = {
-  Karin:   { border: '#f43f5e', badgeBg: '#ffe4e6', badgeColor: '#be123c' },
-  Jürgen:  { border: '#3b82f6', badgeBg: '#dbeafe', badgeColor: '#1d4ed8' },
-}
+const PERSON_COLOR_PALETTE = [
+  { border: '#f43f5e', badgeBg: '#ffe4e6', badgeColor: '#be123c' },
+  { border: '#3b82f6', badgeBg: '#dbeafe', badgeColor: '#1d4ed8' },
+  { border: '#16a34a', badgeBg: '#dcfce7', badgeColor: '#15803d' },
+  { border: '#d97706', badgeBg: '#fef3c7', badgeColor: '#b45309' },
+  { border: '#7c3aed', badgeBg: '#ede9fe', badgeColor: '#6d28d9' },
+  { border: '#0891b2', badgeBg: '#cffafe', badgeColor: '#0369a1' },
+]
 
 function ValueHistory({ history = [], onChange, annuity = false }) {
   const [adding, setAdding] = useState(false)
@@ -297,7 +301,7 @@ function ValueHistory({ history = [], onChange, annuity = false }) {
 // ─── Main component ────────────────────────────────────────────────────────────
 
 const EMPTY_FORM = {
-  name: '', provider: '', categoryId: '', value: '', premium: '', premiumFrequency: 'monthly',
+  name: '', provider: '', vertragsnummer: '', categoryId: '', value: '', premium: '', premiumFrequency: 'monthly',
   start: '', end: '', notes: '', comment: '', active: true,
   renteNachTodesfall: false, verrentungTyp: '', person: '',
   annuityDate: '', multiplikator: '', garantierteJaehrlicheRente: '',
@@ -308,15 +312,24 @@ export default function InsuranceContracts() {
   const [contracts, setContracts] = useLocalStorage('insuranceContracts', [])
   const [allCategories] = useLocalStorage('categories', [])
   const expenseCategories = allCategories.filter(c => c.type === 'Ausgabe')
+  const [persons, setPersons] = useLocalStorage('insurancePersons', ['Karin', 'Jürgen'])
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState(() => ({ ...EMPTY_FORM, annuityDate: todayIso() }))
   const [editId, setEditId] = useState(null)
   const [expandedHistory, setExpandedHistory] = useState(new Set())
+  const [showAddPerson, setShowAddPerson] = useState(false)
+  const [newPersonInput, setNewPersonInput] = useState('')
 
   const [filterPerson, setFilterPerson] = useState('')
   const [filterProvider, setFilterProvider] = useState('')
   const [filterCategory, setFilterCategory] = useState('')
   const [groupBy, setGroupBy] = useState('none')
+
+  function getPersonColor(personName) {
+    const idx = persons.indexOf(personName)
+    if (idx < 0) return null
+    return PERSON_COLOR_PALETTE[idx % PERSON_COLOR_PALETTE.length]
+  }
 
   function field(key) {
     return { value: form[key], onChange: e => setForm(f => ({ ...f, [key]: e.target.value })) }
@@ -345,6 +358,7 @@ export default function InsuranceContracts() {
       id:                  editId || Date.now(),
       name:                form.name,
       provider:            form.provider,
+      vertragsnummer:      form.vertragsnummer,
       categoryId:          form.categoryId ? parseInt(form.categoryId) : null,
       value:               form.value !== '' ? parseFloat(form.value) : null,
       premium:             form.premium !== '' ? parseFloat(form.premium) : 0,
@@ -376,6 +390,7 @@ export default function InsuranceContracts() {
     setForm({
       name:                c.name || '',
       provider:            c.provider || '',
+      vertragsnummer:      c.vertragsnummer || '',
       categoryId:          c.categoryId ? String(c.categoryId) : '',
       value:               latestE ? String(latestE.value) : (c.value != null ? String(c.value) : ''),
       premium:             c.premium ? String(c.premium) : '',
@@ -493,7 +508,7 @@ export default function InsuranceContracts() {
             {editId ? 'Vertrag bearbeiten' : 'Neuer Vertrag'}
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.6rem' }}>
             <div>
               <label style={labelStyle}>Vertragsname *</label>
               <input {...field('name')} placeholder="z. B. Haftpflicht" required style={{ ...inputStyle, width: '100%' }} />
@@ -501,6 +516,10 @@ export default function InsuranceContracts() {
             <div>
               <label style={labelStyle}>Anbieter</label>
               <input {...field('provider')} placeholder="z. B. Allianz" style={{ ...inputStyle, width: '100%' }} />
+            </div>
+            <div>
+              <label style={labelStyle}>Vertragsnummer</label>
+              <input {...field('vertragsnummer')} placeholder="z. B. VN-123456" style={{ ...inputStyle, width: '100%' }} />
             </div>
           </div>
 
@@ -526,11 +545,25 @@ export default function InsuranceContracts() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
             <div>
               <label style={labelStyle}>Person</label>
-              <select value={form.person} onChange={e => setForm(f => ({ ...f, person: e.target.value }))} style={{ ...inputStyle, width: '100%' }}>
-                <option value="">– keine –</option>
-                <option value="Karin">Karin</option>
-                <option value="Jürgen">Jürgen</option>
-              </select>
+              <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
+                <select value={form.person} onChange={e => setForm(f => ({ ...f, person: e.target.value }))} style={{ ...inputStyle, flex: 1 }}>
+                  <option value="">– keine –</option>
+                  {persons.map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
+                <button type="button" onClick={() => setShowAddPerson(v => !v)} title="Person hinzufügen"
+                  style={{ padding: '0.35rem 0.55rem', fontSize: '0.85rem', border: '1px solid var(--color-border)', borderRadius: 5, cursor: 'pointer', background: showAddPerson ? 'var(--color-primary)' : 'var(--color-surface)', color: showAddPerson ? '#fff' : 'inherit', lineHeight: 1 }}>+</button>
+              </div>
+              {showAddPerson && (
+                <div style={{ display: 'flex', gap: '0.3rem', marginTop: '0.35rem' }}>
+                  <input type="text" value={newPersonInput} onChange={e => setNewPersonInput(e.target.value)}
+                    placeholder="Neuer Name…" style={{ ...inputStyle, flex: 1 }}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); if (newPersonInput.trim() && !persons.includes(newPersonInput.trim())) { const n = newPersonInput.trim(); setPersons([...persons, n]); setForm(f => ({ ...f, person: n })) } setNewPersonInput(''); setShowAddPerson(false) }}} />
+                  <button type="button" onClick={() => { if (newPersonInput.trim() && !persons.includes(newPersonInput.trim())) { const n = newPersonInput.trim(); setPersons([...persons, n]); setForm(f => ({ ...f, person: n })) } setNewPersonInput(''); setShowAddPerson(false) }}
+                    style={{ padding: '0.35rem 0.55rem', fontSize: '0.8rem', border: 'none', borderRadius: 5, cursor: 'pointer', background: 'var(--color-primary)', color: '#fff' }}>OK</button>
+                  <button type="button" onClick={() => { setNewPersonInput(''); setShowAddPerson(false) }}
+                    style={{ padding: '0.35rem 0.55rem', fontSize: '0.8rem', border: '1px solid var(--color-border)', borderRadius: 5, cursor: 'pointer' }}>✕</button>
+                </div>
+              )}
             </div>
             <div>
               <label style={labelStyle}>Verrentung / Relevanz</label>
@@ -660,8 +693,7 @@ export default function InsuranceContracts() {
         <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'center', marginBottom: '0.75rem' }}>
           <select value={filterPerson} onChange={e => setFilterPerson(e.target.value)} style={{ fontSize: '0.78rem', padding: '0.22rem 0.4rem', border: '1px solid var(--color-border)', borderRadius: 5 }}>
             <option value="">Alle Personen</option>
-            <option value="Karin">Karin</option>
-            <option value="Jürgen">Jürgen</option>
+            {persons.map(p => <option key={p} value={p}>{p}</option>)}
           </select>
           <select value={filterProvider} onChange={e => setFilterProvider(e.target.value)} style={{ fontSize: '0.78rem', padding: '0.22rem 0.4rem', border: '1px solid var(--color-border)', borderRadius: 5 }}>
             <option value="">Alle Anbieter</option>
@@ -715,7 +747,7 @@ export default function InsuranceContracts() {
                 ? (latestEntry.value / latestEntry.multiplikator) * latestEntry.garantierteJaehrlicheRente
                 : null
               const monatlicheRente = jaehrlicheRente != null ? jaehrlicheRente / 12 : null
-              const personColor = PERSON_COLORS[c.person]
+              const personColor = getPersonColor(c.person)
               return (
                 <div key={c.id} style={{
                   border: '1px solid var(--color-border)', borderRadius: 8,
@@ -768,6 +800,13 @@ export default function InsuranceContracts() {
                       <div style={{ padding: '0.4rem 0.75rem', borderRight: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 100 }}>
                         <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>Anbieter</div>
                         <div style={{ fontWeight: 700, color: 'var(--color-primary)', fontSize: '0.85rem' }}>{c.provider}</div>
+                      </div>
+                    )}
+                    {/* Vertragsnummer */}
+                    {c.vertragsnummer && (
+                      <div style={{ padding: '0.4rem 0.75rem', borderRight: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                        <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>Vertragsnr.</div>
+                        <div style={{ fontFamily: 'monospace', fontSize: '0.82rem' }}>{c.vertragsnummer}</div>
                       </div>
                     )}
                     {/* Wert */}
