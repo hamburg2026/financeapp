@@ -62,6 +62,12 @@ function DateInputSmall({ value, onChange }) {
   )
 }
 
+function latestBalance(account) {
+  const h = account.balanceHistory
+  if (h?.length) return [...h].sort((a, b) => b.date.localeCompare(a.date))[0].value
+  return account.balance
+}
+
 function BalanceHistory({ history = [], onChange }) {
   const [adding, setAdding] = useState(false)
   const [newDate, setNewDate] = useState(todayIso())
@@ -175,7 +181,7 @@ export default function BankAccounts() {
   function startEditAcc(a) {
     setEditAccId(a.id)
     setEditAccName(a.name)
-    setEditAccBalance(String(a.balance))
+    setEditAccBalance(String(latestBalance(a)))
   }
 
   function saveEditAcc() {
@@ -341,8 +347,8 @@ export default function BankAccounts() {
                       <>
                         <tr key={a.id} style={{ borderBottom: histOpen ? 'none' : undefined }}>
                           <td style={cell}>{a.name}</td>
-                          <td style={{ ...cell, fontWeight: 600, color: a.balance >= 0 ? '#16a34a' : '#dc2626' }}>
-                            {fmt(a.balance)}
+                          <td style={{ ...cell, fontWeight: 600, color: latestBalance(a) >= 0 ? '#16a34a' : '#dc2626' }}>
+                            {fmt(latestBalance(a))}
                             {a.balanceHistory?.length > 0 && (
                               <span style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)', marginLeft: 4 }}>({a.balanceHistory.length})</span>
                             )}
