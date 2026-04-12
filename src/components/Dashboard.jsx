@@ -53,6 +53,14 @@ async function deriveKey(password, salt) {
 function toBase64(buf) { return btoa(String.fromCharCode(...new Uint8Array(buf))) }
 function fromBase64(str) { return Uint8Array.from(atob(str), c => c.charCodeAt(0)) }
 
+// Returns BACKUP_SECTIONS indices where at least one key is present in data
+function getAvailableSectionIndices(data) {
+  return BACKUP_SECTIONS.reduce((acc, sec, i) => {
+    if (sec.keys.some(k => k in data)) acc.push(i)
+    return acc
+  }, [])
+}
+
 async function exportBackup(password, keysToExport = BACKUP_KEYS) {
   const data = {}
   keysToExport.forEach(key => {
@@ -169,6 +177,8 @@ export default function Dashboard({ onNavigate }) {
   const [showPassword, setShowPassword] = useState(false)
   const [showLiqConfig, setShowLiqConfig] = useState(false)
   const [selectedSections, setSelectedSections] = useState(() => new Set(BACKUP_SECTIONS.map((_, i) => i)))
+  const [restoreModal, setRestoreModal] = useState(null)
+  // restoreModal: null | { parsed, inner, restorePassword, selectedSections: Set, availableSectionIndices: number[], error }
   const [liquidityLevels, setLiquidityLevelsState] = useState(
     () => JSON.parse(localStorage.getItem('liquidityLevels')) || {}
   )
@@ -182,6 +192,53 @@ export default function Dashboard({ onNavigate }) {
     }
     localStorage.setItem('liquidityLevels', JSON.stringify(next))
     setLiquidityLevelsState(next)
+  }
+
+  async function openRestoreModal(file) {
+    const text = await file.text()
+    try {
+      const parsed = JSON.parse(text)
+      if (parsed.encrypted) {
+        setRestoreModal({ parsed, inner: null, restorePassword: '', selectedSections: new Set(), availableSectionIndices: [], error: null })
+      } else {
+        const inner = parsed
+        const data = inner.data && typeof inner.data === 'object' ? inner.data : inner
+        const available = getAvailableSectionIndices(data)
+        setRestoreModal({ parsed, inner, restorePassword: '', selectedSections: new Set(available), availableSectionIndices: available, error: null })
+      }
+    } catch {
+      alert('Sicherungsdatei konnte nicht gelesen werden.')
+    }
+  }
+
+  async function decryptRestoreModal() {
+    const { parsed, restorePassword } = restoreModal
+    try {
+      const salt = fromBase64(parsed.salt)
+      const iv   = fromBase64(parsed.iv)
+      const key  = await deriveKey(restorePassword, salt)
+      const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, fromBase64(parsed.payload))
+      const inner = JSON.parse(new TextDecoder().decode(decrypted))
+      const data = inner.data && typeof inner.data === 'object' ? inner.data : inner
+      const available = getAvailableSectionIndices(data)
+      setRestoreModal(prev => ({ ...prev, inner, selectedSections: new Set(available), availableSectionIndices: available, error: null }))
+    } catch {
+      setRestoreModal(prev => ({ ...prev, error: 'Falsches Passwort oder beschädigte Datei.' }))
+    }
+  }
+
+  function performRestore() {
+    const { inner, selectedSections: sel, availableSectionIndices } = restoreModal
+    const data = inner.data && typeof inner.data === 'object' ? inner.data : inner
+    const keysToRestore = availableSectionIndices
+      .filter(secIdx => sel.has(secIdx))
+      .flatMap(secIdx => BACKUP_SECTIONS[secIdx].keys)
+    let count = 0
+    keysToRestore.forEach(key => {
+      if (key in data) { localStorage.setItem(key, JSON.stringify(data[key])); count++ }
+    })
+    if (count === 0) { alert('Keine Daten zum Wiederherstellen ausgewählt.'); return }
+    window.location.reload()
   }
 
   const accounts     = JSON.parse(localStorage.getItem('bankAccounts'))       || []
@@ -280,6 +337,122 @@ export default function Dashboard({ onNavigate }) {
 
   return (
     <div>
+      {/* ── Restore Modal ── */}
+      {restoreModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
+          <div style={{ background: 'var(--color-surface)', borderRadius: 12, padding: '1.5rem', maxWidth: 480, width: '100%', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+            <h3 style={{ margin: '0 0 1rem', fontSize: '1.1rem' }}>Sicherung wiederherstellen</h3>
+
+            {/* Export-Datum anzeigen, falls entschlüsselt */}
+            {restoreModal.inner?.exportedAt && (
+              <p style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)', margin: '0 0 0.75rem' }}>
+                Exportiert am: {new Date(restoreModal.inner.exportedAt).toLocaleString('de-DE')}
+              </p>
+            )}
+
+            {/* Verschlüsselt: Passwort-Eingabe */}
+            {restoreModal.parsed.encrypted && !restoreModal.inner && (
+              <div style={{ marginBottom: '0.75rem' }}>
+                <p style={{ fontSize: '0.85rem', margin: '0 0 0.5rem', color: 'var(--color-text-muted)' }}>
+                  Diese Datei ist verschlüsselt. Bitte Passwort eingeben:
+                </p>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <input
+                    type="password"
+                    value={restoreModal.restorePassword}
+                    onChange={e => setRestoreModal(prev => ({ ...prev, restorePassword: e.target.value }))}
+                    onKeyDown={e => { if (e.key === 'Enter') decryptRestoreModal() }}
+                    placeholder="Passwort"
+                    style={{ flex: 1, fontSize: '0.85rem', padding: '0.38rem 0.6rem' }}
+                    autoFocus
+                  />
+                  <button onClick={decryptRestoreModal} style={{ fontSize: '0.85rem', padding: '0.38rem 0.8rem' }}>
+                    Entschlüsseln
+                  </button>
+                </div>
+                {restoreModal.error && (
+                  <p style={{ color: '#dc2626', fontSize: '0.82rem', margin: '0.4rem 0 0' }}>{restoreModal.error}</p>
+                )}
+              </div>
+            )}
+
+            {/* Bereichs-Auswahl nach erfolgreichem Lesen */}
+            {restoreModal.inner && restoreModal.availableSectionIndices.length > 0 && (
+              <div style={{ marginBottom: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                  <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Bereiche wiederherstellen
+                  </span>
+                  <div style={{ display: 'flex', gap: '0.4rem' }}>
+                    <button
+                      onClick={() => setRestoreModal(prev => ({ ...prev, selectedSections: new Set(prev.availableSectionIndices) }))}
+                      style={{ fontSize: '0.75rem', padding: '0.18rem 0.5rem', background: 'transparent', border: '1px solid var(--color-primary)', color: 'var(--color-primary)', borderRadius: 5, cursor: 'pointer' }}
+                    >Alle</button>
+                    <button
+                      onClick={() => setRestoreModal(prev => ({ ...prev, selectedSections: new Set() }))}
+                      style={{ fontSize: '0.75rem', padding: '0.18rem 0.5rem', background: 'transparent', border: '1px solid var(--color-border)', color: 'var(--color-text-muted)', borderRadius: 5, cursor: 'pointer' }}
+                    >Keine</button>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
+                  {restoreModal.availableSectionIndices.map(secIdx => {
+                    const sec = BACKUP_SECTIONS[secIdx]
+                    const checked = restoreModal.selectedSections.has(secIdx)
+                    return (
+                      <label key={secIdx} style={{
+                        display: 'flex', alignItems: 'center', gap: '0.3rem',
+                        fontSize: '0.82rem', cursor: 'pointer',
+                        padding: '0.22rem 0.55rem', borderRadius: 6,
+                        border: `1px solid ${checked ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                        background: checked ? 'rgba(var(--color-primary-rgb, 37,99,235),0.07)' : 'transparent',
+                        userSelect: 'none',
+                      }}>
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => setRestoreModal(prev => {
+                            const next = new Set(prev.selectedSections)
+                            next.has(secIdx) ? next.delete(secIdx) : next.add(secIdx)
+                            return { ...prev, selectedSections: next }
+                          })}
+                          style={{ margin: 0 }}
+                        />
+                        {sec.label}
+                      </label>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {restoreModal.inner && restoreModal.availableSectionIndices.length === 0 && (
+              <p style={{ color: '#dc2626', fontSize: '0.85rem', marginBottom: '0.75rem' }}>
+                Keine bekannten Daten in der Sicherungsdatei gefunden.
+              </p>
+            )}
+
+            {/* Aktions-Buttons */}
+            <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'flex-end', marginTop: '0.25rem' }}>
+              <button
+                onClick={() => setRestoreModal(null)}
+                style={{ fontSize: '0.85rem', padding: '0.45rem 1rem', background: '#6b7280' }}
+              >
+                Abbrechen
+              </button>
+              {restoreModal.inner && (
+                <button
+                  onClick={performRestore}
+                  disabled={restoreModal.selectedSections.size === 0}
+                  style={{ fontSize: '0.85rem', padding: '0.45rem 1rem', opacity: restoreModal.selectedSections.size === 0 ? 0.5 : 1, cursor: restoreModal.selectedSections.size === 0 ? 'not-allowed' : 'pointer' }}
+                >
+                  Wiederherstellen ({restoreModal.selectedSections.size})
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Gesamtvermögen ── */}
       <div className="module" style={{ marginBottom: '1.25rem', background: 'var(--color-primary)', color: '#fff' }}>
         <div style={{ fontSize: '0.8rem', opacity: 0.75, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Gesamtvermögen</div>
@@ -528,7 +701,11 @@ export default function Dashboard({ onNavigate }) {
             type="file"
             accept=".json,application/json"
             style={{ display: 'none' }}
-            onChange={e => { if (e.target.files[0]) importBackup(e.target.files[0], backupPassword || null) }}
+            onChange={e => {
+              const file = e.target.files[0]
+              e.target.value = ''
+              if (file) openRestoreModal(file)
+            }}
           />
           <button
             onClick={() => {
