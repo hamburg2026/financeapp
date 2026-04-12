@@ -468,6 +468,8 @@ export default function PortfolioPerformance() {
   const transactions = JSON.parse(localStorage.getItem('depotTransactions')) || []
   const securities   = JSON.parse(localStorage.getItem('securities'))        || []
   const prices       = JSON.parse(localStorage.getItem('securityPrices'))    || {}
+  const allInsurance = JSON.parse(localStorage.getItem('insuranceContracts')) || []
+  const insWithHistory = allInsurance.filter(c => (c.valueHistory?.length || 0) >= 2)
 
   const [tab,        setTab]        = useState('depots')
   const [period,     setPeriod]     = useState('MAX')
@@ -477,15 +479,20 @@ export default function PortfolioPerformance() {
   // Multi-select state
   const initDepots = new Set(depots.map(d => d.id))
   const initSecs   = new Set(securities.slice(0, 3).map(s => s.id))
+  const initIns    = new Set(insWithHistory.slice(0, 5).map(c => c.id))
 
   const [selDepotIds, setSelDepotIds] = useState(initDepots)
   const [selSecIds,   setSelSecIds]   = useState(initSecs)
+  const [selInsIds,   setSelInsIds]   = useState(initIns)
 
   function toggleDepot(id, on) {
     setSelDepotIds(prev => { const next = new Set(prev); on ? next.add(id) : next.delete(id); return next })
   }
   function toggleSec(id, on) {
     setSelSecIds(prev => { const next = new Set(prev); on ? next.add(id) : next.delete(id); return next })
+  }
+  function toggleIns(id, on) {
+    setSelInsIds(prev => { const next = new Set(prev); on ? next.add(id) : next.delete(id); return next })
   }
 
   const tabSt = active => ({
@@ -549,6 +556,29 @@ export default function PortfolioPerformance() {
   const secChange = firstPt && lastPt ? lastPt.value - firstPt.value : null
   const secPct    = firstPt?.value > 0 && secChange !== null ? (secChange / firstPt.value) * 100 : null
 
+  // ── Build insurance series ─────────────────────────────────────────────────
+
+  const selInsList = insWithHistory.filter(c => selInsIds.has(c.id))
+  const rawInsSeries = selInsList.map(c => {
+    const colorIdx = insWithHistory.findIndex(x => x.id === c.id)
+    const history  = (c.valueHistory || []).slice().sort((a, b) => a.date.localeCompare(b.date))
+    return {
+      label:    c.name + (c.provider ? ` (${c.provider})` : ''),
+      colorIdx,
+      points:   history,
+    }
+  })
+
+  const insSeries = rawInsSeries.map(s => ({
+    ...s,
+    points: applyPeriod(s.points, period, customFrom, customTo),
+  })).filter(s => s.points.length >= 1)
+
+  const totalInsVal = insSeries.reduce((sum, s) => {
+    const last = s.points[s.points.length - 1]
+    return sum + (last?.value || 0)
+  }, 0)
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
@@ -556,9 +586,10 @@ export default function PortfolioPerformance() {
       <h2>Wertentwicklung</h2>
 
       {/* Main tabs */}
-      <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '1.25rem' }}>
-        <button style={tabSt(tab === 'depots')}     onClick={() => setTab('depots')}>Depots</button>
-        <button style={tabSt(tab === 'securities')} onClick={() => setTab('securities')}>Einzeltitel</button>
+      <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
+        <button style={tabSt(tab === 'depots')}      onClick={() => setTab('depots')}>Depots</button>
+        <button style={tabSt(tab === 'securities')}  onClick={() => setTab('securities')}>Einzeltitel</button>
+        <button style={tabSt(tab === 'insurance')}   onClick={() => setTab('insurance')}>Versicherungen</button>
       </div>
 
       {/* Period bar */}
@@ -605,6 +636,34 @@ export default function PortfolioPerformance() {
                     subColor={depotPct >= 0 ? '#16a34a' : '#dc2626'}
                   />
                 )}
+              </div>
+            )}
+          </>
+        )
+      )}
+
+      {/* ══ Versicherungen tab ══════════════════════════════════════════════ */}
+      {tab === 'insurance' && (
+        insWithHistory.length === 0 ? (
+          <p style={{ color: 'var(--color-text-muted)', textAlign: 'center', padding: '2rem 0' }}>
+            Keine Versicherungsverträge mit Werthistorie vorhanden. Bitte in „Versicherungen" Zeitwerte erfassen.
+          </p>
+        ) : (
+          <>
+            <MultiSelect
+              items={insWithHistory.map(c => ({ id: c.id, name: c.name + (c.provider ? ` (${c.provider})` : '') }))}
+              selected={selInsIds}
+              onToggle={toggleIns}
+              colorFn={(it) => insWithHistory.findIndex(c => c.id === it.id)}
+              label="Versicherungen auswählen"
+            />
+
+            <FancyChart series={insSeries} />
+            {insSeries.length > 0 && <Legend series={insSeries} />}
+
+            {totalInsVal > 0 && (
+              <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', marginTop: '1.25rem' }}>
+                <KpiCard label="Aktueller Gesamtwert" value={fmt(totalInsVal)} />
               </div>
             )}
           </>
