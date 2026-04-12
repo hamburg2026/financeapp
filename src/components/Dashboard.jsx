@@ -195,7 +195,12 @@ export default function Dashboard({ onNavigate }) {
   const subscriptions = JSON.parse(localStorage.getItem('subscriptions'))     || []
 
   // ── Bankkonten ──
-  const totalBank = accounts.reduce((s, a) => s + a.balance, 0)
+  function latestBankBalance(a) {
+    const h = a.balanceHistory
+    if (h?.length) return [...h].sort((x, y) => y.date.localeCompare(x.date))[0].value
+    return a.balance
+  }
+  const totalBank = accounts.reduce((s, a) => s + latestBankBalance(a), 0)
 
   // ── Depots ──
   function getCurrentPrice(secId) {
@@ -259,7 +264,7 @@ export default function Dashboard({ onNavigate }) {
 
   // ── Liquidität: alle Positionen als flache Liste ──
   const allAssetItems = [
-    ...accounts.map(a => ({ key: `bank_${a.id}`, name: a.name, type: 'Bankkonto', value: a.balance })),
+    ...accounts.map(a => ({ key: `bank_${a.id}`, name: a.name, type: 'Bankkonto', value: latestBankBalance(a) })),
     ...depotData.map(({ depot, totalValue }) => ({ key: `depot_${depot.id}`, name: depot.name, type: 'Depot', value: totalValue })),
     ...insurance
       .filter(c => c.verrentungTyp !== 'nurVerrentung' && !c.nurVerrentung && c.verrentungTyp !== 'nichtRelevant')
