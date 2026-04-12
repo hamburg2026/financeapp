@@ -262,6 +262,98 @@ tr:last-child td {
   border-bottom: none;
 }
 
+/* ── Sidebar footer ────────────────────────────── */
+.sidebar-footer {
+  padding: 0.75rem 0;
+  border-top: 1px solid rgba(255,255,255,0.15);
+  flex-shrink: 0;
+}
+
+.print-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: none;
+  border: none;
+  border-radius: 0;
+  color: rgba(255,255,255,0.8);
+  font-size: 0.9rem;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.print-btn:hover {
+  background-color: rgba(255,255,255,0.1);
+  color: #fff;
+}
+
+/* ── Print dialog ──────────────────────────────── */
+.print-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.print-dialog-box {
+  background: var(--color-surface);
+  border-radius: 12px;
+  padding: 1.5rem;
+  width: min(540px, 100%);
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+/* ── Print view (only visible during print) ────── */
+.print-view {
+  display: none;
+}
+
+@media print {
+  .app-layout,
+  .print-dialog-overlay {
+    display: none !important;
+  }
+
+  .print-view {
+    display: block !important;
+  }
+
+  @page {
+    margin: 1.5cm 1.5cm 2cm;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .sidebar-footer {
+    border-top: none;
+    border-left: 1px solid rgba(255,255,255,0.15);
+    padding: 0;
+  }
+
+  .print-btn {
+    flex-direction: column;
+    gap: 0.2rem;
+    padding: 0.6rem 0.8rem;
+    font-size: 0.7rem;
+    min-width: 72px;
+  }
+}
+
 /* ── Dashboard grid ────────────────────────────── */
 .dashboard-grid {
   display: grid;

@@ -13,6 +13,7 @@ import ExpenseTree from './components/ExpenseTree'
 import WealthChart from './components/WealthChart'
 import ExpenseChart from './components/ExpenseChart'
 import PortfolioPerformance from './components/PortfolioPerformance'
+import PrintDialog from './components/PrintDialog'
 
 const NAV_ITEMS = [
   { id: 'dashboard',          label: 'Dashboard',           icon: '📊', component: Dashboard },
@@ -32,36 +33,47 @@ const NAV_ITEMS = [
 
 export default function App() {
   const [currentView, setCurrentView] = useState('dashboard')
+  const [showPrint, setShowPrint] = useState(false)
   const current = NAV_ITEMS.find(item => item.id === currentView)
   const CurrentComponent = current.component
 
   return (
-    <div className="app-layout">
-      <aside className="sidebar">
-        <div className="sidebar-header">
-          <h1 className="sidebar-title">Finanzverwaltung</h1>
-          <p className="sidebar-subtitle">Persönliche Finanzen</p>
-        </div>
-        <nav className="sidebar-nav">
-          {NAV_ITEMS.map(item => (
-            <button
-              key={item.id}
-              className={`nav-item${currentView === item.id ? ' active' : ''}`}
-              onClick={() => setCurrentView(item.id)}
-              aria-current={currentView === item.id ? 'page' : undefined}
-            >
-              <span className="nav-icon">{item.icon}</span>
-              {item.label}
+    <>
+      <div className="app-layout">
+        <aside className="sidebar">
+          <div className="sidebar-header">
+            <h1 className="sidebar-title">Finanzverwaltung</h1>
+            <p className="sidebar-subtitle">Persönliche Finanzen</p>
+          </div>
+          <nav className="sidebar-nav">
+            {NAV_ITEMS.map(item => (
+              <button
+                key={item.id}
+                className={`nav-item${currentView === item.id ? ' active' : ''}`}
+                onClick={() => setCurrentView(item.id)}
+                aria-current={currentView === item.id ? 'page' : undefined}
+              >
+                <span className="nav-icon">{item.icon}</span>
+                {item.label}
+              </button>
+            ))}
+          </nav>
+          <div className="sidebar-footer">
+            <button className="print-btn" onClick={() => setShowPrint(true)}>
+              <span className="nav-icon">🖨</span>
+              Drucken
             </button>
-          ))}
-        </nav>
-      </aside>
+          </div>
+        </aside>
 
-      <div className="main-content">
-        <div className="content-area">
-          <CurrentComponent onNavigate={setCurrentView} />
+        <div className="main-content">
+          <div className="content-area">
+            <CurrentComponent onNavigate={setCurrentView} />
+          </div>
         </div>
       </div>
-    </div>
+
+      {showPrint && <PrintDialog onClose={() => setShowPrint(false)} />}
+    </>
   )
 }
