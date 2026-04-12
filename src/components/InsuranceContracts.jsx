@@ -793,55 +793,30 @@ export default function InsuranceContracts() {
                     <button onClick={() => removeContract(c.id)} style={{ background: 'none', border: 'none', color: '#dc2626', padding: '0.15rem 0.3rem', fontSize: '0.8rem', cursor: 'pointer' }}>✕</button>
                   </div>
 
-                  {/* Detail row */}
-                  <div style={{ display: 'flex', flexWrap: 'wrap', fontSize: '0.8rem' }}>
-                    {/* Anbieter – prominent */}
-                    {c.provider && (
-                      <div style={{ padding: '0.4rem 0.75rem', borderRight: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 100 }}>
-                        <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>Anbieter</div>
-                        <div style={{ fontWeight: 700, color: 'var(--color-primary)', fontSize: '0.85rem' }}>{c.provider}</div>
-                      </div>
-                    )}
+                  {/* Detail row – fixed column widths for uniform layout */}
+                  <div style={{ display: 'flex', fontSize: '0.8rem', alignItems: 'stretch', overflow: 'hidden' }}>
+                    {/* Anbieter */}
+                    <div style={{ width: 130, minWidth: 130, padding: '0.4rem 0.75rem', borderRight: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                      <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>Anbieter</div>
+                      <div style={{ fontWeight: 700, color: 'var(--color-primary)', fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.provider || '–'}</div>
+                    </div>
                     {/* Vertragsnummer */}
-                    {c.vertragsnummer && (
-                      <div style={{ padding: '0.4rem 0.75rem', borderRight: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                        <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>Vertragsnr.</div>
-                        <div style={{ fontFamily: 'monospace', fontSize: '0.82rem' }}>{c.vertragsnummer}</div>
-                      </div>
-                    )}
+                    <div style={{ width: 140, minWidth: 140, padding: '0.4rem 0.75rem', borderRight: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                      <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>Vertragsnr.</div>
+                      <div style={{ fontFamily: 'monospace', fontSize: '0.82rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.vertragsnummer || '–'}</div>
+                    </div>
                     {/* Wert */}
-                    {displayVal != null && (
-                      <div style={{ padding: '0.4rem 0.75rem', borderRight: '1px solid var(--color-border)' }}>
-                        <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>
-                          {nurV ? 'Zeitwert' : 'Wert'}
-                        </div>
-                        <div style={{ fontWeight: 600 }}>{fmt(displayVal)}</div>
-                        {c.valueHistory?.length > 0 && (
-                          <div style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)' }}>{c.valueHistory.length} Einträge</div>
-                        )}
-                      </div>
-                    )}
-                    {/* Annuity values */}
-                    {annuity && jaehrlicheRente != null && (
-                      <>
-                        <div style={{ padding: '0.4rem 0.75rem', borderRight: '1px solid var(--color-border)' }}>
-                          <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>Gar. jährl. Rente</div>
-                          <div style={{ fontWeight: 600 }}>{fmt(latestEntry.garantierteJaehrlicheRente)}</div>
-                        </div>
-                        <div style={{ padding: '0.4rem 0.75rem', borderRight: '1px solid var(--color-border)' }}>
-                          <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>Jährl. Rente</div>
-                          <div style={{ fontWeight: 600, color: '#16a34a' }}>{fmt(jaehrlicheRente)}</div>
-                        </div>
-                        <div style={{ padding: '0.4rem 0.75rem', borderRight: '1px solid var(--color-border)' }}>
-                          <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>Monatl. Rente</div>
-                          <div style={{ fontWeight: 600, color: '#16a34a' }}>{fmt(monatlicheRente)}</div>
-                        </div>
-                      </>
-                    )}
+                    <div style={{ width: 110, minWidth: 110, padding: '0.4rem 0.75rem', borderRight: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                      <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>{nurV ? 'Zeitwert' : 'Wert'}</div>
+                      <div style={{ fontWeight: 600 }}>{displayVal != null ? fmt(displayVal) : '–'}</div>
+                      {c.valueHistory?.length > 0 && (
+                        <div style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)' }}>{c.valueHistory.length} Einträge</div>
+                      )}
+                    </div>
                     {/* Beitrag */}
-                    {c.premium > 0 && (
-                      <div style={{ padding: '0.4rem 0.75rem', borderRight: '1px solid var(--color-border)' }}>
-                        <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>Beitrag</div>
+                    <div style={{ width: 120, minWidth: 120, padding: '0.4rem 0.75rem', borderRight: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                      <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>Beitrag</div>
+                      {c.premium > 0 ? (
                         <div style={{ fontWeight: 600, color: '#dc2626' }}>
                           {fmt(c.premium)}
                           <span style={{ fontSize: '0.68rem', fontWeight: 400, color: 'var(--color-text-muted)', marginLeft: '0.25rem' }}>{FREQ_SHORT[c.premiumFrequency || 'monthly']}</span>
@@ -849,23 +824,22 @@ export default function InsuranceContracts() {
                             <span style={{ fontSize: '0.65rem', marginLeft: '0.3rem', color: '#16a34a' }}>✓ DA</span>
                           )}
                         </div>
-                      </div>
-                    )}
+                      ) : <div style={{ color: 'var(--color-text-muted)' }}>–</div>}
+                    </div>
                     {/* Laufzeit */}
-                    {(c.start || c.end) && (
-                      <div style={{ padding: '0.4rem 0.75rem', borderRight: '1px solid var(--color-border)' }}>
-                        <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>Laufzeit</div>
-                        <div style={{ whiteSpace: 'nowrap' }}>{isoToGerman(c.start) || '–'} → {isoToGerman(c.end) || '∞'}</div>
+                    <div style={{ width: 160, minWidth: 160, padding: '0.4rem 0.75rem', borderRight: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                      <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>Laufzeit</div>
+                      <div style={{ whiteSpace: 'nowrap' }}>
+                        {(c.start || c.end) ? `${isoToGerman(c.start) || '–'} → ${isoToGerman(c.end) || '∞'}` : '–'}
                       </div>
-                    )}
-                    {/* Notizen (Kommentar nur im Formular, nicht in der Übersicht) */}
-                    {c.notes && (
-                      <div style={{ padding: '0.4rem 0.75rem', flex: 1, minWidth: 120 }}>
-                        <div style={{ color: 'var(--color-text-muted)' }}>{c.notes}</div>
-                      </div>
-                    )}
+                    </div>
+                    {/* Notizen */}
+                    <div style={{ flex: 1, minWidth: 80, padding: '0.4rem 0.75rem', borderRight: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                      <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>Notizen</div>
+                      <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.notes || '–'}</div>
+                    </div>
                     {/* Werthistorie toggle */}
-                    <div style={{ padding: '0.4rem 0.75rem', display: 'flex', alignItems: 'center', marginLeft: 'auto' }}>
+                    <div style={{ padding: '0.4rem 0.75rem', display: 'flex', alignItems: 'center' }}>
                       <button
                         onClick={() => toggleHistory(c.id)}
                         style={{
