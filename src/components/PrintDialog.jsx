@@ -41,13 +41,13 @@ function isNurVerrentung(c) {
 // ─── Unified print table (no colors, compact) ─────────────────────────────────
 
 const TH = {
-  padding: '0.22rem 0.5rem',
+  padding: '0.15rem 0.35rem',
   background: '#f3f4f6',
   borderBottom: '1px solid #d1d5db',
   borderRight: '1px solid #e5e7eb',
   textAlign: 'left',
   fontWeight: 600,
-  fontSize: '0.67rem',
+  fontSize: '0.62rem',
   textTransform: 'uppercase',
   letterSpacing: '0.04em',
   color: '#4b5563',
@@ -55,19 +55,19 @@ const TH = {
 }
 
 const TD = {
-  padding: '0.22rem 0.5rem',
+  padding: '0.15rem 0.35rem',
   borderBottom: '1px solid #e5e7eb',
   borderRight: '1px solid #f3f4f6',
-  fontSize: '0.77rem',
+  fontSize: '0.72rem',
   verticalAlign: 'top',
 }
 
 const TD_LAST = { ...TD, borderRight: 'none' }
 
 function PrintTable({ headers, rows, emptyText = 'Keine Einträge vorhanden.' }) {
-  if (!rows.length) return <p style={{ fontSize: '0.78rem', color: '#6b7280', margin: '0.2rem 0 0.5rem' }}>{emptyText}</p>
+  if (!rows.length) return <p style={{ fontSize: '0.72rem', color: '#6b7280', margin: '0.15rem 0 0.4rem' }}>{emptyText}</p>
   return (
-    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.77rem', tableLayout: 'auto' }}>
+    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.72rem', tableLayout: 'auto' }}>
       <thead>
         <tr>
           {headers.map((h, i) => (
@@ -91,12 +91,12 @@ function PrintTable({ headers, rows, emptyText = 'Keine Einträge vorhanden.' })
 function SectionTitle({ icon, label }) {
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: '0.4rem',
-      borderBottom: '1.5px solid #374151', paddingBottom: '0.25rem',
-      marginTop: '1.4rem', marginBottom: '0.45rem',
+      display: 'flex', alignItems: 'center', gap: '0.3rem',
+      borderBottom: '1.5px solid #374151', paddingBottom: '0.18rem',
+      marginTop: '0.9rem', marginBottom: '0.3rem',
       pageBreakAfter: 'avoid',
     }}>
-      <h2 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700, color: '#111827' }}>{icon} {label}</h2>
+      <h2 style={{ margin: 0, fontSize: '0.82rem', fontWeight: 700, color: '#111827' }}>{icon} {label}</h2>
     </div>
   )
 }
@@ -115,18 +115,34 @@ function PrintBankAccounts({ accounts }) {
   )
 }
 
+// Column widths for insurance table (fixed layout, equal field sizes for every row)
+const INS_COLS = [
+  { label: 'Name',         width: '19%' },
+  { label: 'Anbieter',     width: '13%' },
+  { label: 'Vertrags-Nr.', width: '11%' },
+  { label: 'Prämie',       width: '8%'  },
+  { label: 'Rhythmus',     width: '9%'  },
+  { label: 'Status',       width: '6%'  },
+  { label: 'Verrentung',   width: '10%' },
+  { label: 'Personen',     width: '14%' },
+  { label: 'Kategorie',    width: '10%' },
+]
+
 function PrintInsurances({ contracts, categories }) {
-  if (!contracts.length) return <p style={{ fontSize: '0.78rem', color: '#6b7280', margin: '0.2rem 0 0.5rem' }}>Keine Versicherungen vorhanden.</p>
+  if (!contracts.length) return <p style={{ fontSize: '0.72rem', color: '#6b7280', margin: '0.15rem 0 0.4rem' }}>Keine Versicherungen vorhanden.</p>
 
   const catName = id => categories.find(c => c.id === id)?.name || '–'
   const freq = f => FREQ_LABELS[f] || f || '–'
 
   return (
-    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.77rem' }}>
+    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.72rem', tableLayout: 'fixed' }}>
+      <colgroup>
+        {INS_COLS.map((col, i) => <col key={i} style={{ width: col.width }} />)}
+      </colgroup>
       <thead>
         <tr>
-          {['Name', 'Gesellschaft', 'Versicherer', 'Vertrags-Nr.', 'Prämie', 'Rhythmus', 'Status', 'Verrentung', 'Personen', 'Kategorie'].map((h, i, arr) => (
-            <th key={i} style={{ ...TH, ...(i === arr.length - 1 ? { borderRight: 'none' } : {}) }}>{h}</th>
+          {INS_COLS.map((col, i) => (
+            <th key={i} style={{ ...TH, ...(i === INS_COLS.length - 1 ? { borderRight: 'none' } : {}) }}>{col.label}</th>
           ))}
         </tr>
       </thead>
@@ -135,14 +151,14 @@ function PrintInsurances({ contracts, categories }) {
           const annuity  = isAnnuity(c)
           const nurVer   = isNurVerrentung(c)
           const verLabel = c.verrentungTyp === 'nichtRelevant' ? 'Nein'
-                         : nurVer           ? 'Nur Verrentung'
+                         : nurVer           ? 'Nur Verr.'
                          : annuity          ? 'Ja'
                          : '–'
           const latest   = c.valueHistory?.length
             ? [...c.valueHistory].sort((a, b) => b.date.localeCompare(a.date))[0]
             : null
           const rentInfo = annuity && latest?.multiplikator && latest?.garantierteJaehrlicheRente
-            ? `${fmt((latest.value / latest.multiplikator) * latest.garantierteJaehrlicheRente)}/Jahr`
+            ? `${fmt((latest.value / latest.multiplikator) * latest.garantierteJaehrlicheRente)}/J.`
             : null
           const personStr = c.persons?.length
             ? c.persons.map(p => p.name + (p.role ? ` (${p.role})` : '')).join(', ')
@@ -150,16 +166,15 @@ function PrintInsurances({ contracts, categories }) {
 
           return (
             <tr key={c.id} style={{ background: ri % 2 === 0 ? '#fff' : '#f9fafb' }}>
-              <td style={{ ...TD, fontWeight: 600 }}>{c.name}</td>
-              <td style={TD}>{c.company  || '–'}</td>
-              <td style={TD}>{c.provider || '–'}</td>
-              <td style={{ ...TD, fontFamily: 'monospace', fontSize: '0.72rem' }}>{c.contractNumber || '–'}</td>
+              <td style={{ ...TD, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</td>
+              <td style={{ ...TD, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.provider || '–'}</td>
+              <td style={{ ...TD, fontFamily: 'monospace', fontSize: '0.68rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.vertragsnummer || '–'}</td>
               <td style={{ ...TD, whiteSpace: 'nowrap' }}>{c.premium > 0 ? fmt(c.premium) : '–'}</td>
               <td style={TD}>{c.premium > 0 ? freq(c.premiumFrequency) : '–'}</td>
               <td style={TD}>{c.active ? 'Aktiv' : 'Inaktiv'}</td>
               <td style={TD}>{rentInfo ? `${verLabel} · ${rentInfo}` : verLabel}</td>
-              <td style={TD}>{personStr}</td>
-              <td style={TD_LAST}>{catName(c.categoryId)}</td>
+              <td style={{ ...TD, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{personStr}</td>
+              <td style={{ ...TD_LAST, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{catName(c.categoryId)}</td>
             </tr>
           )
         })}
@@ -168,17 +183,51 @@ function PrintInsurances({ contracts, categories }) {
   )
 }
 
+const INCOME_TX = new Set(['dividend', 'interest'])
+
 function PrintSecurities({ securities, prices, depots, depotTransactions }) {
   const hasSecurities = securities.length > 0
   const hasDepots     = depots.length > 0
 
-  if (!hasSecurities && !hasDepots) return <p style={{ fontSize: '0.78rem', color: '#6b7280', margin: '0.2rem 0 0.5rem' }}>Keine Wertpapiere oder Depots vorhanden.</p>
+  if (!hasSecurities && !hasDepots) return <p style={{ fontSize: '0.72rem', color: '#6b7280', margin: '0.15rem 0 0.4rem' }}>Keine Wertpapiere oder Depots vorhanden.</p>
+
+  function getLatestPrice(secId) {
+    const arr = prices[String(secId)]
+    if (!arr?.length) return 0
+    return [...arr].sort((a, b) => b.date.localeCompare(a.date))[0].value
+  }
+
+  function getPositions(depotId) {
+    const pos = {}
+    depotTransactions.filter(t => String(t.depotId) === String(depotId)).forEach(t => {
+      if (!pos[t.securityId]) pos[t.securityId] = { quantity: 0, cost: 0, income: 0 }
+      if (t.type === 'buy') {
+        pos[t.securityId].quantity += t.quantity
+        pos[t.securityId].cost    += t.quantity * t.price + (t.fees || 0)
+      } else if (t.type === 'sell') {
+        pos[t.securityId].quantity -= t.quantity
+        pos[t.securityId].cost    -= t.quantity * t.price - (t.fees || 0)
+      } else if (INCOME_TX.has(t.type)) {
+        pos[t.securityId].income  += t.price - (t.fees || 0)
+      }
+    })
+    return Object.entries(pos)
+      .filter(([, p]) => p.quantity > 0.0001 || p.income > 0)
+      .map(([secId, p]) => {
+        const sec      = securities.find(s => String(s.id) === secId)
+        const curPrice = getLatestPrice(secId)
+        const curValue = p.quantity * curPrice
+        return { secId, sec, quantity: p.quantity, curValue, cost: p.cost, income: p.income }
+      })
+  }
+
+  const subLabel = { fontSize: '0.64rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#6b7280', margin: '0.3rem 0 0.15rem' }
 
   return (
     <>
       {hasSecurities && (
         <>
-          <div style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#6b7280', margin: '0.3rem 0 0.2rem' }}>Wertpapiere</div>
+          <div style={subLabel}>Wertpapiere</div>
           <PrintTable
             headers={['Name', 'Symbol', 'ISIN', 'Typ', 'Währung', 'Letzter Kurs', 'Stand']}
             rows={securities.map(s => {
@@ -197,18 +246,32 @@ function PrintSecurities({ securities, prices, depots, depotTransactions }) {
           />
         </>
       )}
-      {hasDepots && (
-        <>
-          <div style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#6b7280', margin: '0.6rem 0 0.2rem' }}>Depots</div>
-          <PrintTable
-            headers={['Depotname', 'Anz. Transaktionen']}
-            rows={depots.map(d => [
-              d.name,
-              depotTransactions.filter(t => t.depotId === d.id).length,
-            ])}
-          />
-        </>
-      )}
+      {hasDepots && depots.map(d => {
+        const positions  = getPositions(d.id)
+        const totalValue = positions.reduce((s, p) => s + p.curValue, 0)
+        const totalIncome = positions.reduce((s, p) => s + p.income, 0)
+        return (
+          <div key={d.id}>
+            <div style={{ ...subLabel, marginTop: hasSecurities ? '0.55rem' : '0.3rem', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+              <span>Depot: {d.name}</span>
+              <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#111827' }}>
+                Bestand: {fmt(totalValue)}{totalIncome > 0 ? ` · Erträge: +${fmt(totalIncome)}` : ''}
+              </span>
+            </div>
+            <PrintTable
+              headers={['Wertpapier', 'ISIN', 'Anzahl', 'Kurs', 'Bestand']}
+              emptyText="Keine offenen Positionen."
+              rows={positions.map(p => [
+                p.sec?.name || p.secId,
+                p.sec?.isin || '–',
+                fmtNum(p.quantity, 4),
+                getLatestPrice(p.secId) > 0 ? fmt(getLatestPrice(p.secId)) : '–',
+                p.curValue > 0 ? fmt(p.curValue) : '–',
+              ])}
+            />
+          </div>
+        )
+      })}
     </>
   )
 }
@@ -409,13 +472,13 @@ export default function PrintDialog({ onClose }) {
 
       {/* ── Print view – only visible during printing ── */}
       <div className="print-view">
-        <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', color: '#111827', fontSize: '0.8rem' }}>
+        <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', color: '#111827', fontSize: '0.72rem' }}>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: '2px solid #111827', paddingBottom: '0.4rem', marginBottom: '0.3rem' }}>
-            <div style={{ fontSize: '1.1rem', fontWeight: 700 }}>Finanzverwaltung – Ausdruck</div>
-            <div style={{ fontSize: '0.72rem', color: '#6b7280' }}>Stand: {printDate}</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: '2px solid #111827', paddingBottom: '0.25rem', marginBottom: '0.2rem' }}>
+            <div style={{ fontSize: '0.95rem', fontWeight: 700 }}>Finanzverwaltung – Ausdruck</div>
+            <div style={{ fontSize: '0.65rem', color: '#6b7280' }}>Stand: {printDate}</div>
           </div>
-          <div style={{ fontSize: '0.7rem', color: '#6b7280', marginBottom: '0.5rem' }}>
+          <div style={{ fontSize: '0.63rem', color: '#6b7280', marginBottom: '0.35rem' }}>
             Enthält: {PRINT_SECTIONS.filter(s => selected[s.id]).map(s => s.label).join(' · ')}
           </div>
 
