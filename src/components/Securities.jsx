@@ -40,6 +40,28 @@ async function fetchAlphaVantagePrice(symbol, apiKey) {
   }
 }
 
+// ── Leeway – kostenloser API-Token unter leeway.tech ──
+// Symbolformat: Deutsche Aktien = "DTE.XETRA", US-Aktien = "AAPL.US", ETFs = "VWCE.XETRA"
+async function fetchLeewayPrice(symbol, apiToken) {
+  const to = new Date()
+  const from = new Date()
+  from.setDate(from.getDate() - 10)
+  const toStr = to.toISOString().slice(0, 10)
+  const fromStr = from.toISOString().slice(0, 10)
+  const url = `https://api.leeway.tech/api/v1/public/historicalquotes/${encodeURIComponent(symbol)}?apitoken=${encodeURIComponent(apiToken)}&from=${fromStr}&to=${toStr}`
+  const res = await fetch(url)
+  if (res.status === 429) throw new Error('Tageslimit überschritten. Bitte später erneut versuchen.')
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  const data = await res.json()
+  if (!Array.isArray(data) || data.length === 0) throw new Error(`Keine Kursdaten für „${symbol}" gefunden. Tipp: Symbolformat „DTE.XETRA" oder „AAPL.US"`)
+  const sorted = [...data].sort((a, b) => new Date(b.date) - new Date(a.date))
+  const latest = sorted[0]
+  return {
+    price: latest.adjusted_close ?? latest.close,
+    date:  latest.date,
+  }
+}
+
 // ── Frankfurter.app FX (kostenlos, CORS-fähig) ──
 async function fetchFrankfurterFx(pair) {
   const res = await fetch(`https://api.frankfurter.app/latest?base=${encodeURIComponent(pair)}&symbols=EUR`)
@@ -55,10 +77,16 @@ export default function Securities() {
   const [prices,       setPrices]       = useLocalStorage('securityPrices', {})
   const [fxRates,      setFxRates]      = useLocalStorage('fxRates', {})
   const [alphaKey,     setAlphaKeyState] = useState(() => localStorage.getItem('alphavantage_key') || '')
+  const [leewayKey,    setLeewayKeyState] = useState(() => localStorage.getItem('leeway_token') || '')
 
   function saveAlphaKey(val) {
     localStorage.setItem('alphavantage_key', val)
     setAlphaKeyState(val)
+  }
+
+  function saveLeewayKey(val) {
+    localStorage.setItem('leeway_token', val)
+    setLeewayKeyState(val)
   }
 
   // ── Add security form ──
@@ -122,10 +150,12 @@ export default function Securities() {
   const [editTxFees,    setEditTxFees]    = useState('')
 
   // ── API fetch state ──
-  const [fetchingPrice, setFetchingPrice] = useState({})
-  const [fetchPriceErr, setFetchPriceErr] = useState({})
-  const [fetchingFx,    setFetchingFx]    = useState({})
-  const [fetchFxErr,    setFetchFxErr]    = useState({})
+  const [fetchingPrice,  setFetchingPrice]  = useState({})
+  const [fetchPriceErr,  setFetchPriceErr]  = useState({})
+  const [fetchingLeeway, setFetchingLeeway] = useState({})
+  const [fetchLeewayErr, setFetchLeewayErr] = useState({})
+  const [fetchingFx,     setFetchingFx]     = useState({})
+  const [fetchFxErr,     setFetchFxErr]     = useState({})
 
   // ─── Security CRUD ───────────────────────────────────────────────────────────
   function addSecurity(e) {
@@ -317,6 +347,31 @@ export default function Securities() {
     }
   }
 
+  // ─── API: Security price (Leeway) ───────────────────────────────────────────
+  async function handleFetchLeewayPrice(sec) {
+    if (!sec.symbol) {
+      setFetchLeewayErr(e => ({ ...e, [sec.id]: 'Kein Ticker/Symbol hinterlegt.' }))
+      return
+    }
+    if (!leewayKey) {
+      setFetchLeewayErr(e => ({ ...e, [sec.id]: 'Bitte zuerst den Leeway API-Token hinterlegen (siehe unten).' }))
+      return
+    }
+    setFetchingLeeway(s => ({ ...s, [sec.id]: true }))
+    setFetchLeewayErr(e => ({ ...e, [sec.id]: null }))
+    try {
+      const { price, date } = await fetchLeewayPrice(sec.symbol, leewayKey)
+      const list = [...(prices[sec.id] || []), { date, value: price }]
+        .sort((a, b) => new Date(b.date) - new Date(a.date))
+      setPrices(prev => ({ ...prev, [sec.id]: list }))
+      setExpandedPrices(prev => { const n = new Set(prev); n.add(sec.id); return n })
+    } catch (err) {
+      setFetchLeewayErr(e => ({ ...e, [sec.id]: `Leeway-Fehler: ${err.message}` }))
+    } finally {
+      setFetchingLeeway(s => ({ ...s, [sec.id]: false }))
+    }
+  }
+
   // ─── FX Rates CRUD ───────────────────────────────────────────────────────────
   function addFxRate(e) {
     e.preventDefault()
@@ -472,9 +527,11 @@ export default function Securities() {
                                  .slice().sort((a, b) => new Date(b.date) - new Date(a.date))
             const isEditing  = editSecId === s.id
             const isLast     = si === securities.length - 1
-            const isFetching = fetchingPrice[s.id]
-            const fetchErr   = fetchPriceErr[s.id]
-            const isinVal    = s.isin?.trim()
+            const isFetching      = fetchingPrice[s.id]
+            const fetchErr        = fetchPriceErr[s.id]
+            const isLeewayFetching = fetchingLeeway[s.id]
+            const leewayFetchErr  = fetchLeewayErr[s.id]
+            const isinVal         = s.isin?.trim()
 
             return (
               <div key={s.id}>
@@ -531,16 +588,31 @@ export default function Securities() {
                         onClick={() => handleFetchApiPrice(s)}
                         disabled={isFetching}
                         style={{ ...btnBase, background: '#dbeafe', color: '#1d4ed8', minWidth: 72 }}
-                        title={`Kurs für ${s.symbol} von Yahoo Finance abrufen`}
+                        title={`Kurs für ${s.symbol} von Alpha Vantage abrufen`}
                       >
-                        {isFetching ? '…' : '↓ API-Kurs'}
+                        {isFetching ? '…' : '↓ Alpha Vantage'}
                       </button>
+                      {leewayKey && (
+                        <button
+                          onClick={() => handleFetchLeewayPrice(s)}
+                          disabled={isLeewayFetching}
+                          style={{ ...btnBase, background: '#ede9fe', color: '#6d28d9', minWidth: 72 }}
+                          title={`Kurs für ${s.symbol} von Leeway abrufen`}
+                        >
+                          {isLeewayFetching ? '…' : '↓ Leeway'}
+                        </button>
+                      )}
                       <button onClick={() => startEditSec(s)} style={{ ...btnBase, background: '#e5e7eb', color: '#374151' }} title="Bearbeiten">✎</button>
                       <button onClick={() => removeSecurity(s.id)} style={{ ...btnBase, background: '#fee2e2', color: '#dc2626' }} title="Löschen">✕</button>
                     </div>
                     {fetchErr && (
                       <div style={{ fontSize: '0.72rem', color: '#dc2626', padding: '0.2rem 0.75rem 0.3rem 2.2rem' }}>
                         {fetchErr}
+                      </div>
+                    )}
+                    {leewayFetchErr && (
+                      <div style={{ fontSize: '0.72rem', color: '#7c3aed', padding: '0.2rem 0.75rem 0.3rem 2.2rem' }}>
+                        {leewayFetchErr}
                       </div>
                     )}
                   </div>
@@ -680,16 +752,19 @@ export default function Securities() {
         </div>
       )}
 
-      {/* ── Alpha Vantage API-Schlüssel ── */}
+      {/* ── API-Konfiguration (Kursdaten) ── */}
       <p style={sectionHead}>API-Konfiguration (Kursdaten)</p>
-      <div style={{ background: alphaKey ? '#f0fdf4' : '#fef9c3', border: `1px solid ${alphaKey ? '#bbf7d0' : '#fde68a'}`, borderRadius: 8, padding: '0.75rem 1rem', marginBottom: '1rem', fontSize: '0.82rem' }}>
+
+      {/* Alpha Vantage */}
+      <div style={{ background: alphaKey ? '#f0fdf4' : '#fef9c3', border: `1px solid ${alphaKey ? '#bbf7d0' : '#fde68a'}`, borderRadius: 8, padding: '0.75rem 1rem', marginBottom: '0.75rem', fontSize: '0.82rem' }}>
+        <p style={{ margin: '0 0 0.4rem', fontWeight: 600, fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>Alpha Vantage</p>
         {!alphaKey && (
           <p style={{ margin: '0 0 0.5rem', color: '#92400e' }}>
-            Für automatische Kursdaten wird ein kostenloser API-Schlüssel von{' '}
+            Kostenloser API-Schlüssel unter{' '}
             <a href="https://www.alphavantage.co/support/#api-key" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-primary)' }}>
               alphavantage.co
             </a>{' '}
-            benötigt (kostenlos, kein Kreditkarte). Limit: 25 Abfragen/Tag.
+            (keine Kreditkarte). Limit: 25 Abfragen/Tag.
           </p>
         )}
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -705,6 +780,35 @@ export default function Securities() {
         {alphaKey && (
           <p style={{ margin: '0.4rem 0 0', color: '#166534', fontSize: '0.75rem' }}>
             Symbolformat: US-Aktien = <code>AAPL</code>, Deutsche Aktien = <code>SAP.FRA</code>, ETFs = <code>VWCE.FRA</code>
+          </p>
+        )}
+      </div>
+
+      {/* Leeway */}
+      <div style={{ background: leewayKey ? '#faf5ff' : '#fef9c3', border: `1px solid ${leewayKey ? '#ddd6fe' : '#fde68a'}`, borderRadius: 8, padding: '0.75rem 1rem', marginBottom: '1rem', fontSize: '0.82rem' }}>
+        <p style={{ margin: '0 0 0.4rem', fontWeight: 600, fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>Leeway</p>
+        {!leewayKey && (
+          <p style={{ margin: '0 0 0.5rem', color: '#92400e' }}>
+            Kostenloser API-Token unter{' '}
+            <a href="https://leeway.tech" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-primary)' }}>
+              leeway.tech
+            </a>{' '}
+            (keine Kreditkarte). Limit: 100.000 Abfragen/Tag.
+          </p>
+        )}
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <input
+            type="text"
+            value={leewayKey}
+            onChange={e => saveLeewayKey(e.target.value)}
+            placeholder="Leeway API-Token"
+            style={{ flex: 1, minWidth: 200, fontSize: '0.82rem', padding: '0.3rem 0.5rem', fontFamily: 'monospace' }}
+          />
+          {leewayKey && <span style={{ color: '#7c3aed', fontSize: '0.78rem', fontWeight: 600 }}>✓ Gespeichert</span>}
+        </div>
+        {leewayKey && (
+          <p style={{ margin: '0.4rem 0 0', color: '#5b21b6', fontSize: '0.75rem' }}>
+            Symbolformat: Deutsche Aktien = <code>DTE.XETRA</code>, US-Aktien = <code>AAPL.US</code>, ETFs = <code>VWCE.XETRA</code>
           </p>
         )}
       </div>
