@@ -317,6 +317,7 @@ export default function InsuranceContracts() {
   const [form, setForm] = useState(() => ({ ...EMPTY_FORM, annuityDate: todayIso() }))
   const [editId, setEditId] = useState(null)
   const [expandedHistory, setExpandedHistory] = useState(new Set())
+  const [expandedContracts, setExpandedContracts] = useState(new Set())
   const [showAddPerson, setShowAddPerson] = useState(false)
   const [newPersonInput, setNewPersonInput] = useState('')
 
@@ -425,6 +426,14 @@ export default function InsuranceContracts() {
 
   function toggleHistory(id) {
     setExpandedHistory(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  function toggleContract(id) {
+    setExpandedContracts(prev => {
       const next = new Set(prev)
       next.has(id) ? next.delete(id) : next.add(id)
       return next
@@ -740,6 +749,7 @@ export default function InsuranceContracts() {
             {items.map(c => {
               const displayVal = getDisplayValue(c)
               const histOpen = expandedHistory.has(c.id)
+              const contractOpen = expandedContracts.has(c.id)
               const latestEntry = latestHistoryEntry(c.valueHistory)
               const annuity = isAnnuity(c)
               const nurV    = isNurVerrentung(c)
@@ -789,17 +799,13 @@ export default function InsuranceContracts() {
                       const cat = allCategories.find(x => x.id === c.categoryId)
                       return cat ? <span style={{ fontSize: '0.72rem', color: '#0369a1', background: '#e0f2fe', borderRadius: 4, padding: '0.1rem 0.4rem' }}>{cat.name}</span> : null
                     })()}
+                    <button onClick={() => toggleContract(c.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.9rem', padding: '0.1rem 0.3rem', color: 'var(--color-text-muted)', lineHeight: 1 }}>{contractOpen ? '▾' : '▸'}</button>
                     <button onClick={() => startEdit(c)} style={{ background: '#e5e7eb', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: '0.75rem', padding: '0.2rem 0.45rem', color: '#374151' }}>✎</button>
                     <button onClick={() => removeContract(c.id)} style={{ background: 'none', border: 'none', color: '#dc2626', padding: '0.15rem 0.3rem', fontSize: '0.8rem', cursor: 'pointer' }}>✕</button>
                   </div>
 
-                  {/* Detail row – fixed column widths for uniform layout */}
+                  {/* Summary row – always visible: Vertragsnr., Wert, Beitrag, Laufzeit */}
                   <div style={{ display: 'flex', fontSize: '0.8rem', alignItems: 'stretch', overflow: 'hidden' }}>
-                    {/* Anbieter */}
-                    <div style={{ width: 130, minWidth: 130, padding: '0.4rem 0.75rem', borderRight: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                      <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>Anbieter</div>
-                      <div style={{ fontWeight: 700, color: 'var(--color-primary)', fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.provider || '–'}</div>
-                    </div>
                     {/* Vertragsnummer */}
                     <div style={{ width: 140, minWidth: 140, padding: '0.4rem 0.75rem', borderRight: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                       <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>Vertragsnr.</div>
@@ -827,41 +833,60 @@ export default function InsuranceContracts() {
                       ) : <div style={{ color: 'var(--color-text-muted)' }}>–</div>}
                     </div>
                     {/* Laufzeit */}
-                    <div style={{ width: 160, minWidth: 160, padding: '0.4rem 0.75rem', borderRight: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                    <div style={{ flex: 1, padding: '0.4rem 0.75rem', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                       <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>Laufzeit</div>
                       <div style={{ whiteSpace: 'nowrap' }}>
                         {(c.start || c.end) ? `${isoToGerman(c.start) || '–'} → ${isoToGerman(c.end) || '∞'}` : '–'}
                       </div>
                     </div>
-                    {/* Notizen */}
-                    <div style={{ flex: 1, minWidth: 80, padding: '0.4rem 0.75rem', borderRight: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                      <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>Notizen</div>
-                      <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.notes || '–'}</div>
-                    </div>
-                    {/* Werthistorie toggle */}
-                    <div style={{ padding: '0.4rem 0.75rem', display: 'flex', alignItems: 'center' }}>
-                      <button
-                        onClick={() => toggleHistory(c.id)}
-                        style={{
-                          background: histOpen ? 'var(--color-primary)' : '#e5e7eb',
-                          color: histOpen ? '#fff' : '#374151',
-                          border: 'none', borderRadius: 5, cursor: 'pointer',
-                          fontSize: '0.72rem', padding: '0.2rem 0.55rem',
-                          display: 'flex', alignItems: 'center', gap: '0.25rem',
-                        }}
-                      >
-                        {histOpen ? '▾' : '▸'} {annuity ? 'Zeitwerte' : 'Werthistorie'}
-                      </button>
-                    </div>
                   </div>
 
-                  {/* Value history (expandable) */}
-                  {histOpen && (
-                    <ValueHistory
-                      history={c.valueHistory || []}
-                      onChange={h => updateHistory(c.id, h)}
-                      annuity={annuity}
-                    />
+                  {/* Expanded details */}
+                  {contractOpen && (
+                    <div>
+                      {/* Details row: Anbieter, Notizen, Kommentar, Werthistorie */}
+                      <div style={{ display: 'flex', fontSize: '0.8rem', alignItems: 'stretch', overflow: 'hidden', borderTop: '1px solid var(--color-border)' }}>
+                        {/* Anbieter */}
+                        <div style={{ width: 160, minWidth: 160, padding: '0.4rem 0.75rem', borderRight: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                          <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>Anbieter</div>
+                          <div style={{ fontWeight: 700, color: 'var(--color-primary)', fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.provider || '–'}</div>
+                        </div>
+                        {/* Notizen */}
+                        <div style={{ flex: 1, minWidth: 80, padding: '0.4rem 0.75rem', borderRight: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                          <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>Notizen</div>
+                          <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.notes || '–'}</div>
+                        </div>
+                        {/* Kommentar */}
+                        <div style={{ flex: 1, minWidth: 80, padding: '0.4rem 0.75rem', borderRight: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                          <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>Kommentar</div>
+                          <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.comment || '–'}</div>
+                        </div>
+                        {/* Werthistorie toggle */}
+                        <div style={{ padding: '0.4rem 0.75rem', display: 'flex', alignItems: 'center' }}>
+                          <button
+                            onClick={() => toggleHistory(c.id)}
+                            style={{
+                              background: histOpen ? 'var(--color-primary)' : '#e5e7eb',
+                              color: histOpen ? '#fff' : '#374151',
+                              border: 'none', borderRadius: 5, cursor: 'pointer',
+                              fontSize: '0.72rem', padding: '0.2rem 0.55rem',
+                              display: 'flex', alignItems: 'center', gap: '0.25rem',
+                            }}
+                          >
+                            {histOpen ? '▾' : '▸'} {annuity ? 'Zeitwerte' : 'Werthistorie'}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Value history */}
+                      {histOpen && (
+                        <ValueHistory
+                          history={c.valueHistory || []}
+                          onChange={h => updateHistory(c.id, h)}
+                          annuity={annuity}
+                        />
+                      )}
+                    </div>
                   )}
                 </div>
               )
