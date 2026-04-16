@@ -237,13 +237,17 @@ export default function Securities() {
     const depotId = txDepotId ? parseInt(txDepotId) : depots[0]?.id
     if (!depotId) return
     const isIncome = INCOME_TX.has(txType)
+    const qty   = isIncome ? 1 : parseFloat(txQty)
+    const price = parseFloat(txPrice)
+    if (!isIncome && (isNaN(qty) || qty <= 0)) return
+    if (isNaN(price) || price < 0) return
     setDepotTransactions([...depotTransactions, {
       id:         Date.now(),
       depotId,
       securityId: secId,
       type:       txType,
-      quantity:   isIncome ? 1 : parseFloat(txQty),
-      price:      parseFloat(txPrice),
+      quantity:   qty,
+      price,
       fees:       parseFloat(txFees) || 0,
       date:       txDate,
     }])
@@ -261,13 +265,18 @@ export default function Securities() {
   }
 
   function saveEditTx() {
+    const isIncome = INCOME_TX.has(editTxType)
+    const qty   = isIncome ? 1 : parseFloat(editTxQty)
+    const price = parseFloat(editTxPrice)
+    if (!isIncome && (isNaN(qty) || qty <= 0)) return
+    if (isNaN(price) || price < 0) return
     setDepotTransactions(depotTransactions.map(t => t.id === editTxId ? {
       ...t,
       date:     editTxDate,
       depotId:  parseInt(editTxDepotId),
       type:     editTxType,
-      quantity: INCOME_TX.has(editTxType) ? 1 : parseFloat(editTxQty),
-      price:    parseFloat(editTxPrice),
+      quantity: qty,
+      price,
       fees:     parseFloat(editTxFees) || 0,
     } : t))
     setEditTxId(null)
@@ -307,7 +316,7 @@ export default function Securities() {
         pos[t.securityId].quantity -= t.quantity
         pos[t.securityId].cost    -= t.quantity * t.price - (t.fees || 0)
       } else if (INCOME_TX.has(t.type)) {
-        pos[t.securityId].income  += t.price - (t.fees || 0)
+        pos[t.securityId].income  += t.quantity * t.price - (t.fees || 0)
       }
     })
     return Object.entries(pos)
