@@ -309,14 +309,17 @@ export default function Securities() {
     const pos = {}
     depotTransactions.filter(t => String(t.depotId) === String(depotId)).forEach(t => {
       if (!pos[t.securityId]) pos[t.securityId] = { quantity: 0, cost: 0, income: 0 }
+      const qty   = t.quantity || 0
+      const price = t.price    || 0
+      const fees  = t.fees     || 0
       if (t.type === 'buy') {
-        pos[t.securityId].quantity += t.quantity
-        pos[t.securityId].cost    += t.quantity * t.price + (t.fees || 0)
+        pos[t.securityId].quantity += qty
+        pos[t.securityId].cost    += qty * price + fees
       } else if (t.type === 'sell') {
-        pos[t.securityId].quantity -= t.quantity
-        pos[t.securityId].cost    -= t.quantity * t.price - (t.fees || 0)
+        pos[t.securityId].quantity -= qty
+        pos[t.securityId].cost    -= qty * price - fees
       } else if (INCOME_TX.has(t.type)) {
-        pos[t.securityId].income  += t.quantity * t.price - (t.fees || 0)
+        pos[t.securityId].income  += qty * price - fees
       }
     })
     return Object.entries(pos)
