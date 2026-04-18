@@ -118,10 +118,29 @@ function parseTransactions(lines) {
     desc = desc.replace(AMOUNT_RE, '')
     desc = desc.replace(/\s+/g, ' ').trim().slice(0, 250)
 
-    results.push({ date, amount, description: desc || '–', recipient: '' })
+    results.push({ date, amount, description: desc || '–', recipient: suggestRecipient(blockText) })
     i++ // advance only by 1 (lines share text; block reading handles continuation)
   }
   return results
+}
+
+// ── Recipient extraction heuristic ────────────────────────────────────
+function suggestRecipient(blockText) {
+  // Labeled field: "Auftraggeber: Name" / "Zahlungsempfänger: Name" etc.
+  const labeled = blockText.match(
+    /(?:Auftraggeber|Zahlungsempfänger|Begünstigter|Empfänger)\s*[:/]\s*([^\n]+?)(?:\s{2,}|\s+(?:IBAN|BIC|Kto\.|Verwendungszweck|Mandats|Ref\.))/i
+  )
+  if (labeled) return labeled[1].trim().slice(0, 60)
+
+  // Credit card style: "VISA MERCHANTNAME CITY"
+  const visa = blockText.match(/\bVISA\s+([A-Z][A-Z0-9\s&\-.]{2,40}?)(?:\s+[A-Z]{2}\b|\s{3,}|$)/i)
+  if (visa) return visa[1].trim().slice(0, 60)
+
+  // Fallback: first Title-Case / ALLCAPS token sequence (likely a business name)
+  const caps = blockText.match(/\b([A-ZÄÖÜ][A-ZÄÖÜa-zäöüß\-&.]{2,}(?:\s+[A-ZÄÖÜ][A-ZÄÖÜa-zäöüß\-&.]{1,}){0,3})\b/)
+  if (caps && caps[1].length >= 4) return caps[1].trim().slice(0, 60)
+
+  return ''
 }
 
 // ── Auto-categorization ────────────────────────────────────────────────
