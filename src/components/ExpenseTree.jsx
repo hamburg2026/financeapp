@@ -141,7 +141,7 @@ export default function ExpenseTree() {
     for (const tx of filteredTxs) {
       const catId = tx.category ? (nameToId[tx.category] ?? null) : null
       const key = catId !== null ? catId : 'uncategorised'
-      totals[key] = (totals[key] || 0) + Math.abs(tx.amount)
+      totals[key] = (totals[key] || 0) + tx.amount
     }
     return totals
   }, [filteredTxs, nameToId])
@@ -236,12 +236,12 @@ export default function ExpenseTree() {
     const nodes = categories
       .filter(c => c.parent == parentId)
       .map(c => ({ ...c, total: txSubtreeTotal(c.id) }))
-      .filter(c => c.total > 0)
-      .sort((a, b) => b.total - a.total)
+      .filter(c => c.total !== 0)
+      .sort((a, b) => Math.abs(b.total) - Math.abs(a.total))
 
     return nodes.map((c, ni) => {
       const directTxs = txsByCatId[c.id] || []
-      const hasChildren = categories.some(ch => ch.parent == c.id && txSubtreeTotal(ch.id) > 0)
+      const hasChildren = categories.some(ch => ch.parent == c.id && txSubtreeTotal(ch.id) !== 0)
       const hasContent = directTxs.length > 0 || hasChildren
       const isOpen = expandedCats.has(c.id)
       const isLast = ni === nodes.length - 1
@@ -261,8 +261,8 @@ export default function ExpenseTree() {
               </button>
             ) : <span style={{ width: '1.4rem', flexShrink: 0 }} />}
             <span style={{ flex: 1, fontSize: level === 0 ? '0.9rem' : '0.83rem', fontWeight: level === 0 ? 600 : 400 }}>{c.name}</span>
-            <span style={{ fontWeight: level === 0 ? 700 : 400, fontSize: '0.87rem', flexShrink: 0, color: '#dc2626' }}>
-              {fmt(c.total)}
+            <span style={{ fontWeight: level === 0 ? 700 : 400, fontSize: '0.87rem', flexShrink: 0, color: c.total >= 0 ? '#16a34a' : '#dc2626' }}>
+              {c.total > 0 ? '+' : ''}{fmt(c.total)}
             </span>
           </div>
           {isOpen && (
@@ -295,7 +295,7 @@ export default function ExpenseTree() {
   const uncatRec = filtered.filter(r => !r.categoryId)
   const uncatNet = uncatRec.reduce((s, r) => s + projSigned(r), 0)
   const uncatTxs = txsByCatId['uncategorised'] || []
-  const uncatTxTotal = uncatTxs.reduce((s, t) => s + Math.abs(t.amount), 0)
+  const uncatTxTotal = uncatTxs.reduce((s, t) => s + t.amount, 0)
 
   const PERIOD_LABEL = { month: 'pro Monat', quarter: 'pro Quartal', year: 'pro Jahr' }
   const filterBtnStyle = active => ({
@@ -318,14 +318,9 @@ export default function ExpenseTree() {
 
       {/* Source toggle */}
       <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '1rem', alignItems: 'center' }}>
-        <span style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', fontWeight: 600 }}>Quelle:</span>
+        <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', fontWeight: 600 }}>Quelle:</span>
         {[['recurring', 'Daueraufträge'], ['transactions', 'Umsätze']].map(([val, label]) => (
-          <button key={val} onClick={() => setSource(val)} style={{
-            background: source === val ? 'var(--color-primary)' : 'transparent',
-            border: '1px solid var(--color-primary)',
-            color: source === val ? '#fff' : 'var(--color-primary)',
-            borderRadius: 8, padding: '0.4rem 0.9rem', fontSize: '0.85rem', cursor: 'pointer',
-          }}>{label}</button>
+          <button key={val} onClick={() => setSource(val)} style={pill(source === val)}>{label}</button>
         ))}
       </div>
 
@@ -334,31 +329,22 @@ export default function ExpenseTree() {
           {/* Period tabs */}
           <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
             {[['month', 'Monat'], ['quarter', 'Quartal'], ['year', 'Jahr']].map(([val, label]) => (
-              <button key={val} onClick={() => setPeriod(val)} style={{
-                background: period === val ? 'var(--color-primary)' : 'transparent',
-                border: '1px solid var(--color-primary)',
-                color: period === val ? '#fff' : 'var(--color-primary)',
-                borderRadius: 8, padding: '0.4rem 0.9rem', fontSize: '0.85rem', cursor: 'pointer',
-              }}>{label}</button>
+              <button key={val} onClick={() => setPeriod(val)} style={pill(period === val)}>{label}</button>
             ))}
           </div>
 
           {/* Summary cards */}
-          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
-            <div style={{ flex: 1, minWidth: 110, background: '#dc2626', color: '#fff', borderRadius: 8, padding: '0.5rem 0.75rem' }}>
-              <div style={{ fontSize: '0.72rem', opacity: 0.85 }}>Ausgaben {PERIOD_LABEL[period]}</div>
-              <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>{fmt(totalExpense)}</div>
-            </div>
-            {totalIncome > 0 && (
-              <div style={{ flex: 1, minWidth: 110, background: '#16a34a', color: '#fff', borderRadius: 8, padding: '0.5rem 0.75rem' }}>
-                <div style={{ fontSize: '0.72rem', opacity: 0.85 }}>Einnahmen {PERIOD_LABEL[period]}</div>
-                <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>+{fmt(totalIncome)}</div>
+          <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+            {[
+              ['Ausgaben ' + PERIOD_LABEL[period], totalExpense, '#dc2626', '–'],
+              totalIncome > 0 ? ['Einnahmen ' + PERIOD_LABEL[period], totalIncome, '#16a34a', '+'] : null,
+              ['Saldo ' + PERIOD_LABEL[period], totalBalance, totalBalance >= 0 ? '#2563eb' : '#9f1239', totalBalance >= 0 ? '+' : ''],
+            ].filter(Boolean).map(([label, val, color, prefix]) => (
+              <div key={label} style={{ flex: 1, minWidth: 100, background: color + '0e', border: `1px solid ${color}28`, borderRadius: 8, padding: '0.42rem 0.65rem' }}>
+                <div style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</div>
+                <div style={{ fontSize: '1rem', fontWeight: 700, color, marginTop: 1 }}>{prefix}{fmt(Math.abs(val))}</div>
               </div>
-            )}
-            <div style={{ flex: 1, minWidth: 110, background: totalBalance >= 0 ? 'var(--color-primary)' : '#9f1239', color: '#fff', borderRadius: 8, padding: '0.5rem 0.75rem' }}>
-              <div style={{ fontSize: '0.72rem', opacity: 0.85 }}>Saldo {PERIOD_LABEL[period]}</div>
-              <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>{totalBalance >= 0 ? '+' : ''}{fmt(totalBalance)}</div>
-            </div>
+            ))}
           </div>
 
           {/* Filters */}
@@ -476,7 +462,7 @@ export default function ExpenseTree() {
             <p style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '2rem 0', margin: 0 }}>
               Noch keine Umsätze vorhanden. Importieren Sie Kontoauszüge über den PDF-Import.
             </p>
-          ) : (txSubtreeTotal(null) === 0 && uncatTxTotal === 0) ? (
+          ) : filteredTxs.length === 0 ? (
             <p style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '2rem 0', margin: 0 }}>
               Keine Umsätze im gewählten Zeitraum.
             </p>
@@ -486,7 +472,7 @@ export default function ExpenseTree() {
               {uncatTxs.length > 0 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.4rem 0.75rem', paddingLeft: '1.65rem', borderTop: '1px solid var(--color-border)', color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>
                   <span>Ohne Kategorie</span>
-                  <span style={{ color: '#dc2626' }}>{fmt(uncatTxTotal)}</span>
+                  <span style={{ color: uncatTxTotal >= 0 ? '#16a34a' : '#dc2626' }}>{uncatTxTotal > 0 ? '+' : ''}{fmt(uncatTxTotal)}</span>
                 </div>
               )}
             </div>
