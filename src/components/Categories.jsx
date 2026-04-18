@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { buildCategoryOptions } from '../categoryOptions'
 
 function useLocalStorage(key, initial) {
   const [value, setValue] = useState(() => JSON.parse(localStorage.getItem(key)) || initial)
@@ -183,28 +184,12 @@ export default function Categories() {
     })
   }
 
-  // Build grouped options for parent selects
   function ParentSelect({ value, onChange, excludeId }) {
-    const roots = categories.filter(c => c.parent == null && c.id !== excludeId)
-    const subs  = categories.filter(c => c.parent != null && c.id !== excludeId)
+    const available = categories.filter(c => c.id !== excludeId)
     return (
       <select value={value} onChange={onChange}>
         <option value="">– Hauptkategorie (keine Oberkategorie) –</option>
-        {roots.length > 0 && (
-          <optgroup label="Hauptkategorien">
-            {roots.map(c => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </optgroup>
-        )}
-        {subs.length > 0 && (
-          <optgroup label="Unterkategorien">
-            {subs.map(c => {
-              const p = categories.find(x => x.id === c.parent)
-              return <option key={c.id} value={c.id}>{p ? `${p.name} › ` : ''}{c.name}</option>
-            })}
-          </optgroup>
-        )}
+        {buildCategoryOptions(available)}
       </select>
     )
   }
