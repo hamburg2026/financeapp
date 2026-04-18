@@ -14,21 +14,25 @@ import WealthChart from './components/WealthChart'
 import ExpenseChart from './components/ExpenseChart'
 import PortfolioPerformance from './components/PortfolioPerformance'
 import PrintDialog from './components/PrintDialog'
+import PdfImport from './components/PdfImport'
+import TransactionAnalytics from './components/TransactionAnalytics'
 
 const NAV_ITEMS = [
-  { id: 'dashboard',          label: 'Dashboard',           icon: '📊', component: Dashboard },
-  { id: 'wealthChart',        label: 'Vermögen',            icon: '💰', component: WealthChart },
-  { id: 'expenseChart',       label: 'Ausgaben-Grafik',     icon: '🎯', component: ExpenseChart },
-  { id: 'bankAccounts',       label: 'Bankkonten',          icon: '🏦', component: BankAccounts },
-  { id: 'categories',         label: 'Kategorien',          icon: '🏷️', component: Categories },
-  { id: 'recurringPayments',  label: 'Daueraufträge',       icon: '🔄', component: RecurringPayments },
-  { id: 'insuranceContracts', label: 'Versicherungen',      icon: '🛡️', component: InsuranceContracts },
-  { id: 'securities',         label: 'Wertpapiere & Depots', icon: '📈', component: Securities },
-  { id: 'portfolioPerf',      label: 'Wertentwicklung',      icon: '💹', component: PortfolioPerformance },
-  { id: 'subscriptions',      label: 'Abonnements',         icon: '📱', component: Subscriptions },
-  { id: 'realEstate',         label: 'Immobilien',          icon: '🏠', component: RealEstate },
-  { id: 'companyShares',      label: 'Firmenbeteiligungen', icon: '🏢', component: CompanyShares },
-  { id: 'expenseTree',        label: 'Ausgaben',            icon: '📉', component: ExpenseTree },
+  { id: 'dashboard',            label: 'Dashboard',             icon: '📊', component: Dashboard },
+  { id: 'wealthChart',          label: 'Vermögen',              icon: '💰', component: WealthChart },
+  { id: 'bankAccounts',         label: 'Bankkonten',            icon: '🏦', component: BankAccounts },
+  { id: 'pdfImport',            label: 'PDF-Import',            icon: '📥', component: PdfImport },
+  { id: 'transactionAnalytics', label: 'Umsatz-Auswertung',     icon: '📊', component: TransactionAnalytics },
+  { id: 'expenseChart',         label: 'Ausgaben-Grafik',       icon: '🎯', component: ExpenseChart },
+  { id: 'categories',           label: 'Kategorien',            icon: '🏷️', component: Categories },
+  { id: 'recurringPayments',    label: 'Daueraufträge',         icon: '🔄', component: RecurringPayments },
+  { id: 'insuranceContracts',   label: 'Versicherungen',        icon: '🛡️', component: InsuranceContracts },
+  { id: 'securities',           label: 'Wertpapiere & Depots',  icon: '📈', component: Securities },
+  { id: 'portfolioPerf',        label: 'Wertentwicklung',       icon: '💹', component: PortfolioPerformance },
+  { id: 'subscriptions',        label: 'Abonnements',           icon: '📱', component: Subscriptions },
+  { id: 'realEstate',           label: 'Immobilien',            icon: '🏠', component: RealEstate },
+  { id: 'companyShares',        label: 'Firmenbeteiligungen',   icon: '🏢', component: CompanyShares },
+  { id: 'expenseTree',          label: 'Ausgaben',              icon: '📉', component: ExpenseTree },
 ]
 
 export default function App() {
