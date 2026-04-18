@@ -47,7 +47,7 @@ async function extractPdfLines(file) {
     const content = await page.getTextContent()
     // Group text items by rounded Y position (same visual line)
     const byY = new Map()
-    for (const item of content.items) {
+    for (const item of (content.items ?? [])) {
       if (!item.str?.trim()) continue
       const y = Math.round(item.transform[5])
       if (!byY.has(y)) byY.set(y, [])
