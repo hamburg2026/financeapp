@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { fmt } from '../fmt'
+import { buildCategoryOptions } from '../categoryOptions'
 
 function useLocalStorage(key, initial) {
   const [value, setValue] = useState(() => JSON.parse(localStorage.getItem(key)) || initial)
@@ -18,23 +19,11 @@ const FREQ_LABELS = {
 }
 const FREQ_ORDER = ['monthly', 'quarterly', 'halfyearly', 'yearly']
 
-// Flat options with full path label: "Nebenkosten → Strom"
 function CategorySelect({ value, onChange, categories, style, placeholder = '– Kategorie wählen –' }) {
-  function buildOptions(parentId = null, prefix = '') {
-    return categories
-      .filter(c => c.parent == parentId)
-      .flatMap(c => {
-        const label = prefix ? `${prefix} → ${c.name}` : c.name
-        return [
-          <option key={c.id} value={c.id}>{label}</option>,
-          ...buildOptions(c.id, label),
-        ]
-      })
-  }
   return (
     <select value={value} onChange={onChange} style={style}>
       <option value="">{placeholder}</option>
-      {buildOptions()}
+      {buildCategoryOptions(categories)}
     </select>
   )
 }

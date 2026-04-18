@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { fmt } from '../fmt'
+import { buildCategoryOptions } from '../categoryOptions'
 
 function useLocalStorage(key, initial) {
   const [value, setValue] = useState(() => JSON.parse(localStorage.getItem(key)) || initial)
@@ -404,7 +405,7 @@ export default function BankAccounts() {
               </select>],
               ['Kategorie', <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)} style={{ fontSize: '0.8rem', padding: '0.3rem 0.4rem' }}>
                 <option value="">Alle</option>
-                {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                {buildCategoryOptions(categories, 'name')}
               </select>],
               ['Typ', <select value={filterType} onChange={e => setFilterType(e.target.value)} style={{ fontSize: '0.8rem', padding: '0.3rem 0.4rem' }}>
                 <option value="all">Alle</option>
@@ -486,7 +487,7 @@ export default function BankAccounts() {
                           <select value={editTxCategory} onChange={e => setEditTxCategory(e.target.value)}
                             style={{ fontSize: '0.78rem', padding: '0.2rem 0.3rem' }}>
                             <option value="">–</option>
-                            {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                            {buildCategoryOptions(categories, 'name')}
                           </select>
                         </td>
                         <td style={{ ...cell, whiteSpace: 'nowrap' }}>
@@ -546,7 +547,7 @@ export default function BankAccounts() {
             </div>
             <select value={txCategory} onChange={e => setTxCategory(e.target.value)} required>
               <option value="">Kategorie wählen</option>
-              {categories.map(c => <option key={c.id} value={c.name}>{c.name} ({c.type || '–'})</option>)}
+              {buildCategoryOptions(categories, 'name')}
             </select>
             <button type="submit">Umsatz hinzufügen</button>
           </form>

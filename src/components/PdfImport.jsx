@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import { fmt } from '../fmt'
+import { buildCategoryOptions } from '../categoryOptions'
 import * as pdfjsLib from 'pdfjs-dist'
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 
@@ -479,9 +480,7 @@ export default function PdfImport({ onNavigate }) {
                             onChange={e => updateItem(idx, { category: e.target.value })}
                             style={{ fontSize: '0.75rem', padding: '0.15rem 0.3rem', maxWidth: 140 }}>
                             <option value="">– keine –</option>
-                            {categories.map(c => (
-                              <option key={c.id} value={c.name}>{c.name}</option>
-                            ))}
+                            {buildCategoryOptions(categories, 'name')}
                           </select>
                           {ct && (
                             <span style={{ fontSize: '0.65rem', padding: '0.1rem 0.3rem', borderRadius: 4, fontWeight: 600, background: ct === 'Ausgabe' ? '#fee2e2' : '#dcfce7', color: ct === 'Ausgabe' ? '#dc2626' : '#16a34a' }}>

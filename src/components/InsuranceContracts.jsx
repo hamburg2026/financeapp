@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import { fmt } from '../fmt'
+import { buildCategoryOptions } from '../categoryOptions'
 
 function useLocalStorage(key, initial) {
   const [value, setValue] = useState(() => JSON.parse(localStorage.getItem(key)) || initial)
@@ -537,9 +538,7 @@ export default function InsuranceContracts() {
               <label style={labelStyle}>Kategorie</label>
               <select {...field('categoryId')} style={{ ...inputStyle, width: '100%' }}>
                 <option value="">– keine –</option>
-                {expenseCategories.map(cat => (
-                  <option key={cat.id} value={cat.id}>{cat.name}</option>
-                ))}
+                {buildCategoryOptions(expenseCategories)}
               </select>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
@@ -710,7 +709,7 @@ export default function InsuranceContracts() {
           </select>
           <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)} style={{ fontSize: '0.78rem', padding: '0.22rem 0.4rem', border: '1px solid var(--color-border)', borderRadius: 5 }}>
             <option value="">Alle Kategorien</option>
-            {expenseCategories.map(cat => <option key={cat.id} value={String(cat.id)}>{cat.name}</option>)}
+            {buildCategoryOptions(expenseCategories)}
           </select>
           {hasActiveFilter && (
             <button onClick={() => { setFilterPerson(''); setFilterProvider(''); setFilterCategory('') }}
