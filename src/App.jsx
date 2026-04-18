@@ -5,7 +5,6 @@ import Categories from './components/Categories'
 import RecurringPayments from './components/RecurringPayments'
 import InsuranceContracts from './components/InsuranceContracts'
 import Securities from './components/Securities'
-import Depots from './components/Depots'
 import Subscriptions from './components/Subscriptions'
 import RealEstate from './components/RealEstate'
 import CompanyShares from './components/CompanyShares'
@@ -15,30 +14,45 @@ import ExpenseChart from './components/ExpenseChart'
 import PortfolioPerformance from './components/PortfolioPerformance'
 import PrintDialog from './components/PrintDialog'
 import PdfImport from './components/PdfImport'
-import TransactionAnalytics from './components/TransactionAnalytics'
 
-const NAV_ITEMS = [
-  { id: 'dashboard',            label: 'Dashboard',             icon: '📊', component: Dashboard },
-  { id: 'wealthChart',          label: 'Vermögen',              icon: '💰', component: WealthChart },
-  { id: 'bankAccounts',         label: 'Bankkonten',            icon: '🏦', component: BankAccounts },
-  { id: 'pdfImport',            label: 'PDF-Import',            icon: '📥', component: PdfImport },
-  { id: 'transactionAnalytics', label: 'Ausgaben-Übersicht',    icon: '📊', component: TransactionAnalytics },
-  { id: 'expenseChart',         label: 'Ausgaben-Grafik',       icon: '🎯', component: ExpenseChart },
-  { id: 'categories',           label: 'Kategorien',            icon: '🏷️', component: Categories },
-  { id: 'recurringPayments',    label: 'Daueraufträge',         icon: '🔄', component: RecurringPayments },
-  { id: 'insuranceContracts',   label: 'Versicherungen',        icon: '🛡️', component: InsuranceContracts },
-  { id: 'securities',           label: 'Wertpapiere & Depots',  icon: '📈', component: Securities },
-  { id: 'portfolioPerf',        label: 'Wertentwicklung',       icon: '💹', component: PortfolioPerformance },
-  { id: 'subscriptions',        label: 'Abonnements',           icon: '📱', component: Subscriptions },
-  { id: 'realEstate',           label: 'Immobilien',            icon: '🏠', component: RealEstate },
-  { id: 'companyShares',        label: 'Firmenbeteiligungen',   icon: '🏢', component: CompanyShares },
-  { id: 'expenseTree',          label: 'Ausgaben',              icon: '📉', component: ExpenseTree },
+const NAV_GROUPS = [
+  {
+    label: 'Stammdaten',
+    items: [
+      { id: 'bankAccounts',       label: 'Bankkonten',           icon: '🏦', component: BankAccounts },
+      { id: 'securities',         label: 'Wertpapiere & Depots', icon: '📈', component: Securities },
+      { id: 'subscriptions',      label: 'Abonnements',          icon: '📱', component: Subscriptions },
+      { id: 'realEstate',         label: 'Immobilien',           icon: '🏠', component: RealEstate },
+      { id: 'companyShares',      label: 'Firmenbeteiligungen',  icon: '🏢', component: CompanyShares },
+      { id: 'insuranceContracts', label: 'Versicherungen',       icon: '🛡️', component: InsuranceContracts },
+    ],
+  },
+  {
+    label: 'Allgemeines',
+    items: [
+      { id: 'categories',        label: 'Kategorien',    icon: '🏷️', component: Categories },
+      { id: 'pdfImport',         label: 'PDF-Import',    icon: '📥', component: PdfImport },
+      { id: 'recurringPayments', label: 'Daueraufträge', icon: '🔄', component: RecurringPayments },
+    ],
+  },
+  {
+    label: 'Auswertungen',
+    items: [
+      { id: 'dashboard',    label: 'Dashboard',       icon: '📊', component: Dashboard },
+      { id: 'wealthChart',  label: 'Vermögen',        icon: '💰', component: WealthChart },
+      { id: 'expenseChart', label: 'Ausgaben-Grafik', icon: '🎯', component: ExpenseChart },
+      { id: 'portfolioPerf',label: 'Wertentwicklung', icon: '💹', component: PortfolioPerformance },
+      { id: 'expenseTree',  label: 'Ausgaben',        icon: '📉', component: ExpenseTree },
+    ],
+  },
 ]
+
+const ALL_ITEMS = NAV_GROUPS.flatMap(g => g.items)
 
 export default function App() {
   const [currentView, setCurrentView] = useState('dashboard')
   const [showPrint, setShowPrint] = useState(false)
-  const current = NAV_ITEMS.find(item => item.id === currentView)
+  const current = ALL_ITEMS.find(item => item.id === currentView) || ALL_ITEMS[0]
   const CurrentComponent = current.component
 
   return (
@@ -50,16 +64,21 @@ export default function App() {
             <p className="sidebar-subtitle">Persönliche Finanzen</p>
           </div>
           <nav className="sidebar-nav">
-            {NAV_ITEMS.map(item => (
-              <button
-                key={item.id}
-                className={`nav-item${currentView === item.id ? ' active' : ''}`}
-                onClick={() => setCurrentView(item.id)}
-                aria-current={currentView === item.id ? 'page' : undefined}
-              >
-                <span className="nav-icon">{item.icon}</span>
-                {item.label}
-              </button>
+            {NAV_GROUPS.map(group => (
+              <div key={group.label} className="nav-group">
+                <div className="nav-group-label">{group.label}</div>
+                {group.items.map(item => (
+                  <button
+                    key={item.id}
+                    className={`nav-item${currentView === item.id ? ' active' : ''}`}
+                    onClick={() => setCurrentView(item.id)}
+                    aria-current={currentView === item.id ? 'page' : undefined}
+                  >
+                    <span className="nav-icon">{item.icon}</span>
+                    {item.label}
+                  </button>
+                ))}
+              </div>
             ))}
           </nav>
           <div className="sidebar-footer">

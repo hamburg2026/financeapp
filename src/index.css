@@ -109,6 +109,20 @@ html, body {
   flex-shrink: 0;
 }
 
+/* ── Nav Groups ────────────────────────────────── */
+.nav-group {
+  margin-bottom: 0.25rem;
+}
+
+.nav-group-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(255,255,255,0.4);
+  padding: 0.9rem 1rem 0.3rem;
+}
+
 /* ── Main Content ──────────────────────────────── */
 .main-content {
   flex: 1;
