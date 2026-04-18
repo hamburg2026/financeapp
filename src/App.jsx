@@ -22,7 +22,7 @@ const NAV_ITEMS = [
   { id: 'wealthChart',          label: 'Vermögen',              icon: '💰', component: WealthChart },
   { id: 'bankAccounts',         label: 'Bankkonten',            icon: '🏦', component: BankAccounts },
   { id: 'pdfImport',            label: 'PDF-Import',            icon: '📥', component: PdfImport },
-  { id: 'transactionAnalytics', label: 'Umsatz-Auswertung',     icon: '📊', component: TransactionAnalytics },
+  { id: 'transactionAnalytics', label: 'Ausgaben-Übersicht',    icon: '📊', component: TransactionAnalytics },
   { id: 'expenseChart',         label: 'Ausgaben-Grafik',       icon: '🎯', component: ExpenseChart },
   { id: 'categories',           label: 'Kategorien',            icon: '🏷️', component: Categories },
   { id: 'recurringPayments',    label: 'Daueraufträge',         icon: '🔄', component: RecurringPayments },
