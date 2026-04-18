@@ -205,15 +205,45 @@ function DonutChart({ segments, size = 160, stroke = 32, centerLabel, centerValu
   )
 }
 
+// ── Recurring → synthetic transactions ────────────────────────────────
+function generateRecurringTxs(recurrings, categories, cutoff) {
+  const todayStr = new Date().toISOString().slice(0, 10)
+  const result = []
+  for (const p of recurrings) {
+    if (!p.amount || !p.frequency || !p.startDate) continue
+    const catName = categories.find(c => c.id == p.categoryId)?.name || ''
+    const pEnd = p.endDate && p.endDate < todayStr ? p.endDate : todayStr
+    let cur = new Date(p.startDate)
+    const to = new Date(pEnd)
+    while (cur <= to) {
+      const d = cur.toISOString().slice(0, 10)
+      if (d >= cutoff) {
+        result.push({ id: `r-${p.id}-${d}`, date: d, description: p.name || '–', amount: -Math.abs(p.amount), category: catName, recipient: '' })
+      }
+      const nx = new Date(cur)
+      if (p.frequency === 'monthly')    nx.setMonth(nx.getMonth() + 1)
+      else if (p.frequency === 'quarterly')  nx.setMonth(nx.getMonth() + 3)
+      else if (p.frequency === 'halfyearly') nx.setMonth(nx.getMonth() + 6)
+      else if (p.frequency === 'yearly') nx.setFullYear(nx.getFullYear() + 1)
+      else break
+      if (nx <= cur) break
+      cur = nx
+    }
+  }
+  return result
+}
+
 // ── Main component ─────────────────────────────────────────────────────
 export default function TransactionAnalytics() {
-  const transactions = useMemo(() => JSON.parse(localStorage.getItem('transactions')) || [], [])
-  const accounts     = useMemo(() => JSON.parse(localStorage.getItem('bankAccounts')) || [], [])
-  const categories   = useMemo(() => JSON.parse(localStorage.getItem('categories')) || [], [])
+  const transactions      = useMemo(() => JSON.parse(localStorage.getItem('transactions')) || [], [])
+  const recurringPayments = useMemo(() => JSON.parse(localStorage.getItem('recurringPayments')) || [], [])
+  const accounts          = useMemo(() => JSON.parse(localStorage.getItem('bankAccounts')) || [], [])
+  const categories        = useMemo(() => JSON.parse(localStorage.getItem('categories')) || [], [])
 
-  const [groupBy, setGroupBy]           = useState('month')
+  const [source,        setSource]        = useState('transactions') // 'transactions' | 'recurring'
+  const [groupBy,       setGroupBy]       = useState('month')
   const [filterAccount, setFilterAccount] = useState('')
-  const [rangeKey, setRangeKey]          = useState('12m') // 3m | 6m | 12m | 24m | all
+  const [rangeKey,      setRangeKey]      = useState('12m')
 
   const now = new Date()
 
@@ -226,11 +256,14 @@ export default function TransactionAnalytics() {
   const cutoff = getCutoff(rangeKey)
 
   // ── Filtered transactions ──────────────────────────────────────────
-  const filtered = useMemo(() => transactions.filter(t => {
-    if (filterAccount && t.accountId !== parseInt(filterAccount)) return false
-    if (t.date < cutoff) return false
-    return true
-  }), [transactions, filterAccount, cutoff])
+  const filtered = useMemo(() => {
+    if (source === 'recurring') return generateRecurringTxs(recurringPayments, categories, cutoff)
+    return transactions.filter(t => {
+      if (filterAccount && t.accountId !== parseInt(filterAccount)) return false
+      if (t.date < cutoff) return false
+      return true
+    })
+  }, [source, transactions, recurringPayments, categories, filterAccount, cutoff])
 
   // ── Period aggregation ─────────────────────────────────────────────
   const periodMap = useMemo(() => {
@@ -339,13 +372,12 @@ export default function TransactionAnalytics() {
     [filtered]
   )
 
-  if (transactions.length === 0) {
+  if (transactions.length === 0 && recurringPayments.length === 0) {
     return (
       <div className="module">
-        <h2>Umsatz-Auswertung</h2>
+        <h2>Ausgaben-Übersicht</h2>
         <p style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem' }}>
-          Noch keine Umsätze vorhanden. Importieren Sie zuerst Transaktionen über den PDF-Import
-          oder fügen Sie Umsätze manuell unter "Bankkonten" hinzu.
+          Noch keine Daten vorhanden. Importieren Sie Umsätze über den PDF-Import oder legen Sie Daueraufträge an.
         </p>
       </div>
     )
@@ -355,11 +387,29 @@ export default function TransactionAnalytics() {
 
   return (
     <div className="module">
-      <h2>Umsatz-Auswertung</h2>
+      <h2>Ausgaben-Übersicht</h2>
 
       {/* ── Filter bar ── */}
       <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: '1.25rem', background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, padding: '0.75rem' }}>
-        {/* Account */}
+        {/* Source toggle */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+          <label style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', fontWeight: 600 }}>Quelle</label>
+          <div style={{ display: 'flex', gap: '0.2rem' }}>
+            {[['transactions', 'Umsätze'], ['recurring', 'Daueraufträge']].map(([val, label]) => (
+              <button key={val} onClick={() => setSource(val)} style={{
+                padding: '0.28rem 0.65rem', borderRadius: 6, cursor: 'pointer', fontSize: '0.8rem',
+                border: `1px solid ${source === val ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                background: source === val ? 'var(--color-primary)' : 'none',
+                color: source === val ? '#fff' : 'var(--color-text-muted)',
+                fontWeight: source === val ? 600 : 400,
+              }}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+        {/* Account (only for transactions source) */}
+        {source === 'transactions' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
           <label style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', fontWeight: 600 }}>Konto</label>
           <select value={filterAccount} onChange={e => setFilterAccount(e.target.value)} style={{ fontSize: '0.82rem', padding: '0.3rem 0.5rem' }}>
@@ -367,6 +417,7 @@ export default function TransactionAnalytics() {
             {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
           </select>
         </div>
+        )}
         {/* Time range */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
           <label style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', fontWeight: 600 }}>Zeitraum</label>
@@ -417,8 +468,8 @@ export default function TransactionAnalytics() {
         </div>
       )}
 
-      {/* ── Balance trend ── */}
-      {balanceTrend.length >= 2 && (
+      {/* ── Balance trend (only for real transactions) ── */}
+      {source === 'transactions' && balanceTrend.length >= 2 && (
         <div style={{ marginBottom: '2rem' }}>
           <div style={sectionTitle}>Kontoverlauf</div>
           <LineChart data={balanceTrend} />
