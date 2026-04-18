@@ -44,14 +44,27 @@ async function extractPdfLines(file) {
   const allLines = []
   for (let pg = 1; pg <= pdf.numPages; pg++) {
     const page = await pdf.getPage(pg)
-    const content = await page.getTextContent()
-    // Group text items by rounded Y position (same visual line)
     const byY = new Map()
-    for (const item of (content.items ?? [])) {
-      if (!item.str?.trim()) continue
-      const y = Math.round(item.transform[5])
-      if (!byY.has(y)) byY.set(y, [])
-      byY.get(y).push({ x: item.transform[4], text: item.str })
+    // Use streamTextContent + reader.read() instead of getTextContent() to avoid
+    // a pdfjs-dist v5 bug where chunks from tagged/graphic-heavy PDFs have
+    // items:undefined, causing push(...undefined) to throw inside getTextContent.
+    const stream = page.streamTextContent({ includeMarkedContent: false })
+    const reader = stream.getReader()
+    try {
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        for (const item of (value?.items ?? [])) {
+          if (!item.str?.trim() || !item.transform) continue
+          const y = Math.round(item.transform[5])
+          if (!byY.has(y)) byY.set(y, [])
+          byY.get(y).push({ x: item.transform[4], text: item.str })
+        }
+      }
+    } catch {
+      // page has no readable text (e.g. image-only or complex structured page)
+    } finally {
+      try { reader.releaseLock() } catch { /* ignore */ }
     }
     // Sort lines top-to-bottom, items left-to-right
     const sortedYs = [...byY.keys()].sort((a, b) => b - a)
