@@ -207,14 +207,16 @@ function generateRecurringTxs(recurrings, categories, from, to) {
   const result = []
   for (const p of recurrings) {
     if (!p.amount || !p.frequency || !p.startDate) continue
-    const catName = categories.find(c => c.id == p.categoryId)?.name || ''
+    const cat = categories.find(c => c.id == p.categoryId)
+    const catName = cat?.name || ''
+    const isIncome = p.type === 'Einnahme' || cat?.type === 'Einnahme'
     const pEnd = p.endDate && p.endDate < to ? p.endDate : to
     let cur = new Date(p.startDate)
     const toDate = new Date(pEnd)
     while (cur <= toDate) {
       const d = cur.toISOString().slice(0, 10)
       if (d >= from) {
-        result.push({ id: `r-${p.id}-${d}`, date: d, description: p.name || '–', amount: -Math.abs(p.amount), category: catName, recipient: '' })
+        result.push({ id: `r-${p.id}-${d}`, date: d, description: p.name || '–', amount: isIncome ? Math.abs(p.amount) : -Math.abs(p.amount), category: catName, recipient: '' })
       }
       const nx = new Date(cur)
       if (p.frequency === 'monthly')     nx.setMonth(nx.getMonth() + 1)
@@ -522,7 +524,7 @@ export default function TransactionAnalytics() {
                   <div style={{ fontSize: '0.78rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tx.description}</div>
                   <div style={{ fontSize: '0.63rem', color: 'var(--color-text-muted)' }}>{tx.date} · {tx.category || 'ohne Kategorie'}</div>
                 </div>
-                <span style={{ fontWeight: 700, color: '#dc2626', flexShrink: 0, fontSize: '0.82rem' }}>{fmt(tx.amount)}</span>
+                <span style={{ fontWeight: 700, color: '#dc2626', flexShrink: 0, fontSize: '0.82rem' }}>–{fmt(Math.abs(tx.amount))}</span>
               </div>
             ))}
           </div>
