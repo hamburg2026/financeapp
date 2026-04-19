@@ -79,7 +79,11 @@ function RecurringRow({ r, projected, indent, showCat, catById, last }) {
 export default function ExpenseTree() {
   const [source,        setSource]        = useState('recurring')
   const [period,        setPeriod]        = useState('month')
+  const initRange = getDateRange('thisYear')
   const [txRangeKey,    setTxRangeKey]    = useState('thisYear')
+  const [txFrom,        setTxFrom]        = useState(initRange.from)
+  const [txTo,          setTxTo]          = useState(initRange.to)
+  const [filterAccount, setFilterAccount] = useState('')
   const [groupBy,       setGroupBy]       = useState('category')
   const [expandedCats,  setExpandedCats]  = useState(new Set())
   const [expandedFreqs, setExpandedFreqs] = useState(new Set(FREQ_ORDER))
@@ -94,12 +98,19 @@ export default function ExpenseTree() {
     source === 'transactions' ? JSON.parse(localStorage.getItem('transactions')) || [] : [],
     [source]
   )
-
-  const { from: txFrom, to: txTo } = useMemo(() => getDateRange(txRangeKey), [txRangeKey])
+  const accounts    = useMemo(() =>
+    source === 'transactions' ? JSON.parse(localStorage.getItem('bankAccounts')) || [] : [],
+    [source]
+  )
 
   const filteredTxs = useMemo(() =>
-    allTxs.filter(t => t.date >= txFrom && t.date <= txTo),
-    [allTxs, txFrom, txTo]
+    allTxs.filter(t => {
+      if (filterAccount && t.accountId !== parseInt(filterAccount)) return false
+      if (txFrom && t.date < txFrom) return false
+      if (txTo   && t.date > txTo)   return false
+      return true
+    }),
+    [allTxs, txFrom, txTo, filterAccount]
   )
 
   // ── Recurring mode data ───────────────────────────────────────────
@@ -182,6 +193,13 @@ export default function ExpenseTree() {
     setExpandedFreqs(new Set(FREQ_ORDER))
   }
   function collapseAll() { setExpandedCats(new Set()); setExpandedFreqs(new Set()) }
+
+  function selectTxRange(key) {
+    setTxRangeKey(key)
+    const r = getDateRange(key)
+    setTxFrom(r.from)
+    setTxTo(r.to)
+  }
 
   // ── Recurring category tree ───────────────────────────────────────
   function renderCategoryTree(parentId = null, level = 0) {
@@ -267,7 +285,7 @@ export default function ExpenseTree() {
           </div>
           {isOpen && (
             <>
-              {directTxs.sort((a, b) => a.amount - b.amount).map((tx, ri) => (
+              {directTxs.sort((a, b) => b.date.localeCompare(a.date)).map((tx, ri) => (
                 <div key={tx.id} style={{
                   display: 'flex', alignItems: 'center', gap: '0.5rem',
                   padding: '0.26rem 0.75rem',
@@ -275,10 +293,11 @@ export default function ExpenseTree() {
                   borderBottom: '1px solid var(--color-border)',
                   background: 'var(--color-surface)', fontSize: '0.78rem',
                 }}>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', whiteSpace: 'nowrap', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{tx.date}</span>
+                  <span style={{ flexShrink: 0, maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tx.recipient || '–'}</span>
                   <span style={{ flex: 1, color: 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {tx.description}
                   </span>
-                  <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', flexShrink: 0 }}>{tx.date}</span>
                   <span style={{ fontWeight: 500, flexShrink: 0, color: tx.amount < 0 ? '#dc2626' : '#16a34a' }}>
                     {fmt(tx.amount)}
                   </span>
@@ -429,15 +448,38 @@ export default function ExpenseTree() {
         </>
       ) : (
         <>
-          {/* Transaction mode: date range */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+          {/* Transaction mode: date range + filters */}
+          <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap', alignItems: 'center', marginBottom: '0.4rem' }}>
             <span style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', fontWeight: 600, marginRight: '0.15rem' }}>Zeitraum:</span>
             {RANGE_PRESETS.map(({ key, label }) => (
-              <button key={key} onClick={() => setTxRangeKey(key)} style={pill(txRangeKey === key)}>{label}</button>
+              <button key={key} onClick={() => selectTxRange(key)} style={pill(txRangeKey === key)}>{label}</button>
             ))}
-            <span style={{ marginLeft: '0.5rem', color: 'var(--color-border)' }}>|</span>
-            <button onClick={expandAll}   style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', background: 'transparent', border: '1px solid var(--color-border)', color: 'var(--color-text-muted)', borderRadius: 6, cursor: 'pointer' }}>Aufklappen</button>
-            <button onClick={collapseAll} style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', background: 'transparent', border: '1px solid var(--color-border)', color: 'var(--color-text-muted)', borderRadius: 6, cursor: 'pointer' }}>Zuklappen</button>
+          </div>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: '1rem' }}>
+            {accounts.length > 0 && (
+              <div>
+                <div style={{ fontSize: '0.69rem', color: 'var(--color-text-muted)', fontWeight: 600, marginBottom: 2 }}>Konto</div>
+                <select value={filterAccount} onChange={e => setFilterAccount(e.target.value)}
+                  style={{ fontSize: '0.78rem', padding: '0.2rem 0.35rem', border: '1px solid var(--color-border)', borderRadius: 4 }}>
+                  <option value="">Alle Konten</option>
+                  {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                </select>
+              </div>
+            )}
+            <div>
+              <div style={{ fontSize: '0.69rem', color: 'var(--color-text-muted)', fontWeight: 600, marginBottom: 2 }}>Von</div>
+              <input type="date" value={txFrom} onChange={e => { setTxFrom(e.target.value); setTxRangeKey('') }}
+                style={{ fontSize: '0.78rem', padding: '0.2rem 0.35rem', border: '1px solid var(--color-border)', borderRadius: 4 }} />
+            </div>
+            <div>
+              <div style={{ fontSize: '0.69rem', color: 'var(--color-text-muted)', fontWeight: 600, marginBottom: 2 }}>Bis</div>
+              <input type="date" value={txTo} onChange={e => { setTxTo(e.target.value); setTxRangeKey('') }}
+                style={{ fontSize: '0.78rem', padding: '0.2rem 0.35rem', border: '1px solid var(--color-border)', borderRadius: 4 }} />
+            </div>
+            <div style={{ display: 'flex', gap: '0.3rem', alignSelf: 'flex-end' }}>
+              <button onClick={expandAll}   style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', background: 'transparent', border: '1px solid var(--color-border)', color: 'var(--color-text-muted)', borderRadius: 6, cursor: 'pointer' }}>Aufklappen</button>
+              <button onClick={collapseAll} style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', background: 'transparent', border: '1px solid var(--color-border)', color: 'var(--color-text-muted)', borderRadius: 6, cursor: 'pointer' }}>Zuklappen</button>
+            </div>
           </div>
 
           {/* Transaction summary cards */}

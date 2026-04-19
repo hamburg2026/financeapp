@@ -195,28 +195,52 @@ function normalizeText(text) {
 }
 
 function buildCategoryLookup(existingTransactions) {
-  const lookup = {} // normalizedKey → { cat: score }
+  const recipientMap = {}
+  const textMap = {}
   for (const tx of existingTransactions) {
     if (!tx.category) continue
-    const key = normalizeText(tx.description + ' ' + (tx.recipient || ''))
-    if (!lookup[key]) lookup[key] = {}
-    lookup[key][tx.category] = (lookup[key][tx.category] || 0) + 1
+    const recNorm = normalizeText(tx.recipient || '')
+    if (recNorm.length >= 4) {
+      if (!recipientMap[recNorm]) recipientMap[recNorm] = {}
+      recipientMap[recNorm][tx.category] = (recipientMap[recNorm][tx.category] || 0) + 1
+    }
+    const txtNorm = normalizeText(tx.description + ' ' + (tx.recipient || ''))
+    if (txtNorm) {
+      if (!textMap[txtNorm]) textMap[txtNorm] = {}
+      textMap[txtNorm][tx.category] = (textMap[txtNorm][tx.category] || 0) + 1
+    }
   }
-  return lookup
+  return { recipientMap, textMap }
 }
 
 function suggestCategory(description, recipient, lookup) {
+  const { recipientMap, textMap } = lookup
+  const scores = {}
+  // Recipient match (3× weight — same payee almost certainly same category)
+  const normRecip = normalizeText(recipient || '')
+  if (normRecip.length >= 4) {
+    const rWords = new Set(normRecip.split(/\s+/).filter(w => w.length >= 3))
+    for (const [key, cats] of Object.entries(recipientMap)) {
+      const kWords = new Set(key.split(/\s+/).filter(w => w.length >= 3))
+      if (!kWords.size || !rWords.size) continue
+      const common = [...rWords].filter(w => kWords.has(w)).length
+      if (!common) continue
+      const sim = common / Math.max(rWords.size, kWords.size)
+      for (const [cat, cnt] of Object.entries(cats))
+        scores[cat] = (scores[cat] || 0) + sim * cnt * 3
+    }
+  }
+  // Text match (1× weight)
   const query = normalizeText(description + ' ' + (recipient || ''))
   const qWords = new Set(query.split(/\s+/).filter(w => w.length >= 3))
-  if (qWords.size === 0) return ''
-  const scores = {}
-  for (const [key, cats] of Object.entries(lookup)) {
-    const kWords = new Set(key.split(/\s+/).filter(w => w.length >= 3))
-    const common = [...qWords].filter(w => kWords.has(w)).length
-    if (common === 0) continue
-    const sim = common / Math.max(qWords.size, kWords.size)
-    for (const [cat, cnt] of Object.entries(cats)) {
-      scores[cat] = (scores[cat] || 0) + sim * cnt
+  if (qWords.size) {
+    for (const [key, cats] of Object.entries(textMap)) {
+      const kWords = new Set(key.split(/\s+/).filter(w => w.length >= 3))
+      const common = [...qWords].filter(w => kWords.has(w)).length
+      if (!common) continue
+      const sim = common / Math.max(qWords.size, kWords.size)
+      for (const [cat, cnt] of Object.entries(cats))
+        scores[cat] = (scores[cat] || 0) + sim * cnt
     }
   }
   const best = Object.entries(scores).sort((a, b) => b[1] - a[1])[0]
