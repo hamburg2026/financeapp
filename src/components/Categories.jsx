@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { buildCategoryOptions } from '../categoryOptions'
+import CategorySelect from './CategorySelect'
 import Modal from './Modal'
 
 function useLocalStorage(key, initial) {
@@ -15,10 +15,7 @@ const lbl = { fontSize: '0.78rem', color: 'var(--color-text-muted)', marginBotto
 function ParentSelect({ value, onChange, excludeId, categories }) {
   const available = categories.filter(c => c.id !== excludeId)
   return (
-    <select value={value} onChange={onChange} style={{ width: '100%' }}>
-      <option value="">– Hauptkategorie (keine Oberkategorie) –</option>
-      {buildCategoryOptions(available)}
-    </select>
+    <CategorySelect value={value} onChange={onChange} categories={available} placeholder="– Hauptkategorie (keine Oberkategorie) –" style={{ width: '100%' }} />
   )
 }
 

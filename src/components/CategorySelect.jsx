@@ -1,0 +1,126 @@
+import { useState, useRef, useEffect } from 'react'
+
+export default function CategorySelect({
+  categories,
+  value,
+  onChange,
+  valueKey = 'id',
+  placeholder = '– Kategorie wählen –',
+  style = {},
+}) {
+  const [open, setOpen]       = useState(false)
+  const [expanded, setExpanded] = useState(new Set())
+  const ref = useRef()
+
+  useEffect(() => {
+    if (!open) return
+    function outside(e) { if (!ref.current?.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', outside)
+    return () => document.removeEventListener('mousedown', outside)
+  }, [open])
+
+  const getVal = cat => valueKey === 'name' ? cat.name : String(cat.id)
+
+  function getLabel() {
+    if (!value && value !== 0) return ''
+    const cat = valueKey === 'name'
+      ? categories.find(c => c.name === value)
+      : categories.find(c => String(c.id) === String(value))
+    if (!cat) return String(value)
+    const parent = cat.parent != null ? categories.find(c => c.id == cat.parent) : null
+    return parent ? `${parent.name} › ${cat.name}` : cat.name
+  }
+
+  function emit(val) {
+    onChange({ target: { value: val } })
+    setOpen(false)
+  }
+
+  function toggle(id, e) {
+    e.stopPropagation()
+    setExpanded(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+  }
+
+  function renderTree(parentId = null, depth = 0) {
+    return categories
+      .filter(c => (c.parent ?? null) == parentId)
+      .sort((a, b) => a.name.localeCompare(b.name, 'de'))
+      .map(cat => {
+        const hasKids   = categories.some(c => (c.parent ?? null) == cat.id)
+        const isExpanded = expanded.has(cat.id)
+        const isSelected = (value !== '' && value != null) && String(value) === String(getVal(cat))
+        const pl = 0.55 + depth * 1.0
+        return (
+          <div key={cat.id}>
+            <div
+              onClick={() => emit(getVal(cat))}
+              style={{
+                display: 'flex', alignItems: 'center',
+                padding: `0.27rem 0.55rem 0.27rem ${pl}rem`,
+                cursor: 'pointer',
+                fontSize: depth === 0 ? '0.82rem' : '0.79rem',
+                fontWeight: depth === 0 ? 600 : 400,
+                background: isSelected ? 'var(--color-primary)' : undefined,
+                color: isSelected ? '#fff' : undefined,
+              }}
+            >
+              {hasKids
+                ? <button
+                    onClick={e => toggle(cat.id, e)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 0.2rem 0 0', fontSize: '0.6rem', color: isSelected ? '#fff' : 'var(--color-text-muted)', flexShrink: 0, lineHeight: 1 }}
+                  >{isExpanded ? '▾' : '▸'}</button>
+                : <span style={{ width: '0.85rem', flexShrink: 0 }} />
+              }
+              <span style={{ flex: 1 }}>{cat.name}</span>
+            </div>
+            {hasKids && isExpanded && renderTree(cat.id, depth + 1)}
+          </div>
+        )
+      })
+  }
+
+  const label = getLabel()
+
+  return (
+    <div ref={ref} style={{ position: 'relative', display: 'inline-block', verticalAlign: 'middle', ...style }}>
+      <div
+        onClick={() => setOpen(o => !o)}
+        style={{
+          border: '1px solid var(--color-border)',
+          borderRadius: 4,
+          background: 'var(--color-surface)',
+          cursor: 'pointer', userSelect: 'none',
+          width: '100%', boxSizing: 'border-box',
+          padding: style.padding || '0.22rem 0.5rem',
+          fontSize: style.fontSize || '0.83rem',
+          ...(style.border     ? { border: style.border }           : {}),
+          ...(style.borderRadius != null ? { borderRadius: style.borderRadius } : {}),
+          display: 'flex', alignItems: 'center', gap: '0.25rem',
+        }}
+      >
+        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: !label ? 'var(--color-text-muted)' : undefined }}>
+          {label || placeholder}
+        </span>
+        <span style={{ fontSize: '0.55rem', color: 'var(--color-text-muted)', flexShrink: 0 }}>▾</span>
+      </div>
+      {open && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 2px)', left: 0, zIndex: 9999,
+          background: 'var(--color-surface)', border: '1px solid var(--color-border)',
+          borderRadius: 6, boxShadow: '0 4px 16px rgba(0,0,0,0.18)',
+          minWidth: 'max(100%, 160px)', maxWidth: 300, maxHeight: 260, overflowY: 'auto',
+        }}>
+          <div
+            onClick={() => emit('')}
+            style={{
+              padding: '0.27rem 0.55rem', fontSize: '0.82rem', cursor: 'pointer',
+              color: 'var(--color-text-muted)', borderBottom: '1px solid var(--color-border)',
+              background: (!value && value !== 0) ? 'var(--color-bg)' : undefined,
+            }}
+          >{placeholder}</div>
+          {renderTree()}
+        </div>
+      )}
+    </div>
+  )
+}

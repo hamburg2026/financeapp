@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { fmt } from '../fmt'
-import { buildCategoryOptions } from '../categoryOptions'
+import CategorySelect from './CategorySelect'
 import Modal from './Modal'
 
 function useLocalStorage(key, initial) {
@@ -235,10 +235,7 @@ function TransactionModal({ accountId, accounts, transactions, categories, onClo
           </div>
           <div>
             <div style={fl}>Kategorie</div>
-            <select value={filterCat} onChange={e => setFilterCat(e.target.value)} style={{ fontSize: '0.78rem', padding: '0.2rem 0.35rem' }}>
-              <option value="">Alle</option>
-              {buildCategoryOptions(categories, 'name')}
-            </select>
+            <CategorySelect value={filterCat} onChange={e => setFilterCat(e.target.value)} categories={categories} valueKey="name" placeholder="Alle" style={{ fontSize: '0.78rem', padding: '0.2rem 0.35rem' }} />
           </div>
           <div>
             <div style={fl}>Typ</div>
@@ -269,10 +266,7 @@ function TransactionModal({ accountId, accounts, transactions, categories, onClo
             <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--color-primary)' }}>
               {selectedIds.size} ausgewählt
             </span>
-            <select value={bulkCat} onChange={e => setBulkCat(e.target.value)} style={{ fontSize: '0.78rem', padding: '0.2rem 0.4rem' }}>
-              <option value="">Kategorie wählen…</option>
-              {buildCategoryOptions(categories, 'name')}
-            </select>
+            <CategorySelect value={bulkCat} onChange={e => setBulkCat(e.target.value)} categories={categories} valueKey="name" placeholder="Kategorie wählen…" style={{ fontSize: '0.78rem', padding: '0.2rem 0.4rem' }} />
             <button onClick={bulkAssign} disabled={!bulkCat}
               style={{ ...btnSm, background: bulkCat ? 'var(--color-primary)' : '#e5e7eb', color: bulkCat ? '#fff' : '#9ca3af', padding: '0.23rem 0.7rem' }}>
               Zuordnen
@@ -322,9 +316,7 @@ function TransactionModal({ accountId, accounts, transactions, categories, onClo
                         {catType(editCat) && <span style={{ fontSize: '0.65rem', fontWeight: 700, color: catType(editCat) === 'Ausgabe' ? '#dc2626' : '#16a34a' }}>{catType(editCat) === 'Ausgabe' ? '−' : '+'}</span>}
                       </div>
                     </td>
-                    <td style={c}><select value={editCat} onChange={e => setEditCat(e.target.value)} style={{ fontSize: '0.76rem', padding: '0.13rem 0.3rem', maxWidth: 160 }}>
-                      <option value="">–</option>{buildCategoryOptions(categories, 'name')}
-                    </select></td>
+                    <td style={c}><CategorySelect value={editCat} onChange={e => setEditCat(e.target.value)} categories={categories} valueKey="name" placeholder="–" style={{ fontSize: '0.76rem', padding: '0.13rem 0.3rem', maxWidth: 160 }} /></td>
                     <td style={{ ...c, whiteSpace: 'nowrap' }}>
                       <button onClick={saveEdit} style={{ ...btnSm, background: 'var(--color-primary)', color: '#fff', marginRight: 3 }}>✓</button>
                       <button onClick={() => setEditId(null)} style={{ ...btnSm, background: '#e5e7eb', color: '#374151' }}>Abbrechen</button>

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { fmt } from '../fmt'
-import { buildCategoryOptions } from '../categoryOptions'
+import CategorySelect from './CategorySelect'
 import Modal from './Modal'
 
 function useLocalStorage(key, initial) {
@@ -164,10 +164,7 @@ export default function Subscriptions() {
               </div>
               <div>
                 <label style={lbl}>Kategorie</label>
-                <select value={form.categoryId} onChange={e => handleCategoryChange(e.target.value)} style={{ width: '100%' }}>
-                  <option value="">– keine –</option>
-                  {buildCategoryOptions(categories)}
-                </select>
+                <CategorySelect value={form.categoryId} onChange={e => handleCategoryChange(e.target.value)} categories={categories} placeholder="– keine –" style={{ width: '100%' }} />
               </div>
               <div>
                 <label style={lbl}>Typ</label>
