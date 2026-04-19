@@ -36,24 +36,29 @@ export default function CategorySelect({
     setOpen(false)
   }
 
-  function toggle(id, e) {
-    e.stopPropagation()
-    setExpanded(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
-  }
-
   function renderTree(parentId = null, depth = 0) {
     return categories
       .filter(c => (c.parent ?? null) == parentId)
       .sort((a, b) => a.name.localeCompare(b.name, 'de'))
       .map(cat => {
-        const hasKids   = categories.some(c => (c.parent ?? null) == cat.id)
+        const hasKids    = categories.some(c => (c.parent ?? null) == cat.id)
         const isExpanded = expanded.has(cat.id)
         const isSelected = (value !== '' && value != null) && String(value) === String(getVal(cat))
         const pl = 0.65 + depth * 1.1
+
+        function handleClick() {
+          if (hasKids) {
+            // Parent category: toggle expand only, keep dropdown open
+            setExpanded(prev => { const n = new Set(prev); n.has(cat.id) ? n.delete(cat.id) : n.add(cat.id); return n })
+          } else {
+            emit(getVal(cat))
+          }
+        }
+
         return (
           <div key={cat.id}>
             <div
-              onClick={() => emit(getVal(cat))}
+              onClick={handleClick}
               onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = 'var(--color-bg)' }}
               onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = '' }}
               style={{
@@ -67,11 +72,10 @@ export default function CategorySelect({
               }}
             >
               {hasKids
-                ? <button
-                    onClick={e => toggle(cat.id, e)}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 0.2rem 0 0', fontSize: '0.6rem', color: isSelected ? '#fff' : 'var(--color-text-muted)', flexShrink: 0, lineHeight: 1 }}
-                  >{isExpanded ? '▾' : '▸'}</button>
-                : <span style={{ width: '0.85rem', flexShrink: 0 }} />
+                ? <span style={{ fontSize: '0.72rem', color: isSelected ? '#fff' : 'var(--color-text-muted)', flexShrink: 0, marginRight: '0.3rem', lineHeight: 1 }}>
+                    {isExpanded ? '▾' : '▸'}
+                  </span>
+                : <span style={{ width: '1.1rem', flexShrink: 0 }} />
               }
               <span style={{ flex: 1 }}>{cat.name}</span>
             </div>
