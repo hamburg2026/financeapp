@@ -180,7 +180,52 @@ function suggestCategory(description, recipient, lookup) {
   return best ? best[0] : ''
 }
 
-// ── Duplicate detection ────────────────────────────────────────────────
+// ── Commerzbank parser ─────────────────────────────────────────────────
+// Each transaction line contains recipient + date + amount.
+// Lines between two transaction lines become the Buchungstext.
+function parseCommerzbank(lines) {
+  const results = []
+
+  // Identify transaction lines: contain BOTH a date and an amount
+  const txLines = []
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    const dateMatch = line.match(/\b(\d{2}\.\d{2}\.(?:20|19)?\d{2})\b/)
+    if (!dateMatch) continue
+    const amountMatches = [...line.matchAll(AMOUNT_RE)]
+    if (amountMatches.length === 0) continue
+    const date = parseGermanDate(dateMatch[1])
+    const amount = parseGermanAmount(amountMatches[0][1])
+    if (!date || amount === null || amount === 0) continue
+    txLines.push({ lineIdx: i, date, amount, amountStr: amountMatches[0][0], dateStr: dateMatch[0] })
+  }
+
+  for (let ti = 0; ti < txLines.length; ti++) {
+    const { lineIdx, date, amount, amountStr, dateStr } = txLines[ti]
+    const nextLineIdx = ti + 1 < txLines.length ? txLines[ti + 1].lineIdx : lines.length
+
+    // Recipient = transaction line minus date and amount
+    const recipient = lines[lineIdx]
+      .replace(dateStr, '')
+      .replace(amountStr, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 80)
+
+    // Continuation lines → Buchungstext
+    const contLines = []
+    for (let j = lineIdx + 1; j < nextLineIdx; j++) {
+      const txt = lines[j].trim()
+      if (txt) contLines.push(txt)
+    }
+    const description = contLines.join(' ').replace(/\s+/g, ' ').trim().slice(0, 250) || recipient
+
+    results.push({ date, amount, description: description || '–', recipient })
+  }
+  return results
+}
+
+
 function isDuplicate(newTx, existing) {
   return existing.some(t =>
     t.date === newTx.date &&
@@ -195,6 +240,7 @@ export default function PdfImport({ onNavigate }) {
   const categories = JSON.parse(localStorage.getItem('categories')) || []
 
   const [step, setStep] = useState('select') // select | preview | done
+  const [bankType, setBankType] = useState('lufthansa')
   const [selectedAccountId, setSelectedAccountId] = useState(() => {
     const accs = JSON.parse(localStorage.getItem('bankAccounts')) || []
     return accs[0]?.id ? String(accs[0].id) : ''
@@ -219,7 +265,7 @@ export default function PdfImport({ onNavigate }) {
       const allParsed = []
       for (const file of files) {
         const lines = await extractPdfLines(file)
-        const txs = parseTransactions(lines)
+        const txs = bankType === 'commerzbank' ? parseCommerzbank(lines) : parseTransactions(lines)
         for (const tx of txs) {
           const dup = isDuplicate(tx, [...existing, ...allParsed.filter(p => !p._skip)])
           const sugCat = suggestCategory(tx.description, tx.recipient, lookup)
@@ -319,6 +365,41 @@ export default function PdfImport({ onNavigate }) {
               Noch keine Konten vorhanden – bitte zuerst unter "Bankkonten" anlegen.
             </p>
           )}
+        </div>
+
+        {/* Bank type */}
+        <div>
+          <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: '0.5rem' }}>
+            Kontoauszug-Format
+          </label>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            {[
+              { id: 'lufthansa', label: 'Lufthansa / Allgemein' },
+              { id: 'commerzbank', label: 'Commerzbank' },
+            ].map(({ id, label }) => {
+              const active = bankType === id
+              return (
+                <label key={id} style={{
+                  display: 'flex', alignItems: 'center', gap: '0.45rem',
+                  padding: '0.45rem 0.9rem', borderRadius: 8, cursor: 'pointer',
+                  border: `2px solid ${active ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                  background: active ? 'var(--color-primary)' : 'var(--color-surface)',
+                  color: active ? '#fff' : 'inherit',
+                  fontSize: '0.85rem', fontWeight: active ? 600 : 400,
+                  transition: 'all 0.12s',
+                }}>
+                  <input type="radio" name="bankType" value={id} checked={active}
+                    onChange={() => setBankType(id)} style={{ display: 'none' }} />
+                  {label}
+                </label>
+              )
+            })}
+          </div>
+          <p style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', marginTop: '0.35rem', marginBottom: 0 }}>
+            {bankType === 'commerzbank'
+              ? 'Jede Zeile enthält Empfänger, Datum und Betrag. Folgezeilen werden als Buchungstext übernommen.'
+              : 'Universeller Parser: erkennt Datum und Betrag in mehrzeiligen Blöcken.'}
+          </p>
         </div>
 
         {/* File selection */}
