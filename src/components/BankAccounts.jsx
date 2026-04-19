@@ -330,8 +330,8 @@ function TransactionModal({ accountId, accounts, transactions, categories, onClo
                       <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(t.id)} style={{ cursor: 'pointer' }} />
                     </td>
                     <td style={{ ...c, color: 'var(--color-text-muted)', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{t.date}</td>
-                    <td style={{ ...c, color: 'var(--color-text-muted)', maxWidth: 130 }}><span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{t.recipient || '–'}</span></td>
-                    <td style={{ ...c, maxWidth: 260 }}><span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{t.description}</span></td>
+                    <td style={{ ...c, color: 'var(--color-text-muted)', maxWidth: 130 }}><span title={t.recipient || ''} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block', cursor: 'default' }}>{t.recipient || '–'}</span></td>
+                    <td style={{ ...c, maxWidth: 260 }}><span title={t.description} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block', cursor: 'default' }}>{t.description}</span></td>
                     <td style={{ ...c, fontWeight: 700, color: t.amount >= 0 ? '#16a34a' : '#dc2626', whiteSpace: 'nowrap', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{fmt(t.amount)}</td>
                     <td style={{ ...c, color: 'var(--color-text-muted)', fontSize: '0.75rem' }}>{t.category || '–'}</td>
                     <td style={{ ...c, whiteSpace: 'nowrap' }}>
