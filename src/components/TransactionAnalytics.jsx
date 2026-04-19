@@ -516,14 +516,13 @@ export default function TransactionAnalytics() {
           <div style={sec}>Größte Ausgaben</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.22rem' }}>
             {topExpenses.map((tx, i) => (
-              <div key={tx.id} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.35rem 0.6rem', borderRadius: 7, background: 'var(--color-bg)', border: '1px solid var(--color-border)' }}>
+              <div key={tx.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.35rem 0.6rem', borderRadius: 7, background: 'var(--color-bg)', border: '1px solid var(--color-border)' }}>
                 <span style={{ width: 19, height: 19, borderRadius: '50%', background: '#fee2e2', color: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.63rem', fontWeight: 700, flexShrink: 0 }}>
                   {i + 1}
                 </span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: '0.78rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tx.description}</div>
-                  <div style={{ fontSize: '0.63rem', color: 'var(--color-text-muted)' }}>{tx.date} · {tx.category || 'ohne Kategorie'}</div>
-                </div>
+                <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', whiteSpace: 'nowrap', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{tx.date}</span>
+                <span style={{ fontSize: '0.74rem', flexShrink: 0, maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tx.recipient || '–'}</span>
+                <span style={{ fontSize: '0.74rem', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--color-text-muted)' }}>{tx.description}</span>
                 <span style={{ fontWeight: 700, color: '#dc2626', flexShrink: 0, fontSize: '0.82rem' }}>–{fmt(Math.abs(tx.amount))}</span>
               </div>
             ))}
