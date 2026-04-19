@@ -280,7 +280,7 @@ function TransactionModal({ accountId, accounts, transactions, categories, onClo
 
         {/* Scrollable table */}
         <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <table style={{ width: '100%', minWidth: 680, borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: 'var(--color-surface)', borderBottom: '2px solid var(--color-border)' }}>
                 <th style={{ ...c, width: 32, position: 'sticky', top: 0, background: 'var(--color-surface)', zIndex: 1 }}>
@@ -331,7 +331,7 @@ function TransactionModal({ accountId, accounts, transactions, categories, onClo
                     </td>
                     <td style={{ ...c, color: 'var(--color-text-muted)', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{t.date}</td>
                     <td style={{ ...c, color: 'var(--color-text-muted)', maxWidth: 130 }}><span title={t.recipient || ''} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block', cursor: 'default' }}>{t.recipient || '–'}</span></td>
-                    <td style={{ ...c, maxWidth: 260 }}><span title={t.description} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block', cursor: 'default' }}>{t.description}</span></td>
+                    <td style={{ ...c, maxWidth: 340 }}><span style={{ display: 'block', wordBreak: 'break-word', lineHeight: 1.35, fontSize: '0.77rem' }}>{t.description}</span></td>
                     <td style={{ ...c, fontWeight: 700, color: t.amount >= 0 ? '#16a34a' : '#dc2626', whiteSpace: 'nowrap', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{fmt(t.amount)}</td>
                     <td style={{ ...c, color: 'var(--color-text-muted)', fontSize: '0.75rem' }}>{t.category || '–'}</td>
                     <td style={{ ...c, whiteSpace: 'nowrap' }}>
