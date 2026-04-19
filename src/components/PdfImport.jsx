@@ -247,6 +247,53 @@ function suggestCategory(description, recipient, lookup) {
   return best ? best[0] : ''
 }
 
+function parseCsvPostbank(text) {
+  const lines = text.split(/\r?\n/)
+  const headerIdx = lines.findIndex(l => /^"?Buchungstag"?;/.test(l))
+  if (headerIdx === -1) return []
+  const header = splitCsvLine(lines[headerIdx])
+  const col = name => header.findIndex(h => h.replace(/^"|"$/g, '').trim() === name)
+  const colDate   = col('Buchungstag')
+  const colRecip  = col('Begünstigter / Auftraggeber')
+  const colDesc   = col('Verwendungszweck')
+  const colBetrag = col('Betrag')
+  if (colDate === -1) return []
+
+  const results = []
+  for (let i = headerIdx + 1; i < lines.length; i++) {
+    const line = lines[i].trim()
+    if (!line) continue
+    const cells = splitCsvLine(line)
+    if (cells.length <= colDate) continue
+    const dateM = cells[colDate].match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/)
+    if (!dateM) continue
+    const date = `${dateM[3]}-${dateM[2].padStart(2, '0')}-${dateM[1].padStart(2, '0')}`
+    const rawAmt = colBetrag !== -1 ? cells[colBetrag] : ''
+    const amount = parsePostbankAmount(rawAmt)
+    if (amount === null || amount === 0) continue
+    const recipient = (colRecip !== -1 ? cells[colRecip] : '').slice(0, 80)
+    const description = (colDesc !== -1 ? cells[colDesc] : '').slice(0, 250) || '–'
+    results.push({ date, amount, description, recipient })
+  }
+  return results
+}
+
+function parsePostbankAmount(str) {
+  if (!str) return null
+  let s = str.replace(/\s/g, '')
+  if (!s || s === '-') return null
+  const trailing = s.endsWith('-')
+  if (trailing) s = '-' + s.slice(0, -1)
+  // German format: comma = decimal, dot = thousands
+  if (s.includes(',')) {
+    s = s.replace(/\./g, '').replace(',', '.')
+  } else {
+    s = s.replace(/\./g, '')  // no decimal part → dots are thousands separators
+  }
+  const n = parseFloat(s)
+  return isNaN(n) ? null : n
+}
+
 // ── Commerzbank parser ─────────────────────────────────────────────────
 // Format: erste Zeile jedes Blocks = "Empfänger TT.MM Betrag"
 // Folgezeilen = Buchungstext. Betrag mit trailing "-" = Ausgabe, ohne = Einnahme.
@@ -334,7 +381,9 @@ export default function PdfImport({ onNavigate }) {
       for (const file of files) {
         let txs
         if (file.name.toLowerCase().endsWith('.csv')) {
-          txs = parseCsvCommerzbank(await file.text())
+          txs = bankType === 'postbank'
+            ? parseCsvPostbank(await file.text())
+            : parseCsvCommerzbank(await file.text())
         } else {
           const lines = await extractPdfLines(file)
           txs = bankType === 'commerzbank' ? parseCommerzbank(lines) : parseTransactions(lines)
@@ -356,7 +405,7 @@ export default function PdfImport({ onNavigate }) {
       setPreviewItems(allParsed)
       setStep('preview')
     } catch (err) {
-      setParseError('Fehler beim Lesen der PDF: ' + err.message)
+      setParseError('Fehler beim Lesen der Datei: ' + err.message)
     } finally {
       setParsing(false)
     }
@@ -449,6 +498,7 @@ export default function PdfImport({ onNavigate }) {
             {[
               { id: 'lufthansa', label: 'Lufthansa / Allgemein' },
               { id: 'commerzbank', label: 'Commerzbank' },
+              { id: 'postbank', label: 'Postbank' },
             ].map(({ id, label }) => {
               const active = bankType === id
               return (
@@ -470,7 +520,9 @@ export default function PdfImport({ onNavigate }) {
           </div>
           <p style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', marginTop: '0.35rem', marginBottom: 0 }}>
             {bankType === 'commerzbank'
-              ? 'PDF-Kontoauszüge (Empfänger/Datum/Betrag pro Zeile) und CSV-Exporte aus dem Commerzbank Online-Banking werden unterstützt.'
+              ? 'PDF-Kontoauszüge und CSV-Exporte aus dem Commerzbank Online-Banking.'
+              : bankType === 'postbank'
+              ? 'CSV-Export aus dem Postbank Online-Banking (Umsatzübersicht, Semikolon-getrennt).'
               : 'Universeller Parser: erkennt Datum und Betrag in mehrzeiligen Blöcken.'}
           </p>
         </div>
@@ -478,7 +530,7 @@ export default function PdfImport({ onNavigate }) {
         {/* File selection */}
         <div>
           <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: '0.3rem' }}>
-            PDF-Dateien
+            {bankType === 'postbank' ? 'CSV-Datei' : 'PDF-Dateien'}
           </label>
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
             <label style={{
@@ -487,7 +539,7 @@ export default function PdfImport({ onNavigate }) {
               background: 'var(--color-primary)', color: '#fff', fontSize: '0.85rem', fontWeight: 600,
             }}>
               Dateien wählen
-              <input ref={fileInputRef} type="file" accept={bankType === 'commerzbank' ? '.pdf,.csv' : '.pdf'} multiple style={{ display: 'none' }}
+              <input ref={fileInputRef} type="file" accept={bankType === 'postbank' ? '.csv' : bankType === 'commerzbank' ? '.pdf,.csv' : '.pdf'} multiple style={{ display: 'none' }}
                 onChange={e => {
                   const newFiles = [...e.target.files]
                   setFiles(prev => {
@@ -554,7 +606,7 @@ export default function PdfImport({ onNavigate }) {
             alignSelf: 'flex-start',
           }}
         >
-          {parsing ? '⏳ PDFs werden gelesen…' : `📂 ${files.length} PDF${files.length !== 1 ? 's' : ''} analysieren`}
+          {parsing ? '⏳ Dateien werden gelesen…' : `📂 ${files.length} Datei${files.length !== 1 ? 'en' : ''} analysieren`}
         </button>
       </div>
     </div>
