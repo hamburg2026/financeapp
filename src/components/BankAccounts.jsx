@@ -278,6 +278,58 @@ function TransactionModal({ accountId, accounts, transactions, categories, onClo
           </div>
         )}
 
+        {/* Edit transaction modal */}
+        {editId !== null && (
+          <Modal title="Umsatz bearbeiten" onClose={() => setEditId(null)} maxWidth={480}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              {!accountId && (
+                <div>
+                  <label style={lbl}>Konto</label>
+                  <select value={editAccId} onChange={e => setEditAccId(e.target.value)} style={{ width: '100%', fontSize: '0.9rem', padding: '0.4rem 0.5rem' }}>
+                    {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                  </select>
+                </div>
+              )}
+              <div>
+                <label style={lbl}>Datum</label>
+                <input type="date" value={editDate} onChange={e => setEditDate(e.target.value)} style={{ width: '100%', fontSize: '0.9rem', padding: '0.4rem 0.5rem' }} />
+              </div>
+              <div>
+                <label style={lbl}>Empfänger</label>
+                <input value={editRecip} onChange={e => setEditRecip(e.target.value)} style={{ width: '100%', fontSize: '0.9rem', padding: '0.4rem 0.5rem' }} />
+              </div>
+              <div>
+                <label style={lbl}>Buchungstext</label>
+                <textarea value={editDesc} onChange={e => setEditDesc(e.target.value)} rows={3}
+                  style={{ width: '100%', fontSize: '0.9rem', padding: '0.4rem 0.5rem', resize: 'vertical', boxSizing: 'border-box' }} />
+              </div>
+              <div>
+                <label style={lbl}>Betrag (€)</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <input type="number" value={editAmt} onChange={e => setEditAmt(e.target.value)} step="0.01" min="0"
+                    style={{ flex: 1, fontSize: '0.9rem', padding: '0.4rem 0.5rem' }} />
+                  {catType(editCat) && (
+                    <span style={{ fontSize: '0.8rem', fontWeight: 700, padding: '0.25rem 0.5rem', borderRadius: 5,
+                      background: catType(editCat) === 'Ausgabe' ? '#fee2e2' : '#dcfce7',
+                      color: catType(editCat) === 'Ausgabe' ? '#dc2626' : '#16a34a' }}>
+                      {catType(editCat) === 'Ausgabe' ? 'Ausgabe' : 'Einnahme'}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div>
+                <label style={lbl}>Kategorie</label>
+                <CategorySelect value={editCat} onChange={e => setEditCat(e.target.value)} categories={categories}
+                  valueKey="name" placeholder="– keine –" style={{ width: '100%', fontSize: '0.9rem', padding: '0.4rem 0.5rem' }} />
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
+                <button onClick={saveEdit} style={{ flex: 1, padding: '0.6rem', background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, cursor: 'pointer' }}>Speichern</button>
+                <button onClick={() => setEditId(null)} style={{ padding: '0.6rem 1rem', background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: 8, cursor: 'pointer' }}>Abbrechen</button>
+              </div>
+            </div>
+          </Modal>
+        )}
+
         {/* Scrollable table */}
         <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
           <table style={{ width: '100%', minWidth: 680, borderCollapse: 'collapse' }}>
@@ -304,25 +356,6 @@ function TransactionModal({ accountId, accounts, transactions, categories, onClo
                 </td></tr>
               )}
               {filtered.map(t => {
-                if (editId === t.id) return (
-                  <tr key={t.id} style={{ background: '#fefce8', borderBottom: '1px solid var(--color-border)' }}>
-                    <td style={c} />
-                    <td style={c}><input type="date" value={editDate} onChange={e => setEditDate(e.target.value)} style={{ fontSize: '0.76rem', padding: '0.13rem 0.3rem', width: 120 }} /></td>
-                    <td style={c}><input value={editRecip} onChange={e => setEditRecip(e.target.value)} style={{ fontSize: '0.76rem', padding: '0.13rem 0.3rem', width: 90 }} /></td>
-                    <td style={c}><input value={editDesc} onChange={e => setEditDesc(e.target.value)} style={{ fontSize: '0.76rem', padding: '0.13rem 0.3rem', width: '100%', minWidth: 140 }} /></td>
-                    <td style={c}>
-                      <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
-                        <input type="number" value={editAmt} onChange={e => setEditAmt(e.target.value)} step="0.01" min="0" style={{ fontSize: '0.76rem', padding: '0.13rem 0.3rem', width: 80, textAlign: 'right' }} />
-                        {catType(editCat) && <span style={{ fontSize: '0.65rem', fontWeight: 700, color: catType(editCat) === 'Ausgabe' ? '#dc2626' : '#16a34a' }}>{catType(editCat) === 'Ausgabe' ? '−' : '+'}</span>}
-                      </div>
-                    </td>
-                    <td style={c}><CategorySelect value={editCat} onChange={e => setEditCat(e.target.value)} categories={categories} valueKey="name" placeholder="–" style={{ fontSize: '0.76rem', padding: '0.13rem 0.3rem', maxWidth: 160 }} /></td>
-                    <td style={{ ...c, whiteSpace: 'nowrap' }}>
-                      <button onClick={saveEdit} style={{ ...btnSm, background: 'var(--color-primary)', color: '#fff', marginRight: 3 }}>✓</button>
-                      <button onClick={() => setEditId(null)} style={{ ...btnSm, background: '#e5e7eb', color: '#374151' }}>Abbrechen</button>
-                    </td>
-                  </tr>
-                )
                 const isSelected = selectedIds.has(t.id)
                 return (
                   <tr key={t.id} style={{ borderBottom: '1px solid var(--color-border)', background: isSelected ? '#eff6ff' : undefined }}>
