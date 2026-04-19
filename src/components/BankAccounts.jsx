@@ -77,6 +77,7 @@ function TransactionModal({ accountId, accounts, transactions, categories, onClo
   const [editDesc,  setEditDesc]  = useState('')
   const [editRecip, setEditRecip] = useState('')
   const [editAmt,   setEditAmt]   = useState('')
+  const [editSign,  setEditSign]  = useState(-1)
   const [editCat,   setEditCat]   = useState('')
 
   const [selectedIds, setSelectedIds] = useState(new Set())
@@ -122,12 +123,13 @@ function TransactionModal({ accountId, accounts, transactions, categories, onClo
   function startEdit(t) {
     setEditId(t.id); setEditAccId(String(t.accountId)); setEditDate(t.date)
     setEditDesc(t.description); setEditRecip(t.recipient || '')
-    setEditAmt(String(Math.abs(t.amount))); setEditCat(t.category || '')
+    setEditAmt(String(Math.abs(t.amount))); setEditSign(t.amount >= 0 ? 1 : -1)
+    setEditCat(t.category || '')
   }
 
   function saveEdit() {
     const old    = transactions.find(t => t.id === editId)
-    const newAmt = applySign(editAmt, editCat)
+    const newAmt = editSign * (Math.abs(parseFloat(editAmt)) || 0)
     const newAcc = parseInt(editAccId)
     let accs = accounts.map(a => a.id === old.accountId ? { ...a, balance: a.balance - old.amount } : a)
     accs     = accs.map(a => a.id === newAcc ? { ...a, balance: a.balance + newAmt } : a)
@@ -306,20 +308,26 @@ function TransactionModal({ accountId, accounts, transactions, categories, onClo
               <div>
                 <label style={lbl}>Betrag (€)</label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <button onClick={() => setEditSign(s => -s)} style={{
+                    padding: '0.4rem 0.8rem', border: 'none', borderRadius: 6, cursor: 'pointer',
+                    fontWeight: 700, fontSize: '1.1rem', lineHeight: 1, flexShrink: 0,
+                    background: editSign < 0 ? '#fee2e2' : '#dcfce7',
+                    color: editSign < 0 ? '#dc2626' : '#16a34a',
+                  }}>{editSign < 0 ? '−' : '+'}</button>
                   <input type="number" value={editAmt} onChange={e => setEditAmt(e.target.value)} step="0.01" min="0"
                     style={{ flex: 1, fontSize: '0.9rem', padding: '0.4rem 0.5rem' }} />
-                  {catType(editCat) && (
-                    <span style={{ fontSize: '0.8rem', fontWeight: 700, padding: '0.25rem 0.5rem', borderRadius: 5,
-                      background: catType(editCat) === 'Ausgabe' ? '#fee2e2' : '#dcfce7',
-                      color: catType(editCat) === 'Ausgabe' ? '#dc2626' : '#16a34a' }}>
-                      {catType(editCat) === 'Ausgabe' ? 'Ausgabe' : 'Einnahme'}
-                    </span>
-                  )}
                 </div>
               </div>
               <div>
                 <label style={lbl}>Kategorie</label>
-                <CategorySelect value={editCat} onChange={e => setEditCat(e.target.value)} categories={categories}
+                <CategorySelect value={editCat}
+                  onChange={e => {
+                    setEditCat(e.target.value)
+                    const type = catType(e.target.value)
+                    if (type === 'Ausgabe')  setEditSign(-1)
+                    if (type === 'Einnahme') setEditSign(1)
+                  }}
+                  categories={categories}
                   valueKey="name" placeholder="– keine –" style={{ width: '100%', fontSize: '0.9rem', padding: '0.4rem 0.5rem' }} />
               </div>
               <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
