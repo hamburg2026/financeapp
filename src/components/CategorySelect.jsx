@@ -49,16 +49,18 @@ export default function CategorySelect({
         const hasKids   = categories.some(c => (c.parent ?? null) == cat.id)
         const isExpanded = expanded.has(cat.id)
         const isSelected = (value !== '' && value != null) && String(value) === String(getVal(cat))
-        const pl = 0.55 + depth * 1.0
+        const pl = 0.65 + depth * 1.1
         return (
           <div key={cat.id}>
             <div
               onClick={() => emit(getVal(cat))}
+              onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = 'var(--color-bg)' }}
+              onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = '' }}
               style={{
                 display: 'flex', alignItems: 'center',
-                padding: `0.27rem 0.55rem 0.27rem ${pl}rem`,
+                padding: `0.35rem 0.65rem 0.35rem ${pl}rem`,
                 cursor: 'pointer',
-                fontSize: depth === 0 ? '0.82rem' : '0.79rem',
+                fontSize: depth === 0 ? '0.84rem' : '0.81rem',
                 fontWeight: depth === 0 ? 600 : 400,
                 background: isSelected ? 'var(--color-primary)' : undefined,
                 color: isSelected ? '#fff' : undefined,
@@ -105,15 +107,17 @@ export default function CategorySelect({
       </div>
       {open && (
         <div style={{
-          position: 'absolute', top: 'calc(100% + 2px)', left: 0, zIndex: 9999,
+          position: 'absolute', top: 'calc(100% + 3px)', left: 0, zIndex: 9999,
           background: 'var(--color-surface)', border: '1px solid var(--color-border)',
-          borderRadius: 6, boxShadow: '0 4px 16px rgba(0,0,0,0.18)',
-          minWidth: 'max(100%, 160px)', maxWidth: 300, maxHeight: 260, overflowY: 'auto',
+          borderRadius: 6, boxShadow: '0 6px 24px rgba(0,0,0,0.22)',
+          minWidth: 'max(100%, 240px)', maxWidth: 400, maxHeight: 360, overflowY: 'auto',
         }}>
           <div
             onClick={() => emit('')}
+            onMouseEnter={e => { if (value || value === 0) e.currentTarget.style.background = 'var(--color-bg)' }}
+            onMouseLeave={e => { if (value || value === 0) e.currentTarget.style.background = '' }}
             style={{
-              padding: '0.27rem 0.55rem', fontSize: '0.82rem', cursor: 'pointer',
+              padding: '0.35rem 0.65rem', fontSize: '0.84rem', cursor: 'pointer',
               color: 'var(--color-text-muted)', borderBottom: '1px solid var(--color-border)',
               background: (!value && value !== 0) ? 'var(--color-bg)' : undefined,
             }}
