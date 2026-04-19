@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { fmt } from '../fmt'
-import { buildCategoryOptions } from '../categoryOptions'
+import CategorySelect from './CategorySelect'
 import Modal from './Modal'
 
 function useLocalStorage(key, initial) {
@@ -520,10 +520,7 @@ export default function InsuranceContracts() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
             <div>
               <label style={labelStyle}>Kategorie</label>
-              <select {...field('categoryId')} style={{ ...inputStyle, width: '100%' }}>
-                <option value="">– keine –</option>
-                {buildCategoryOptions(expenseCategories)}
-              </select>
+              <CategorySelect {...field('categoryId')} categories={expenseCategories} placeholder="– keine –" style={{ ...inputStyle, width: '100%' }} />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
               <label style={{ ...labelStyle, marginBottom: '0.5rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -692,10 +689,7 @@ export default function InsuranceContracts() {
             <option value="">Alle Anbieter</option>
             {providers.map(p => <option key={p} value={p}>{p}</option>)}
           </select>
-          <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)} style={{ fontSize: '0.78rem', padding: '0.22rem 0.4rem', border: '1px solid var(--color-border)', borderRadius: 5 }}>
-            <option value="">Alle Kategorien</option>
-            {buildCategoryOptions(expenseCategories)}
-          </select>
+          <CategorySelect value={filterCategory} onChange={e => setFilterCategory(e.target.value)} categories={expenseCategories} placeholder="Alle Kategorien" style={{ fontSize: '0.78rem', padding: '0.22rem 0.4rem', border: '1px solid var(--color-border)', borderRadius: 5 }} />
           {hasActiveFilter && (
             <button onClick={() => { setFilterPerson(''); setFilterProvider(''); setFilterCategory('') }}
               style={{ fontSize: '0.72rem', padding: '0.18rem 0.45rem', background: 'none', border: '1px solid var(--color-border)', borderRadius: 4, cursor: 'pointer', color: 'var(--color-text-muted)' }}>

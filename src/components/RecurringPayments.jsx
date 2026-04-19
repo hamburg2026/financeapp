@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { fmt } from '../fmt'
-import { buildCategoryOptions } from '../categoryOptions'
+import CategorySelect from './CategorySelect'
 import Modal from './Modal'
 
 function useLocalStorage(key, initial) {
@@ -14,14 +14,6 @@ const FREQ_ORDER  = ['monthly', 'quarterly', 'halfyearly', 'yearly']
 const lbl = { fontSize: '0.78rem', color: 'var(--color-text-muted)', marginBottom: '0.3rem', display: 'block', fontWeight: 500 }
 const EMPTY = { description: '', amount: '', frequency: 'monthly', categoryId: '', type: 'Ausgabe' }
 
-function CategorySelect({ value, onChange, categories, style, placeholder = '– Kategorie wählen –' }) {
-  return (
-    <select value={value} onChange={onChange} style={style}>
-      <option value="">{placeholder}</option>
-      {buildCategoryOptions(categories)}
-    </select>
-  )
-}
 
 function getDescendants(catId, categories) {
   const children = categories.filter(c => c.parent == catId)
