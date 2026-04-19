@@ -15,7 +15,7 @@ const lbl = { fontSize: '0.78rem', color: 'var(--color-text-muted)', marginBotto
 function ParentSelect({ value, onChange, excludeId, categories }) {
   const available = categories.filter(c => c.id !== excludeId)
   return (
-    <CategorySelect value={value} onChange={onChange} categories={available} placeholder="– Hauptkategorie (keine Oberkategorie) –" style={{ width: '100%' }} />
+    <CategorySelect value={value} onChange={onChange} categories={available} placeholder="– Hauptkategorie (keine Oberkategorie) –" selectParents style={{ width: '100%' }} />
   )
 }
 
