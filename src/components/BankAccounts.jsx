@@ -86,14 +86,6 @@ function TransactionModal({ accountId, accounts, transactions, categories, onClo
   const catType  = name => categories.find(c => c.name === name)?.type || null
   const accLabel = id   => accounts.find(a => a.id === id)?.name || '–'
 
-  function applySign(amount, catName) {
-    const abs  = Math.abs(parseFloat(amount) || 0)
-    const type = catType(catName)
-    if (type === 'Ausgabe')  return -abs
-    if (type === 'Einnahme') return  abs
-    return parseFloat(amount) || 0
-  }
-
   function selectDim(key) {
     setDateDim(key)
     const r = getDateRange(key)
@@ -321,12 +313,7 @@ function TransactionModal({ accountId, accounts, transactions, categories, onClo
               <div>
                 <label style={lbl}>Kategorie</label>
                 <CategorySelect value={editCat}
-                  onChange={e => {
-                    setEditCat(e.target.value)
-                    const type = catType(e.target.value)
-                    if (type === 'Ausgabe')  setEditSign(-1)
-                    if (type === 'Einnahme') setEditSign(1)
-                  }}
+                  onChange={e => setEditCat(e.target.value)}
                   categories={categories}
                   valueKey="name" placeholder="– keine –" style={{ width: '100%', fontSize: '0.9rem', padding: '0.4rem 0.5rem' }} />
               </div>
