@@ -8,6 +8,7 @@ const DATE_DIMS = [
   { key: 'lastQ',     label: 'Letztes Quartal' },
   { key: 'thisYear',  label: 'Dieses Jahr' },
   { key: 'lastYear',  label: 'Letztes Jahr' },
+  { key: 'all',       label: 'Alles' },
 ]
 
 function getDateRange(key) {
@@ -78,9 +79,15 @@ export default function TransactionPivot() {
 
   function selectDim(key) {
     setDateDim(key)
-    const r = getDateRange(key)
-    setDateFrom(r.from)
-    setDateTo(r.to)
+    if (key === 'all') {
+      const dates = transactions.map(t => t.date).filter(Boolean).sort()
+      setDateFrom(dates[0] || '')
+      setDateTo(dates[dates.length - 1] || '')
+    } else {
+      const r = getDateRange(key)
+      setDateFrom(r.from)
+      setDateTo(r.to)
+    }
   }
 
   function toggleCat(id) {
