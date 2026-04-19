@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { fmt } from '../fmt'
+import Modal from './Modal'
 
 function useLocalStorage(key, initial) {
   const [value, setValue] = useState(() => JSON.parse(localStorage.getItem(key)) || initial)
@@ -227,31 +228,32 @@ export default function RealEstate() {
       )}
 
       {showForm && (
-        <form onSubmit={saveProperty} style={{ background: 'var(--color-bg)', borderRadius: 8, padding: '1rem', marginTop: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', border: '1px solid var(--color-border)' }}>
-          <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--color-primary)' }}>{editId ? 'Immobilie bearbeiten' : 'Neue Immobilie'}</div>
-          <div>
-            <label style={labelStyle}>Name / Bezeichnung *</label>
-            <input {...field('name')} placeholder="z. B. Einfamilienhaus München" required style={{ ...inputStyle, width: '100%' }} />
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+        <Modal title={editId ? 'Immobilie bearbeiten' : 'Neue Immobilie'} onClose={cancelForm} maxWidth={520}>
+          <form onSubmit={saveProperty} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
             <div>
-              <label style={labelStyle}>Anschaffungswert (€) *</label>
-              <input type="number" {...field('purchase')} placeholder="z. B. 350000" step="0.01" min="0" required style={{ ...inputStyle, width: '100%' }} />
+              <label style={labelStyle}>Name / Bezeichnung *</label>
+              <input {...field('name')} placeholder="z. B. Einfamilienhaus München" required style={{ ...inputStyle, width: '100%' }} />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+              <div>
+                <label style={labelStyle}>Anschaffungswert (€) *</label>
+                <input type="number" {...field('purchase')} placeholder="z. B. 350000" step="0.01" min="0" required style={{ ...inputStyle, width: '100%' }} />
+              </div>
+              <div>
+                <label style={labelStyle}>Aktueller Zeitwert (€) *</label>
+                <input type="number" {...field('current')} placeholder="z. B. 420000" step="0.01" min="0" required style={{ ...inputStyle, width: '100%' }} />
+              </div>
             </div>
             <div>
-              <label style={labelStyle}>Aktueller Zeitwert (€) *</label>
-              <input type="number" {...field('current')} placeholder="z. B. 420000" step="0.01" min="0" required style={{ ...inputStyle, width: '100%' }} />
+              <label style={labelStyle}>Notizen</label>
+              <textarea {...field('notes')} placeholder="Adresse, Besonderheiten…" rows={2} style={{ ...inputStyle, width: '100%', resize: 'vertical' }} />
             </div>
-          </div>
-          <div>
-            <label style={labelStyle}>Notizen</label>
-            <textarea {...field('notes')} placeholder="Adresse, Besonderheiten…" rows={2} style={{ ...inputStyle, width: '100%', resize: 'vertical' }} />
-          </div>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <button type="submit" style={{ flex: 1 }}>{editId ? 'Änderungen speichern' : 'Immobilie hinzufügen'}</button>
-            <button type="button" onClick={cancelForm} style={{ background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: 6, padding: '0.4rem 0.9rem', cursor: 'pointer' }}>Abbrechen</button>
-          </div>
-        </form>
+            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
+              <button type="submit" style={{ flex: 1 }}>{editId ? 'Änderungen speichern' : 'Immobilie hinzufügen'}</button>
+              <button type="button" onClick={cancelForm} style={{ background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: 8, padding: '0.6rem 1rem', cursor: 'pointer' }}>Abbrechen</button>
+            </div>
+          </form>
+        </Modal>
       )}
     </div>
   )

@@ -14,6 +14,7 @@ import ExpenseChart from './components/ExpenseChart'
 import PortfolioPerformance from './components/PortfolioPerformance'
 import PrintDialog from './components/PrintDialog'
 import PdfImport from './components/PdfImport'
+import { THEMES, applyTheme, loadTheme } from './theme'
 
 const NAV_GROUPS = [
   {
@@ -52,8 +53,14 @@ const ALL_ITEMS = NAV_GROUPS.flatMap(g => g.items)
 export default function App() {
   const [currentView, setCurrentView] = useState('dashboard')
   const [showPrint, setShowPrint] = useState(false)
+  const [theme, setTheme] = useState(() => loadTheme())
   const current = ALL_ITEMS.find(item => item.id === currentView) || ALL_ITEMS[0]
   const CurrentComponent = current.component
+
+  function handleTheme(id) {
+    applyTheme(id)
+    setTheme(id)
+  }
 
   return (
     <>
@@ -82,6 +89,18 @@ export default function App() {
             ))}
           </nav>
           <div className="sidebar-footer">
+            <div className="sidebar-theme-picker">
+              <span className="sidebar-theme-label">Farbe</span>
+              {THEMES.map(t => (
+                <button
+                  key={t.id}
+                  onClick={() => handleTheme(t.id)}
+                  title={t.label}
+                  className={`theme-dot${theme === t.id ? ' active' : ''}`}
+                  style={{ background: t.primary }}
+                />
+              ))}
+            </div>
             <button className="print-btn" onClick={() => setShowPrint(true)}>
               <span className="nav-icon">🖨</span>
               Drucken

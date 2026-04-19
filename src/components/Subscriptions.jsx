@@ -1,38 +1,23 @@
 import { useState } from 'react'
 import { fmt } from '../fmt'
 import { buildCategoryOptions } from '../categoryOptions'
+import Modal from './Modal'
 
 function useLocalStorage(key, initial) {
   const [value, setValue] = useState(() => JSON.parse(localStorage.getItem(key)) || initial)
-  const set = (newVal) => {
-    localStorage.setItem(key, JSON.stringify(newVal))
-    setValue(newVal)
-  }
+  const set = (newVal) => { localStorage.setItem(key, JSON.stringify(newVal)); setValue(newVal) }
   return [value, set]
 }
 
 const FREQ_LABELS = { monthly: 'Monatlich', quarterly: 'Vierteljährlich', halfyearly: 'Halbjährlich', yearly: 'Jährlich' }
+const lbl = { fontSize: '0.78rem', color: 'var(--color-text-muted)', marginBottom: '0.3rem', display: 'block', fontWeight: 500 }
 
-function CategorySelect({ value, onChange, categories }) {
-  return (
-    <select value={value} onChange={onChange}>
-      <option value="">– Kategorie wählen –</option>
-      {buildCategoryOptions(categories)}
-    </select>
-  )
-}
-
-// Keep recurringPayments in sync for a subscription
 function syncRecurring(sub, isActive) {
   const recurrings = JSON.parse(localStorage.getItem('recurringPayments')) || []
-
   if (!isActive) {
-    localStorage.setItem('recurringPayments', JSON.stringify(
-      recurrings.filter(r => r.subscriptionId !== sub.id)
-    ))
+    localStorage.setItem('recurringPayments', JSON.stringify(recurrings.filter(r => r.subscriptionId !== sub.id)))
     return
   }
-
   const existing = recurrings.find(r => r.subscriptionId === sub.id)
   if (existing) {
     localStorage.setItem('recurringPayments', JSON.stringify(
@@ -49,81 +34,47 @@ function syncRecurring(sub, isActive) {
   }
 }
 
+const EMPTY = { name: '', cost: '', frequency: 'monthly', cancel: '', cancelDate: '', aktiv: true, categoryId: '', type: 'Ausgabe' }
+
 export default function Subscriptions() {
   const [subscriptions, setSubscriptions] = useLocalStorage('subscriptions', [])
   const categories = JSON.parse(localStorage.getItem('categories')) || []
 
-  const [name,       setName]       = useState('')
-  const [cost,       setCost]       = useState('')
-  const [frequency,  setFrequency]  = useState('monthly')
-  const [cancel,     setCancel]     = useState('')
-  const [cancelDate, setCancelDate] = useState('')
-  const [aktiv,      setAktiv]      = useState(true)
-  const [categoryId, setCategoryId] = useState('')
-  const [type,       setType]       = useState('Ausgabe')
+  const [modal, setModal] = useState(null) // null | 'add' | subId
+  const [form, setForm] = useState(EMPTY)
+
+  function field(key) { return { value: form[key], onChange: e => setForm(f => ({ ...f, [key]: e.target.value })) } }
+  function check(key) { return { checked: form[key], onChange: e => setForm(f => ({ ...f, [key]: e.target.checked })) } }
 
   function handleCategoryChange(val) {
-    setCategoryId(val)
-    if (val) {
-      const cat = categories.find(c => c.id === parseInt(val))
-      if (cat?.type) setType(cat.type)
-    }
+    setForm(f => {
+      const cat = val ? categories.find(c => c.id === parseInt(val)) : null
+      return { ...f, categoryId: val, type: cat?.type || f.type }
+    })
   }
 
-  function getCategoryLabel(catId) {
-    if (!catId) return null
-    const cat = categories.find(c => c.id === catId)
-    if (!cat) return null
-    const parent = cat.parent ? categories.find(c => c.id === cat.parent) : null
-    return parent ? `${parent.name} → ${cat.name}` : cat.name
+  function openAdd() { setForm(EMPTY); setModal('add') }
+  function openEdit(s) {
+    setForm({ name: s.name, cost: String(s.cost), frequency: s.frequency, cancel: s.cancel || '', cancelDate: s.cancelDate || '', aktiv: s.aktiv ?? true, categoryId: s.categoryId ? String(s.categoryId) : '', type: s.type || 'Ausgabe' })
+    setModal(s.id)
   }
+  function closeModal() { setModal(null) }
 
-  // Edit state
-  const [editId,          setEditId]          = useState(null)
-  const [editName,        setEditName]        = useState('')
-  const [editCost,        setEditCost]        = useState('')
-  const [editFrequency,   setEditFrequency]   = useState('monthly')
-  const [editCancel,      setEditCancel]      = useState('')
-  const [editCancelDate,  setEditCancelDate]  = useState('')
-  const [editAktiv,       setEditAktiv]       = useState(true)
-  const [editCategoryId,  setEditCategoryId]  = useState('')
-  const [editType,        setEditType]        = useState('Ausgabe')
-
-  function addSubscription(e) {
+  function save(e) {
     e.preventDefault()
-    const sub = { id: Date.now(), name, cost: parseFloat(cost), frequency, cancel, cancelDate, aktiv, categoryId: categoryId ? parseInt(categoryId) : null, type }
-    setSubscriptions([...subscriptions, sub])
-    syncRecurring(sub, aktiv)
-    setName(''); setCost(''); setFrequency('monthly'); setCancel(''); setCancelDate(''); setAktiv(true); setCategoryId(''); setType('Ausgabe')
-  }
-
-  function startEdit(s) {
-    setEditId(s.id)
-    setEditName(s.name)
-    setEditCost(String(s.cost))
-    setEditFrequency(s.frequency)
-    setEditCancel(s.cancel || '')
-    setEditCancelDate(s.cancelDate || '')
-    setEditAktiv(s.aktiv ?? true)
-    setEditCategoryId(s.categoryId ? String(s.categoryId) : '')
-    setEditType(s.type || 'Ausgabe')
-  }
-
-  function saveEdit() {
-    const updated = {
-      ...subscriptions.find(s => s.id === editId),
-      name:       editName,
-      cost:       parseFloat(editCost),
-      frequency:  editFrequency,
-      cancel:     editCancel,
-      cancelDate: editCancelDate,
-      aktiv:      editAktiv,
-      categoryId: editCategoryId ? parseInt(editCategoryId) : null,
-      type:       editType,
+    const sub = {
+      id: modal === 'add' ? Date.now() : modal,
+      name: form.name, cost: parseFloat(form.cost), frequency: form.frequency,
+      cancel: form.cancel, cancelDate: form.cancelDate, aktiv: form.aktiv,
+      categoryId: form.categoryId ? parseInt(form.categoryId) : null, type: form.type,
     }
-    setSubscriptions(subscriptions.map(s => s.id === editId ? updated : s))
-    syncRecurring(updated, updated.aktiv)
-    setEditId(null)
+    if (modal === 'add') {
+      setSubscriptions([...subscriptions, sub])
+    } else {
+      setSubscriptions(subscriptions.map(s => s.id === modal ? sub : s))
+    }
+    syncRecurring(sub, form.aktiv)
+    closeModal()
   }
 
   function toggleAktiv(sub) {
@@ -138,9 +89,23 @@ export default function Subscriptions() {
     setSubscriptions(subscriptions.filter(s => s.id !== id))
   }
 
+  function getCategoryLabel(catId) {
+    if (!catId) return null
+    const cat = categories.find(c => c.id === catId)
+    if (!cat) return null
+    const parent = cat.parent ? categories.find(c => c.id === cat.parent) : null
+    return parent ? `${parent.name} → ${cat.name}` : cat.name
+  }
+
+  const btnS = { border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: '0.75rem', padding: '0.2rem 0.45rem' }
+  const isEditing = modal !== null && modal !== 'add'
+
   return (
     <div className="module">
-      <h2>Abonnements</h2>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+        <h2 style={{ margin: 0 }}>Abonnements</h2>
+        <button onClick={openAdd} style={{ padding: '0.4rem 0.9rem', fontSize: '0.85rem' }}>+ Neu</button>
+      </div>
 
       <div style={{ border: '1px solid var(--color-border)', borderRadius: 8, overflow: 'hidden' }}>
         {subscriptions.length === 0 ? (
@@ -149,47 +114,6 @@ export default function Subscriptions() {
           </p>
         ) : subscriptions.map((s, i) => {
           const border = i < subscriptions.length - 1 ? '1px solid var(--color-border)' : 'none'
-          const btnS = { border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: '0.75rem', padding: '0.2rem 0.45rem' }
-
-          if (editId === s.id) {
-            return (
-              <div key={s.id} style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', alignItems: 'center', padding: '0.45rem 0.75rem', borderBottom: border, background: '#fefce8' }}>
-                <input value={editName} onChange={e => setEditName(e.target.value)}
-                  style={{ flex: 2, minWidth: 120, fontSize: '0.82rem', padding: '0.25rem 0.4rem' }} placeholder="Name" />
-                <input type="number" value={editCost} onChange={e => setEditCost(e.target.value)}
-                  style={{ width: 90, fontSize: '0.82rem', padding: '0.25rem 0.4rem' }} step="0.01" min="0" />
-                <select value={editFrequency} onChange={e => setEditFrequency(e.target.value)} style={{ fontSize: '0.82rem', padding: '0.25rem 0.4rem' }}>
-                  <option value="monthly">Monatlich</option>
-                  <option value="quarterly">Vierteljährlich</option>
-                  <option value="halfyearly">Halbjährlich</option>
-                  <option value="yearly">Jährlich</option>
-                </select>
-                <CategorySelect value={editCategoryId} onChange={e => setEditCategoryId(e.target.value)} categories={categories} />
-                <select value={editType} onChange={e => setEditType(e.target.value)} style={{ fontSize: '0.82rem', padding: '0.25rem 0.4rem' }}>
-                  <option value="Ausgabe">Ausgabe</option>
-                  <option value="Einnahme">Einnahme</option>
-                </select>
-                <input list="cancel-options" value={editCancel} onChange={e => setEditCancel(e.target.value)}
-                  style={{ width: 130, fontSize: '0.82rem', padding: '0.25rem 0.4rem' }} placeholder="Kündigungsfrist" />
-                <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                  <input type="date" value={editCancelDate} onChange={e => setEditCancelDate(e.target.value)}
-                    style={{ fontSize: '0.82rem', padding: '0.25rem 0.4rem' }} />
-                  {editCancelDate && (
-                    <button type="button" onClick={() => setEditCancelDate('')}
-                      style={{ border: 'none', background: '#e5e7eb', borderRadius: 4, cursor: 'pointer', fontSize: '0.7rem', padding: '0.2rem 0.4rem', color: '#374151' }}
-                      title="Datum entfernen">✕</button>
-                  )}
-                </span>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.82rem' }}>
-                  <input type="checkbox" checked={editAktiv} onChange={e => setEditAktiv(e.target.checked)} />
-                  Aktiv
-                </label>
-                <button onClick={saveEdit} style={{ ...btnS, background: '#16a34a', color: '#fff' }}>Speichern</button>
-                <button onClick={() => setEditId(null)} style={{ ...btnS, background: '#e5e7eb', color: '#374151' }}>Abbrechen</button>
-              </div>
-            )
-          }
-
           return (
             <div key={s.id} style={{
               display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap',
@@ -210,49 +134,71 @@ export default function Subscriptions() {
                 style={{ ...btnS, background: s.aktiv ? 'var(--color-primary)' : '#e5e7eb', color: s.aktiv ? '#fff' : '#374151' }}>
                 {s.aktiv ? 'Aktiv' : 'Inaktiv'}
               </button>
-              <button onClick={() => startEdit(s)} style={{ ...btnS, background: '#e5e7eb', color: '#374151' }} title="Bearbeiten">✎</button>
-              <button onClick={() => removeSubscription(s.id)}
-                style={{ background: 'none', border: 'none', color: '#dc2626', padding: '0.15rem 0.3rem', fontSize: '0.8rem', cursor: 'pointer', flexShrink: 0 }}
-                title="Löschen">✕</button>
+              <button onClick={() => openEdit(s)} style={{ ...btnS, background: '#e5e7eb', color: '#374151' }} title="Bearbeiten">✎</button>
+              <button onClick={() => removeSubscription(s.id)} style={{ background: 'none', border: 'none', color: '#dc2626', padding: '0.15rem 0.3rem', fontSize: '0.8rem', cursor: 'pointer', flexShrink: 0 }} title="Löschen">✕</button>
             </div>
           )
         })}
       </div>
 
-      <h3 style={{ marginTop: '1.5rem', marginBottom: '0.5rem' }}>Abonnement hinzufügen</h3>
-      <form onSubmit={addSubscription}>
-        <input value={name} onChange={e => setName(e.target.value)} placeholder="Name" required />
-        <input type="number" value={cost} onChange={e => setCost(e.target.value)} placeholder="Kosten" step="0.01" required />
-        <select value={frequency} onChange={e => setFrequency(e.target.value)} required>
-          <option value="monthly">Monatlich</option>
-          <option value="quarterly">Vierteljährlich</option>
-          <option value="halfyearly">Halbjährlich</option>
-          <option value="yearly">Jährlich</option>
-        </select>
-        <input list="cancel-options" value={cancel} onChange={e => setCancel(e.target.value)} placeholder="Kündigungsfrist" />
-        <datalist id="cancel-options">
-          <option value="1 Monat" />
-          <option value="2 Monate" />
-          <option value="3 Monate" />
-          <option value="6 Monate" />
-          <option value="12 Monate" />
-          <option value="quartalsweise" />
-          <option value="halbjährlich" />
-          <option value="jährlich" />
-          <option value="individuell" />
-        </datalist>
-        <input type="date" value={cancelDate} onChange={e => setCancelDate(e.target.value)} placeholder="Kündigungsdatum" />
-        <CategorySelect value={categoryId} onChange={e => handleCategoryChange(e.target.value)} categories={categories} />
-        <select value={type} onChange={e => setType(e.target.value)}>
-          <option value="Ausgabe">Ausgabe</option>
-          <option value="Einnahme">Einnahme</option>
-        </select>
-        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem' }}>
-          <input type="checkbox" checked={aktiv} onChange={e => setAktiv(e.target.checked)} />
-          Aktiv (als Dauerauftrag übernehmen)
-        </label>
-        <button type="submit">Abonnement hinzufügen</button>
-      </form>
+      {modal && (
+        <Modal title={isEditing ? 'Abonnement bearbeiten' : 'Abonnement hinzufügen'} onClose={closeModal} maxWidth={540}>
+          <form onSubmit={save} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.7rem' }}>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={lbl}>Name *</label>
+                <input {...field('name')} placeholder="z. B. Netflix" required style={{ width: '100%' }} />
+              </div>
+              <div>
+                <label style={lbl}>Kosten (€) *</label>
+                <input type="number" {...field('cost')} placeholder="9.99" step="0.01" min="0" required style={{ width: '100%' }} />
+              </div>
+              <div>
+                <label style={lbl}>Frequenz</label>
+                <select {...field('frequency')} style={{ width: '100%' }}>
+                  <option value="monthly">Monatlich</option>
+                  <option value="quarterly">Vierteljährlich</option>
+                  <option value="halfyearly">Halbjährlich</option>
+                  <option value="yearly">Jährlich</option>
+                </select>
+              </div>
+              <div>
+                <label style={lbl}>Kategorie</label>
+                <select value={form.categoryId} onChange={e => handleCategoryChange(e.target.value)} style={{ width: '100%' }}>
+                  <option value="">– keine –</option>
+                  {buildCategoryOptions(categories)}
+                </select>
+              </div>
+              <div>
+                <label style={lbl}>Typ</label>
+                <select {...field('type')} style={{ width: '100%' }}>
+                  <option value="Ausgabe">Ausgabe</option>
+                  <option value="Einnahme">Einnahme</option>
+                </select>
+              </div>
+              <div>
+                <label style={lbl}>Kündigungsfrist</label>
+                <input list="cancel-opts" {...field('cancel')} placeholder="z. B. 1 Monat" style={{ width: '100%' }} />
+                <datalist id="cancel-opts">
+                  {['1 Monat','2 Monate','3 Monate','6 Monate','12 Monate','quartalsweise','halbjährlich','jährlich','individuell'].map(v => <option key={v} value={v} />)}
+                </datalist>
+              </div>
+              <div>
+                <label style={lbl}>Kündigungsdatum</label>
+                <input type="date" {...field('cancelDate')} style={{ width: '100%' }} />
+              </div>
+            </div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', cursor: 'pointer' }}>
+              <input type="checkbox" {...check('aktiv')} />
+              Aktiv (als Dauerauftrag übernehmen)
+            </label>
+            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
+              <button type="submit" style={{ flex: 1 }}>{isEditing ? 'Änderungen speichern' : 'Abonnement hinzufügen'}</button>
+              <button type="button" onClick={closeModal} style={{ background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: 8, padding: '0.6rem 1rem', cursor: 'pointer' }}>Abbrechen</button>
+            </div>
+          </form>
+        </Modal>
+      )}
     </div>
   )
 }
