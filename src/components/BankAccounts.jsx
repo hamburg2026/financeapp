@@ -86,6 +86,9 @@ function TransactionModal({ accountId, accounts, transactions, categories, onClo
   const [addAmt,   setAddAmt]   = useState('')
   const [addCat,   setAddCat]   = useState('')
 
+  const [selectedIds, setSelectedIds] = useState(new Set())
+  const [bulkCat,     setBulkCat]     = useState('')
+
   const catType  = name => categories.find(c => c.name === name)?.type || null
   const accLabel = id   => accounts.find(a => a.id === id)?.name || '–'
 
@@ -158,6 +161,21 @@ function TransactionModal({ accountId, accounts, transactions, categories, onClo
     onUpdateAccounts(accounts.map(a => a.id === aId ? { ...a, balance: a.balance + amt } : a))
     onUpdateTransactions([...transactions, { id: Date.now(), accountId: aId, date: addDate, description: addDesc, recipient: addRecip, amount: amt, category: addCat }])
     setAddDate(today()); setAddDesc(''); setAddRecip(''); setAddAmt(''); setAddCat('')
+  }
+
+  function toggleSelect(id) {
+    setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+  }
+
+  function toggleSelectAll() {
+    setSelectedIds(selectedIds.size === filtered.length ? new Set() : new Set(filtered.map(t => t.id)))
+  }
+
+  function bulkAssign() {
+    if (!bulkCat || selectedIds.size === 0) return
+    onUpdateTransactions(transactions.map(t => selectedIds.has(t.id) ? { ...t, category: bulkCat } : t))
+    setSelectedIds(new Set())
+    setBulkCat('')
   }
 
   const title = accountId ? `Umsätze – ${accLabel(accountId)}` : 'Alle Umsätze'
@@ -258,11 +276,39 @@ function TransactionModal({ accountId, accounts, transactions, categories, onClo
           </button>
         </div>
 
+        {/* Bulk action bar */}
+        {selectedIds.size > 0 && (
+          <div style={{ padding: '0.45rem 1.25rem', borderBottom: '1px solid var(--color-border)', flexShrink: 0,
+            background: '#eff6ff', display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--color-primary)' }}>
+              {selectedIds.size} ausgewählt
+            </span>
+            <select value={bulkCat} onChange={e => setBulkCat(e.target.value)} style={{ fontSize: '0.78rem', padding: '0.2rem 0.4rem' }}>
+              <option value="">Kategorie wählen…</option>
+              {buildCategoryOptions(categories, 'name')}
+            </select>
+            <button onClick={bulkAssign} disabled={!bulkCat}
+              style={{ ...btnSm, background: bulkCat ? 'var(--color-primary)' : '#e5e7eb', color: bulkCat ? '#fff' : '#9ca3af', padding: '0.23rem 0.7rem' }}>
+              Zuordnen
+            </button>
+            <button onClick={() => setSelectedIds(new Set())}
+              style={{ ...btnSm, background: 'none', color: 'var(--color-text-muted)', padding: '0.23rem 0.5rem' }}>
+              Auswahl aufheben
+            </button>
+          </div>
+        )}
+
         {/* Scrollable table */}
         <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: 'var(--color-surface)', borderBottom: '2px solid var(--color-border)' }}>
+                <th style={{ ...c, width: 32, position: 'sticky', top: 0, background: 'var(--color-surface)', zIndex: 1 }}>
+                  <input type="checkbox"
+                    checked={filtered.length > 0 && selectedIds.size === filtered.length}
+                    onChange={toggleSelectAll}
+                    style={{ cursor: 'pointer' }} />
+                </th>
                 {['Datum', 'Beschreibung', 'Empfänger', 'Betrag', 'Kategorie', ''].map((h, i) => (
                   <th key={i} style={{ ...c, fontWeight: 700, textAlign: i === 3 ? 'right' : 'left',
                     whiteSpace: 'nowrap', position: 'sticky', top: 0, background: 'var(--color-surface)', zIndex: 1 }}>
@@ -273,13 +319,14 @@ function TransactionModal({ accountId, accounts, transactions, categories, onClo
             </thead>
             <tbody>
               {filtered.length === 0 && (
-                <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '2.5rem', fontSize: '0.85rem' }}>
+                <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '2.5rem', fontSize: '0.85rem' }}>
                   Keine Umsätze im gewählten Zeitraum
                 </td></tr>
               )}
               {filtered.map(t => {
                 if (editId === t.id) return (
                   <tr key={t.id} style={{ background: '#fefce8', borderBottom: '1px solid var(--color-border)' }}>
+                    <td style={c} />
                     <td style={c}><input type="date" value={editDate} onChange={e => setEditDate(e.target.value)} style={{ fontSize: '0.76rem', padding: '0.13rem 0.3rem', width: 120 }} /></td>
                     <td style={c}><input value={editDesc} onChange={e => setEditDesc(e.target.value)} style={{ fontSize: '0.76rem', padding: '0.13rem 0.3rem', width: '100%', minWidth: 140 }} /></td>
                     <td style={c}><input value={editRecip} onChange={e => setEditRecip(e.target.value)} style={{ fontSize: '0.76rem', padding: '0.13rem 0.3rem', width: 90 }} /></td>
@@ -298,8 +345,12 @@ function TransactionModal({ accountId, accounts, transactions, categories, onClo
                     </td>
                   </tr>
                 )
+                const isSelected = selectedIds.has(t.id)
                 return (
-                  <tr key={t.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                  <tr key={t.id} style={{ borderBottom: '1px solid var(--color-border)', background: isSelected ? '#eff6ff' : undefined }}>
+                    <td style={{ ...c, width: 32 }}>
+                      <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(t.id)} style={{ cursor: 'pointer' }} />
+                    </td>
                     <td style={{ ...c, color: 'var(--color-text-muted)', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{t.date}</td>
                     <td style={{ ...c, maxWidth: 260 }}><span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{t.description}</span></td>
                     <td style={{ ...c, color: 'var(--color-text-muted)', maxWidth: 130 }}><span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{t.recipient || '–'}</span></td>
