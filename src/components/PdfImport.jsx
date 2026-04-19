@@ -38,6 +38,49 @@ function parseGermanAmount(str) {
   return isNaN(n) ? null : n
 }
 
+function splitCsvLine(line, sep = ';') {
+  const fields = []
+  let cur = '', inQ = false
+  for (const ch of line) {
+    if (ch === '"') { inQ = !inQ }
+    else if (ch === sep && !inQ) { fields.push(cur); cur = '' }
+    else cur += ch
+  }
+  fields.push(cur)
+  return fields.map(f => f.trim().replace(/^"|"$/g, ''))
+}
+
+function extractCsvRecipient(buchungstext) {
+  const m = buchungstext.match(/^(.*?)(?:\s+End-to-End-Ref\.|\s+Mandatsref|\s+Gläubiger-ID|\s+Kundenreferenz:|\s+SEPA-|\s+WPKNR:|\s+ISIN:|\s+NENNWERT:|\s+GESCH\.TG)/)
+  return (m ? m[1] : buchungstext).trim().slice(0, 80)
+}
+
+function parseCsvCommerzbank(text) {
+  const lines = text.split(/\r?\n/)
+  const headerIdx = lines.findIndex(l => l.includes('Buchungstag') && l.includes('Buchungstext'))
+  if (headerIdx === -1) return []
+  const header = splitCsvLine(lines[headerIdx])
+  const col = name => header.findIndex(h => h.includes(name))
+  const colDate = col('Buchungstag'), colText = col('Buchungstext'), colAmt = col('Betrag')
+  if (colDate === -1 || colText === -1 || colAmt === -1) return []
+  const results = []
+  for (let i = headerIdx + 1; i < lines.length; i++) {
+    const cells = splitCsvLine(lines[i])
+    if (cells.length <= colAmt) continue
+    const date = parseGermanDate(cells[colDate])
+    if (!date) continue
+    const amount = parseGermanAmount(cells[colAmt])
+    if (amount === null) continue
+    const buchungstext = cells[colText] || ''
+    results.push({
+      date, amount,
+      description: buchungstext.slice(0, 250) || '–',
+      recipient: extractCsvRecipient(buchungstext),
+    })
+  }
+  return results
+}
+
 // Extract all lines from a PDF file using PDF.js
 async function extractPdfLines(file) {
   const buffer = await file.arrayBuffer()
@@ -265,8 +308,13 @@ export default function PdfImport({ onNavigate }) {
       const existing = transactions.filter(t => t.accountId === parseInt(selectedAccountId))
       const allParsed = []
       for (const file of files) {
-        const lines = await extractPdfLines(file)
-        const txs = bankType === 'commerzbank' ? parseCommerzbank(lines) : parseTransactions(lines)
+        let txs
+        if (file.name.toLowerCase().endsWith('.csv')) {
+          txs = parseCsvCommerzbank(await file.text())
+        } else {
+          const lines = await extractPdfLines(file)
+          txs = bankType === 'commerzbank' ? parseCommerzbank(lines) : parseTransactions(lines)
+        }
         for (const tx of txs) {
           const dup = isDuplicate(tx, [...existing, ...allParsed.filter(p => !p._skip)])
           const sugCat = suggestCategory(tx.description, tx.recipient, lookup)
@@ -398,7 +446,7 @@ export default function PdfImport({ onNavigate }) {
           </div>
           <p style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', marginTop: '0.35rem', marginBottom: 0 }}>
             {bankType === 'commerzbank'
-              ? 'Jede Zeile enthält Empfänger, Datum und Betrag. Folgezeilen werden als Buchungstext übernommen.'
+              ? 'PDF-Kontoauszüge (Empfänger/Datum/Betrag pro Zeile) und CSV-Exporte aus dem Commerzbank Online-Banking werden unterstützt.'
               : 'Universeller Parser: erkennt Datum und Betrag in mehrzeiligen Blöcken.'}
           </p>
         </div>
@@ -415,7 +463,7 @@ export default function PdfImport({ onNavigate }) {
               background: 'var(--color-primary)', color: '#fff', fontSize: '0.85rem', fontWeight: 600,
             }}>
               Dateien wählen
-              <input ref={fileInputRef} type="file" accept=".pdf" multiple style={{ display: 'none' }}
+              <input ref={fileInputRef} type="file" accept={bankType === 'commerzbank' ? '.pdf,.csv' : '.pdf'} multiple style={{ display: 'none' }}
                 onChange={e => {
                   const newFiles = [...e.target.files]
                   setFiles(prev => {
