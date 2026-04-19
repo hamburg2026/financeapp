@@ -6,6 +6,7 @@ export default function CategorySelect({
   onChange,
   valueKey = 'id',
   placeholder = '– Kategorie wählen –',
+  selectParents = false,
   style = {},
 }) {
   const [open, setOpen]       = useState(false)
@@ -46,10 +47,13 @@ export default function CategorySelect({
         const isSelected = (value !== '' && value != null) && String(value) === String(getVal(cat))
         const pl = 0.65 + depth * 1.1
 
+        const toggleExpand = () => setExpanded(prev => {
+          const n = new Set(prev); n.has(cat.id) ? n.delete(cat.id) : n.add(cat.id); return n
+        })
+
         function handleClick() {
-          if (hasKids) {
-            // Parent category: toggle expand only, keep dropdown open
-            setExpanded(prev => { const n = new Set(prev); n.has(cat.id) ? n.delete(cat.id) : n.add(cat.id); return n })
+          if (hasKids && !selectParents) {
+            toggleExpand()
           } else {
             emit(getVal(cat))
           }
@@ -72,9 +76,14 @@ export default function CategorySelect({
               }}
             >
               {hasKids
-                ? <span style={{ fontSize: '0.72rem', color: isSelected ? '#fff' : 'var(--color-text-muted)', flexShrink: 0, marginRight: '0.3rem', lineHeight: 1 }}>
-                    {isExpanded ? '▾' : '▸'}
-                  </span>
+                ? selectParents
+                  ? <button onClick={e => { e.stopPropagation(); toggleExpand() }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 0.3rem 0 0', fontSize: '0.72rem', color: isSelected ? '#fff' : 'var(--color-text-muted)', flexShrink: 0, lineHeight: 1 }}>
+                      {isExpanded ? '▾' : '▸'}
+                    </button>
+                  : <span style={{ fontSize: '0.72rem', color: isSelected ? '#fff' : 'var(--color-text-muted)', flexShrink: 0, marginRight: '0.3rem', lineHeight: 1 }}>
+                      {isExpanded ? '▾' : '▸'}
+                    </span>
                 : <span style={{ width: '1.1rem', flexShrink: 0 }} />
               }
               <span style={{ flex: 1 }}>{cat.name}</span>
