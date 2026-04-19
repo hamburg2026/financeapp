@@ -79,13 +79,6 @@ function TransactionModal({ accountId, accounts, transactions, categories, onClo
   const [editAmt,   setEditAmt]   = useState('')
   const [editCat,   setEditCat]   = useState('')
 
-  const [addAccId, setAddAccId] = useState(accountId ? String(accountId) : (accounts[0]?.id ? String(accounts[0].id) : ''))
-  const [addDate,  setAddDate]  = useState(today())
-  const [addDesc,  setAddDesc]  = useState('')
-  const [addRecip, setAddRecip] = useState('')
-  const [addAmt,   setAddAmt]   = useState('')
-  const [addCat,   setAddCat]   = useState('')
-
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [bulkCat,     setBulkCat]     = useState('')
 
@@ -154,15 +147,6 @@ function TransactionModal({ accountId, accounts, transactions, categories, onClo
     onUpdateTransactions(transactions.filter(t => t.id !== id))
   }
 
-  function addTx(e) {
-    e.preventDefault()
-    const aId = parseInt(addAccId)
-    const amt = applySign(addAmt, addCat)
-    onUpdateAccounts(accounts.map(a => a.id === aId ? { ...a, balance: a.balance + amt } : a))
-    onUpdateTransactions([...transactions, { id: Date.now(), accountId: aId, date: addDate, description: addDesc, recipient: addRecip, amount: amt, category: addCat }])
-    setAddDate(today()); setAddDesc(''); setAddRecip(''); setAddAmt(''); setAddCat('')
-  }
-
   function toggleSelect(id) {
     setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
   }
@@ -209,9 +193,9 @@ function TransactionModal({ accountId, accounts, transactions, categories, onClo
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.3rem', lineHeight: 1, color: 'var(--color-text-muted)', padding: '0.2rem 0.5rem' }}>✕</button>
         </div>
 
-        {/* Date dimensions */}
-        <div style={{ padding: '0.6rem 1.25rem', borderBottom: '1px solid var(--color-border)', flexShrink: 0, background: 'var(--color-bg)' }}>
-          <div style={{ display: 'flex', gap: '0.28rem', flexWrap: 'wrap', marginBottom: '0.45rem' }}>
+        {/* Date dimension pills */}
+        <div style={{ padding: '0.5rem 1.25rem', borderBottom: '1px solid var(--color-border)', flexShrink: 0, background: 'var(--color-bg)' }}>
+          <div style={{ display: 'flex', gap: '0.28rem', flexWrap: 'wrap' }}>
             {DATE_DIMS.map(({ key, label }) => {
               const active = dateDim === key
               return (
@@ -225,28 +209,30 @@ function TransactionModal({ accountId, accounts, transactions, categories, onClo
               )
             })}
           </div>
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '0.71rem', color: 'var(--color-text-muted)' }}>Von</span>
-            <input type="date" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setDateDim('custom') }}
-              style={{ fontSize: '0.78rem', padding: '0.18rem 0.35rem', border: '1px solid var(--color-border)', borderRadius: 4 }} />
-            <span style={{ fontSize: '0.71rem', color: 'var(--color-text-muted)' }}>Bis</span>
-            <input type="date" value={dateTo} onChange={e => { setDateTo(e.target.value); setDateDim('custom') }}
-              style={{ fontSize: '0.78rem', padding: '0.18rem 0.35rem', border: '1px solid var(--color-border)', borderRadius: 4 }} />
-          </div>
         </div>
 
-        {/* Filters */}
-        <div style={{ padding: '0.55rem 1.25rem', borderBottom: '1px solid var(--color-border)', flexShrink: 0,
+        {/* Filters + date inputs */}
+        <div style={{ padding: '0.5rem 1.25rem', borderBottom: '1px solid var(--color-border)', flexShrink: 0,
           display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
           {!accountId && (
             <div>
               <div style={fl}>Konto</div>
               <select value={filterAcc} onChange={e => setFilterAcc(e.target.value)} style={{ fontSize: '0.78rem', padding: '0.2rem 0.35rem' }}>
-                <option value="">Alle</option>
+                <option value="">Alle Konten</option>
                 {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
               </select>
             </div>
           )}
+          <div>
+            <div style={fl}>Von</div>
+            <input type="date" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setDateDim('custom') }}
+              style={{ fontSize: '0.78rem', padding: '0.2rem 0.35rem', border: '1px solid var(--color-border)', borderRadius: 4 }} />
+          </div>
+          <div>
+            <div style={fl}>Bis</div>
+            <input type="date" value={dateTo} onChange={e => { setDateTo(e.target.value); setDateDim('custom') }}
+              style={{ fontSize: '0.78rem', padding: '0.2rem 0.35rem', border: '1px solid var(--color-border)', borderRadius: 4 }} />
+          </div>
           <div>
             <div style={fl}>Kategorie</div>
             <select value={filterCat} onChange={e => setFilterCat(e.target.value)} style={{ fontSize: '0.78rem', padding: '0.2rem 0.35rem' }}>
@@ -264,11 +250,11 @@ function TransactionModal({ accountId, accounts, transactions, categories, onClo
           </div>
           <div>
             <div style={fl}>Empfänger</div>
-            <input value={filterRecipient} onChange={e => setFilterRecipient(e.target.value)} placeholder="..." style={{ fontSize: '0.78rem', padding: '0.2rem 0.35rem', width: 100 }} />
+            <input value={filterRecipient} onChange={e => setFilterRecipient(e.target.value)} placeholder="…" style={{ fontSize: '0.78rem', padding: '0.2rem 0.35rem', width: 100 }} />
           </div>
           <div>
             <div style={fl}>Suche</div>
-            <input value={filterSearch} onChange={e => setFilterSearch(e.target.value)} placeholder="Beschreibung…" style={{ fontSize: '0.78rem', padding: '0.2rem 0.35rem', width: 140 }} />
+            <input value={filterSearch} onChange={e => setFilterSearch(e.target.value)} placeholder="Buchungstext…" style={{ fontSize: '0.78rem', padding: '0.2rem 0.35rem', width: 130 }} />
           </div>
           <button onClick={() => { setFilterCat(''); setFilterType('all'); setFilterRecipient(''); setFilterSearch('') }}
             style={{ ...btnSm, background: '#e5e7eb', color: '#374151', padding: '0.23rem 0.6rem', alignSelf: 'flex-end' }}>
@@ -309,7 +295,7 @@ function TransactionModal({ accountId, accounts, transactions, categories, onClo
                     onChange={toggleSelectAll}
                     style={{ cursor: 'pointer' }} />
                 </th>
-                {['Datum', 'Beschreibung', 'Empfänger', 'Betrag', 'Kategorie', ''].map((h, i) => (
+                {['Datum', 'Empfänger', 'Buchungstext', 'Betrag', 'Kategorie', ''].map((h, i) => (
                   <th key={i} style={{ ...c, fontWeight: 700, textAlign: i === 3 ? 'right' : 'left',
                     whiteSpace: 'nowrap', position: 'sticky', top: 0, background: 'var(--color-surface)', zIndex: 1 }}>
                     {h}
@@ -328,8 +314,8 @@ function TransactionModal({ accountId, accounts, transactions, categories, onClo
                   <tr key={t.id} style={{ background: '#fefce8', borderBottom: '1px solid var(--color-border)' }}>
                     <td style={c} />
                     <td style={c}><input type="date" value={editDate} onChange={e => setEditDate(e.target.value)} style={{ fontSize: '0.76rem', padding: '0.13rem 0.3rem', width: 120 }} /></td>
-                    <td style={c}><input value={editDesc} onChange={e => setEditDesc(e.target.value)} style={{ fontSize: '0.76rem', padding: '0.13rem 0.3rem', width: '100%', minWidth: 140 }} /></td>
                     <td style={c}><input value={editRecip} onChange={e => setEditRecip(e.target.value)} style={{ fontSize: '0.76rem', padding: '0.13rem 0.3rem', width: 90 }} /></td>
+                    <td style={c}><input value={editDesc} onChange={e => setEditDesc(e.target.value)} style={{ fontSize: '0.76rem', padding: '0.13rem 0.3rem', width: '100%', minWidth: 140 }} /></td>
                     <td style={c}>
                       <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
                         <input type="number" value={editAmt} onChange={e => setEditAmt(e.target.value)} step="0.01" min="0" style={{ fontSize: '0.76rem', padding: '0.13rem 0.3rem', width: 80, textAlign: 'right' }} />
@@ -352,8 +338,8 @@ function TransactionModal({ accountId, accounts, transactions, categories, onClo
                       <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(t.id)} style={{ cursor: 'pointer' }} />
                     </td>
                     <td style={{ ...c, color: 'var(--color-text-muted)', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{t.date}</td>
-                    <td style={{ ...c, maxWidth: 260 }}><span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{t.description}</span></td>
                     <td style={{ ...c, color: 'var(--color-text-muted)', maxWidth: 130 }}><span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{t.recipient || '–'}</span></td>
+                    <td style={{ ...c, maxWidth: 260 }}><span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{t.description}</span></td>
                     <td style={{ ...c, fontWeight: 700, color: t.amount >= 0 ? '#16a34a' : '#dc2626', whiteSpace: 'nowrap', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{fmt(t.amount)}</td>
                     <td style={{ ...c, color: 'var(--color-text-muted)', fontSize: '0.75rem' }}>{t.category || '–'}</td>
                     <td style={{ ...c, whiteSpace: 'nowrap' }}>
@@ -367,34 +353,7 @@ function TransactionModal({ accountId, accounts, transactions, categories, onClo
           </table>
         </div>
 
-        {/* Add form */}
-        <div style={{ padding: '0.65rem 1.25rem', borderTop: '2px solid var(--color-border)', flexShrink: 0, background: 'var(--color-bg)' }}>
-          <div style={{ fontSize: '0.69rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-muted)', marginBottom: '0.45rem' }}>
-            Umsatz erfassen
-          </div>
-          <form onSubmit={addTx} style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
-            <select value={addAccId} onChange={e => setAddAccId(e.target.value)} required style={{ fontSize: '0.79rem', padding: '0.22rem 0.4rem' }}>
-              <option value="">Konto</option>
-              {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-            </select>
-            <input type="date" value={addDate} onChange={e => setAddDate(e.target.value)} required style={{ fontSize: '0.79rem', padding: '0.22rem 0.4rem' }} />
-            <input value={addDesc} onChange={e => setAddDesc(e.target.value)} placeholder="Beschreibung" required style={{ fontSize: '0.79rem', padding: '0.22rem 0.4rem', flex: '1 1 140px', minWidth: 100 }} />
-            <input value={addRecip} onChange={e => setAddRecip(e.target.value)} placeholder="Empfänger" style={{ fontSize: '0.79rem', padding: '0.22rem 0.4rem', width: 110 }} />
-            <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
-              <input type="number" value={addAmt} onChange={e => setAddAmt(e.target.value)} placeholder="Betrag" step="0.01" min="0" required style={{ fontSize: '0.79rem', padding: '0.22rem 0.4rem', width: 90 }} />
-              {catType(addCat) && <span style={{ fontSize: '0.71rem', fontWeight: 700, padding: '0.13rem 0.35rem', borderRadius: 4, background: catType(addCat) === 'Ausgabe' ? '#fee2e2' : '#dcfce7', color: catType(addCat) === 'Ausgabe' ? '#dc2626' : '#16a34a' }}>
-                {catType(addCat) === 'Ausgabe' ? '− Ausgabe' : '+ Einnahme'}
-              </span>}
-            </div>
-            <select value={addCat} onChange={e => setAddCat(e.target.value)} style={{ fontSize: '0.79rem', padding: '0.22rem 0.4rem' }}>
-              <option value="">Kategorie</option>
-              {buildCategoryOptions(categories, 'name')}
-            </select>
-            <button type="submit" style={{ padding: '0.24rem 0.85rem', borderRadius: 6, border: 'none', background: 'var(--color-primary)', color: '#fff', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 }}>
-              Erfassen
-            </button>
-          </form>
-        </div>
+
       </div>
     </div>
   )
