@@ -50,7 +50,13 @@ async function deriveKey(password, salt) {
   )
 }
 
-function toBase64(buf) { return btoa(String.fromCharCode(...new Uint8Array(buf))) }
+function toBase64(buf) {
+  const bytes = new Uint8Array(buf)
+  let binary = ''
+  for (let i = 0; i < bytes.length; i += 8192)
+    binary += String.fromCharCode(...bytes.subarray(i, i + 8192))
+  return btoa(binary)
+}
 function fromBase64(str) { return Uint8Array.from(atob(str), c => c.charCodeAt(0)) }
 
 // Returns BACKUP_SECTIONS indices where at least one key is present in data
