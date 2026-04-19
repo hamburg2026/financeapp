@@ -181,42 +181,43 @@ function suggestCategory(description, recipient, lookup) {
 }
 
 // ── Commerzbank parser ─────────────────────────────────────────────────
-// Each transaction line contains recipient + date + amount.
-// Lines between two transaction lines become the Buchungstext.
+// Format: erste Zeile jedes Blocks = "Empfänger TT.MM Betrag"
+// Folgezeilen = Buchungstext. Betrag mit trailing "-" = Ausgabe, ohne = Einnahme.
 function parseCommerzbank(lines) {
   const results = []
 
-  // Identify transaction lines: contain BOTH a date and an amount
-  const txLines = []
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]
-    const dateMatch = line.match(/\b(\d{2}\.\d{2}\.(?:20|19)?\d{2})\b/)
-    if (!dateMatch) continue
-    const amountMatches = [...line.matchAll(AMOUNT_RE)]
-    if (amountMatches.length === 0) continue
-    const date = parseGermanDate(dateMatch[1])
-    const amount = parseGermanAmount(amountMatches[0][1])
-    if (!date || amount === null || amount === 0) continue
-    txLines.push({ lineIdx: i, date, amount, amountStr: amountMatches[0][0], dateStr: dateMatch[0] })
+  // Jahr aus Dokument ableiten (z. B. aus "Kontoauszug_2025" oder "20.12.2025")
+  let year = String(new Date().getFullYear())
+  for (const line of lines) {
+    const m = line.match(/\b(20\d{2})\b/)
+    if (m) { year = m[1]; break }
   }
 
+  // Transaktionszeile: "Empfänger TT.MM Betrag" – TT.MM darf KEIN weiteres ".\d" folgen
+  // (schließt vollständige Daten wie 01.12.25 als Valuta-Datum aus)
+  // Greedy (.+) damit das Valuta-Datum am Ende der Empfängertext-Sektion steht
+  const CB_TX_RE = /^(.+)\s+(\d{2}\.\d{2})(?!\.\d)\s+(\d{1,3}(?:\.\d{3})*,\d{2}\s*-?)$/
+
+  // Alle Transaktionszeilen finden
+  const txLines = []
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(CB_TX_RE)
+    if (!m) continue
+    const amount = parseGermanAmount(m[3].trim())
+    if (amount === null || amount === 0) continue
+    const [dd, mm] = m[2].split('.')
+    txLines.push({ lineIdx: i, date: `${year}-${mm}-${dd}`, amount, recipient: m[1].trim().slice(0, 80) })
+  }
+
+  // Für jede Transaktion Folgezeilen als Buchungstext einsammeln
   for (let ti = 0; ti < txLines.length; ti++) {
-    const { lineIdx, date, amount, amountStr, dateStr } = txLines[ti]
+    const { lineIdx, date, amount, recipient } = txLines[ti]
     const nextLineIdx = ti + 1 < txLines.length ? txLines[ti + 1].lineIdx : lines.length
 
-    // Recipient = transaction line minus date and amount
-    const recipient = lines[lineIdx]
-      .replace(dateStr, '')
-      .replace(amountStr, '')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .slice(0, 80)
-
-    // Continuation lines → Buchungstext
     const contLines = []
     for (let j = lineIdx + 1; j < nextLineIdx; j++) {
       const txt = lines[j].trim()
-      if (txt) contLines.push(txt)
+      if (txt && !txt.startsWith('Buchungsdatum:') && !txt.startsWith('Angaben zu den')) contLines.push(txt)
     }
     const description = contLines.join(' ').replace(/\s+/g, ' ').trim().slice(0, 250) || recipient
 
