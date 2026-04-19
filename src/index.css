@@ -123,6 +123,68 @@ html, body {
   padding: 0.9rem 1rem 0.3rem;
 }
 
+/* ── Sidebar Footer & Theme Picker ────────────── */
+.sidebar-footer {
+  border-top: 1px solid rgba(255,255,255,0.12);
+  padding-bottom: var(--safe-area-bottom);
+}
+
+.sidebar-theme-picker {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  padding: 0.6rem 1rem 0.4rem;
+}
+
+.sidebar-theme-label {
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255,255,255,0.4);
+  margin-right: 0.15rem;
+}
+
+.theme-dot {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition: transform 0.12s, border-color 0.12s;
+}
+
+.theme-dot:hover { transform: scale(1.18); }
+
+.theme-dot.active {
+  border-color: rgba(255,255,255,0.9);
+  transform: scale(1.12);
+}
+
+.print-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: none;
+  border: none;
+  border-radius: 0;
+  color: rgba(255,255,255,0.7);
+  font-size: 0.9rem;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.print-btn:hover {
+  background-color: rgba(255,255,255,0.1);
+  color: #fff;
+}
+
 /* ── Main Content ──────────────────────────────── */
 .main-content {
   flex: 1;

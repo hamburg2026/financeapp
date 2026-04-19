@@ -135,7 +135,7 @@ export default function WealthChart() {
       <div style={{
         position: 'relative',
         overflow: 'hidden',
-        background: 'linear-gradient(135deg, #0d3d22 0%, #1a6b3c 45%, #5b21b6 100%)',
+        background: 'linear-gradient(135deg, var(--color-primary-dark) 0%, var(--color-primary) 60%, color-mix(in srgb, var(--color-primary) 55%, #5b21b6) 100%)',
         padding: '2rem 2rem 1.75rem',
         color: '#fff',
       }}>

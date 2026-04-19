@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { fmt, fmtNum } from '../fmt'
+import Modal from './Modal'
 
 function useLocalStorage(key, initial) {
   const [value, setValue] = useState(() => JSON.parse(localStorage.getItem(key)) || initial)
@@ -165,8 +166,8 @@ export default function CompanyShares() {
     <div className="module">
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
         <h2 style={{ margin: 0 }}>Firmenbeteiligungen</h2>
-        <button onClick={() => showForm ? cancelForm() : setShowForm(true)} style={{ padding: '0.4rem 0.9rem', fontSize: '0.85rem' }}>
-          {showForm ? 'Abbrechen' : '+ Neu'}
+        <button onClick={() => setShowForm(true)} style={{ padding: '0.4rem 0.9rem', fontSize: '0.85rem' }}>
+          + Neu
         </button>
       </div>
 
@@ -222,31 +223,32 @@ export default function CompanyShares() {
       )}
 
       {showForm && (
-        <form onSubmit={saveShare} style={{ background: 'var(--color-bg)', borderRadius: 8, padding: '1rem', marginTop: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', border: '1px solid var(--color-border)' }}>
-          <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--color-primary)' }}>{editId ? 'Beteiligung bearbeiten' : 'Neue Beteiligung'}</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
-            <div>
-              <label style={labelStyle}>Firmenname *</label>
-              <input {...field('company')} placeholder="z. B. Muster GmbH" required style={{ ...inputStyle, width: '100%' }} />
+        <Modal title={editId ? 'Beteiligung bearbeiten' : 'Neue Beteiligung'} onClose={cancelForm} maxWidth={520}>
+          <form onSubmit={saveShare} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+              <div>
+                <label style={labelStyle}>Firmenname *</label>
+                <input {...field('company')} placeholder="z. B. Muster GmbH" required style={{ ...inputStyle, width: '100%' }} />
+              </div>
+              <div>
+                <label style={labelStyle}>Beteiligung (%)</label>
+                <input type="number" {...field('percentage')} placeholder="z. B. 25" step="0.01" min="0" max="100" required style={{ ...inputStyle, width: '100%' }} />
+              </div>
             </div>
             <div>
-              <label style={labelStyle}>Beteiligung (%)</label>
-              <input type="number" {...field('percentage')} placeholder="z. B. 25" step="0.01" min="0" max="100" required style={{ ...inputStyle, width: '100%' }} />
+              <label style={labelStyle}>Aktueller Wert (€)</label>
+              <input type="number" {...field('value')} placeholder="z. B. 50000" step="0.01" min="0" required style={{ ...inputStyle, width: '100%' }} />
             </div>
-          </div>
-          <div>
-            <label style={labelStyle}>Aktueller Wert (€)</label>
-            <input type="number" {...field('value')} placeholder="z. B. 50000" step="0.01" min="0" required style={{ ...inputStyle, width: '100%' }} />
-          </div>
-          <div>
-            <label style={labelStyle}>Notizen</label>
-            <textarea {...field('notes')} placeholder="Anmerkungen zur Beteiligung…" rows={2} style={{ ...inputStyle, width: '100%', resize: 'vertical' }} />
-          </div>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <button type="submit" style={{ flex: 1 }}>{editId ? 'Änderungen speichern' : 'Beteiligung hinzufügen'}</button>
-            <button type="button" onClick={cancelForm} style={{ background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: 6, padding: '0.4rem 0.9rem', cursor: 'pointer' }}>Abbrechen</button>
-          </div>
-        </form>
+            <div>
+              <label style={labelStyle}>Notizen</label>
+              <textarea {...field('notes')} placeholder="Anmerkungen zur Beteiligung…" rows={2} style={{ ...inputStyle, width: '100%', resize: 'vertical' }} />
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
+              <button type="submit" style={{ flex: 1 }}>{editId ? 'Änderungen speichern' : 'Beteiligung hinzufügen'}</button>
+              <button type="button" onClick={cancelForm} style={{ background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: 8, padding: '0.6rem 1rem', cursor: 'pointer' }}>Abbrechen</button>
+            </div>
+          </form>
+        </Modal>
       )}
     </div>
   )

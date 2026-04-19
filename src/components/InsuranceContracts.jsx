@@ -1,6 +1,7 @@
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import { fmt } from '../fmt'
 import { buildCategoryOptions } from '../categoryOptions'
+import Modal from './Modal'
 
 function useLocalStorage(key, initial) {
   const [value, setValue] = useState(() => JSON.parse(localStorage.getItem(key)) || initial)
@@ -309,7 +310,6 @@ const EMPTY_FORM = {
 }
 
 export default function InsuranceContracts() {
-  const formRef = useRef(null)
   const [contracts, setContracts] = useLocalStorage('insuranceContracts', [])
   const [allCategories] = useLocalStorage('categories', [])
   const expenseCategories = allCategories.filter(c => c.type === 'Ausgabe')
@@ -411,7 +411,6 @@ export default function InsuranceContracts() {
     })
     setEditId(c.id)
     setShowForm(true)
-    setTimeout(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50)
   }
 
   function cancelForm() {
@@ -494,29 +493,14 @@ export default function InsuranceContracts() {
     <div className="module">
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
         <h2 style={{ margin: 0 }}>Versicherungsverträge</h2>
-        <button
-          onClick={() => {
-            if (showForm) { cancelForm() } else {
-              setShowForm(true)
-              setTimeout(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50)
-            }
-          }}
-          style={{ padding: '0.4rem 0.9rem', fontSize: '0.85rem' }}
-        >
-          {showForm ? 'Abbrechen' : '+ Neu'}
+        <button onClick={() => setShowForm(true)} style={{ padding: '0.4rem 0.9rem', fontSize: '0.85rem' }}>
+          + Neu
         </button>
       </div>
 
-      {/* ── Formular (oben, nicht am Ende der Liste) ── */}
       {showForm && (
-        <form ref={formRef} onSubmit={saveContract} style={{
-          background: 'var(--color-bg)', borderRadius: 8, padding: '1rem',
-          marginBottom: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem',
-          border: '1px solid var(--color-border)',
-        }}>
-          <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--color-primary)' }}>
-            {editId ? 'Vertrag bearbeiten' : 'Neuer Vertrag'}
-          </div>
+        <Modal title={editId ? 'Vertrag bearbeiten' : 'Neuer Vertrag'} onClose={cancelForm} maxWidth={680}>
+          <form onSubmit={saveContract} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.6rem' }}>
             <div>
@@ -685,15 +669,16 @@ export default function InsuranceContracts() {
               style={{ ...inputStyle, width: '100%', resize: 'vertical' }} />
           </div>
 
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
             <button type="submit" style={{ flex: 1 }}>
               {editId ? 'Änderungen speichern' : 'Vertrag hinzufügen'}
             </button>
-            <button type="button" onClick={cancelForm} style={{ background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: 6, padding: '0.4rem 0.9rem', cursor: 'pointer' }}>
+            <button type="button" onClick={cancelForm} style={{ background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: 8, padding: '0.6rem 1rem', cursor: 'pointer' }}>
               Abbrechen
             </button>
           </div>
-        </form>
+          </form>
+        </Modal>
       )}
 
       {/* ── Filter- und Gruppierungsleiste ── */}
