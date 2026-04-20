@@ -34,6 +34,11 @@ export default function Categories() {
     setModal('add')
   }
 
+  function openAddChild(c) {
+    setName(''); setParent(String(c.id)); setType(c.type || 'Ausgabe')
+    setModal('add')
+  }
+
   function openEdit(c) {
     setName(c.name)
     setParent(c.parent ? String(c.parent) : '')
@@ -57,7 +62,15 @@ export default function Categories() {
     closeModal()
   }
 
-  function removeCategory(id) { setCategories(categories.filter(c => c.id !== id && c.parent !== id)) }
+  function getAllDescendantIds(id) {
+    const children = categories.filter(c => c.parent === id)
+    return [id, ...children.flatMap(c => getAllDescendantIds(c.id))]
+  }
+
+  function removeCategory(id) {
+    const toRemove = new Set(getAllDescendantIds(id))
+    setCategories(categories.filter(c => !toRemove.has(c.id)))
+  }
 
   function toggle(id) {
     setExpanded(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
@@ -90,6 +103,7 @@ export default function Categories() {
             <span style={{ fontSize: '0.68rem', fontWeight: 600, background: typeColor + '18', color: typeColor, border: `1px solid ${typeColor}40`, borderRadius: 4, padding: '0.1rem 0.4rem', flexShrink: 0 }}>
               {c.type || 'Ausgabe'}
             </span>
+            <button onClick={() => openAddChild(c)} style={{ ...btnBase, background: '#dcfce7', color: '#16a34a' }} title="Unterkategorie hinzufügen">+</button>
             <button onClick={() => openEdit(c)} style={{ ...btnBase, background: '#e5e7eb', color: '#374151' }} title="Bearbeiten">✎</button>
             <button onClick={() => removeCategory(c.id)} style={{ ...btnBase, background: '#fee2e2', color: '#dc2626' }} title="Löschen">✕</button>
           </div>
