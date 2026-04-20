@@ -121,6 +121,8 @@ function PivotDrilldownModal({ txSubset, categories, accounts, title, onClose, o
   const [editAmt,   setEditAmt]   = useState('')
   const [editSign,  setEditSign]  = useState(-1)
   const [editCat,   setEditCat]   = useState('')
+  const [selectedIds, setSelectedIds] = useState(new Set())
+  const [bulkCat,     setBulkCat]     = useState('')
 
   const groups = useMemo(() => {
     const map = {}
@@ -141,6 +143,28 @@ function PivotDrilldownModal({ txSubset, categories, accounts, title, onClose, o
 
   function toggleGroup(key) {
     setExpandedGroups(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n })
+  }
+
+  function toggleSelect(id, e) {
+    e.stopPropagation()
+    setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+  }
+
+  function toggleGroupSelect(ids, e) {
+    e.stopPropagation()
+    const allSelected = ids.every(id => selectedIds.has(id))
+    setSelectedIds(prev => {
+      const n = new Set(prev)
+      allSelected ? ids.forEach(id => n.delete(id)) : ids.forEach(id => n.add(id))
+      return n
+    })
+  }
+
+  function bulkAssign() {
+    if (!bulkCat || selectedIds.size === 0) return
+    onUpdateTransactions(txSubset.map(t => selectedIds.has(t.id) ? { ...t, category: bulkCat } : t))
+    setSelectedIds(new Set())
+    setBulkCat('')
   }
 
   function startEdit(t) {
@@ -205,11 +229,36 @@ function PivotDrilldownModal({ txSubset, categories, accounts, title, onClose, o
               color: 'var(--color-text-muted)', padding: '0.2rem 0.5rem' }}>✕</button>
         </div>
 
+        {/* Bulk action bar */}
+        {selectedIds.size > 0 && (
+          <div style={{ padding: '0.45rem 1.25rem', borderBottom: '1px solid var(--color-border)', flexShrink: 0,
+            background: '#eff6ff', display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--color-primary)' }}>
+              {selectedIds.size} ausgewählt
+            </span>
+            <CategorySelect value={bulkCat} onChange={e => setBulkCat(e.target.value)}
+              categories={categories} valueKey="name" placeholder="Kategorie wählen…"
+              style={{ fontSize: '0.78rem', padding: '0.2rem 0.4rem' }} />
+            <button onClick={bulkAssign} disabled={!bulkCat}
+              style={{ ...btn, background: bulkCat ? 'var(--color-primary)' : '#e5e7eb',
+                color: bulkCat ? '#fff' : '#9ca3af', padding: '0.23rem 0.7rem' }}>
+              Zuordnen
+            </button>
+            <button onClick={() => setSelectedIds(new Set())}
+              style={{ ...btn, background: 'none', color: 'var(--color-text-muted)', padding: '0.23rem 0.5rem' }}>
+              Auswahl aufheben
+            </button>
+          </div>
+        )}
+
         {/* Category groups */}
         <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
           {groups.map(g => {
             const key = g.name ?? '__uncat__'
             const isOpen = expandedGroups.has(key)
+            const groupIds = g.txs.map(t => t.id)
+            const allGroupSelected = groupIds.every(id => selectedIds.has(id))
+            const someGroupSelected = groupIds.some(id => selectedIds.has(id))
             return (
               <div key={key} style={{ borderBottom: '1px solid var(--color-border)' }}>
 
@@ -218,6 +267,12 @@ function PivotDrilldownModal({ txSubset, categories, accounts, title, onClose, o
                   style={{ display: 'flex', alignItems: 'center', gap: '0.5rem',
                     padding: '0.52rem 1rem', cursor: 'pointer',
                     background: 'var(--color-bg)', userSelect: 'none' }}>
+                  <input type="checkbox"
+                    checked={allGroupSelected}
+                    ref={el => { if (el) el.indeterminate = someGroupSelected && !allGroupSelected }}
+                    onClick={e => toggleGroupSelect(groupIds, e)}
+                    onChange={() => {}}
+                    style={{ cursor: 'pointer', flexShrink: 0 }} />
                   <span style={{ fontSize: '0.6rem', color: 'var(--color-text-muted)', width: '0.8rem', flexShrink: 0 }}>
                     {isOpen ? '▾' : '▸'}
                   </span>
@@ -298,9 +353,13 @@ function PivotDrilldownModal({ txSubset, categories, accounts, title, onClose, o
                   ) : (
                     <div key={t.id}
                       style={{ display: 'flex', alignItems: 'center', gap: '0.5rem',
-                        padding: '0.3rem 1rem 0.3rem 2rem',
+                        padding: '0.3rem 1rem 0.3rem 1rem',
                         borderTop: '1px solid var(--color-border)',
-                        background: 'var(--color-surface)', fontSize: '0.79rem' }}>
+                        background: selectedIds.has(t.id) ? '#eff6ff' : 'var(--color-surface)',
+                        fontSize: '0.79rem' }}>
+                      <input type="checkbox" checked={selectedIds.has(t.id)}
+                        onChange={e => toggleSelect(t.id, e)}
+                        style={{ cursor: 'pointer', flexShrink: 0, marginLeft: '0.25rem' }} />
                       <span style={{ color: 'var(--color-text-muted)', whiteSpace: 'nowrap',
                         fontVariantNumeric: 'tabular-nums', width: 82, flexShrink: 0 }}>{t.date}</span>
                       <span style={{ color: 'var(--color-text-muted)', width: 120, flexShrink: 0,
@@ -414,7 +473,7 @@ export default function ExpenseTree() {
     const totals = {}
     for (const tx of typedFilteredTxs) {
       const catId = tx.category ? (nameToId[tx.category] ?? null) : null
-      const key = catId !== null ? catId : 'uncategorised'
+      const key = catId !== null ? catId : (tx.category ? '_unknown_' : 'uncategorised')
       totals[key] = (totals[key] || 0) + tx.amount
     }
     return totals
@@ -423,7 +482,7 @@ export default function ExpenseTree() {
   const txsByCatId = useMemo(() => {
     const map = {}
     for (const tx of typedFilteredTxs) {
-      const catId = tx.category ? (nameToId[tx.category] ?? 'uncategorised') : 'uncategorised'
+      const catId = tx.category ? (nameToId[tx.category] ?? '_unknown_') : 'uncategorised'
       if (!map[catId]) map[catId] = []
       map[catId].push(tx)
     }
@@ -434,7 +493,7 @@ export default function ExpenseTree() {
   const pivotCellMap = useMemo(() => {
     const map = {}
     for (const tx of typedFilteredTxs) {
-      const catId = tx.category ? (nameToId[tx.category] ?? 'uncat') : 'uncat'
+      const catId = tx.category ? (nameToId[tx.category] ?? '_unknown_') : 'uncat'
       const pk = getPivotKey(tx.date, pivotGroupBy)
       if (!map[catId]) map[catId] = {}
       map[catId][pk] = (map[catId][pk] || 0) + tx.amount
