@@ -473,7 +473,7 @@ export default function ExpenseTree() {
     const totals = {}
     for (const tx of typedFilteredTxs) {
       const catId = tx.category ? (nameToId[tx.category] ?? null) : null
-      const key = catId !== null ? catId : 'uncategorised'
+      const key = catId !== null ? catId : (tx.category ? '_unknown_' : 'uncategorised')
       totals[key] = (totals[key] || 0) + tx.amount
     }
     return totals
@@ -482,7 +482,7 @@ export default function ExpenseTree() {
   const txsByCatId = useMemo(() => {
     const map = {}
     for (const tx of typedFilteredTxs) {
-      const catId = tx.category ? (nameToId[tx.category] ?? 'uncategorised') : 'uncategorised'
+      const catId = tx.category ? (nameToId[tx.category] ?? '_unknown_') : 'uncategorised'
       if (!map[catId]) map[catId] = []
       map[catId].push(tx)
     }
@@ -493,7 +493,7 @@ export default function ExpenseTree() {
   const pivotCellMap = useMemo(() => {
     const map = {}
     for (const tx of typedFilteredTxs) {
-      const catId = tx.category ? (nameToId[tx.category] ?? 'uncat') : 'uncat'
+      const catId = tx.category ? (nameToId[tx.category] ?? '_unknown_') : 'uncat'
       const pk = getPivotKey(tx.date, pivotGroupBy)
       if (!map[catId]) map[catId] = {}
       map[catId][pk] = (map[catId][pk] || 0) + tx.amount
