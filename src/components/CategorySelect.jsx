@@ -37,10 +37,12 @@ export default function CategorySelect({
     if (!open || !triggerRef.current) { setDropPos(null); return }
     const r = triggerRef.current.getBoundingClientRect()
     const spaceBelow = window.innerHeight - r.bottom
-    setDropPos(spaceBelow < 340
-      ? { top: 'auto', bottom: window.innerHeight - r.top + 3, left: r.left, minW: r.width }
-      : { top: r.bottom + 3, bottom: 'auto',                   left: r.left, minW: r.width }
-    )
+    const spaceAbove = r.top
+    if (spaceBelow < 340 && spaceAbove > spaceBelow) {
+      setDropPos({ top: 'auto', bottom: window.innerHeight - r.top + 3, left: r.left, minW: r.width, maxH: Math.min(520, spaceAbove - 10) })
+    } else {
+      setDropPos({ top: r.bottom + 3, bottom: 'auto', left: r.left, minW: r.width, maxH: Math.min(520, spaceBelow - 10) })
+    }
   }, [open])
 
   const getVal = cat => valueKey === 'name' ? cat.name : String(cat.id)
@@ -133,7 +135,7 @@ export default function CategorySelect({
           border: '1px solid var(--color-border)', borderRadius: 6,
           boxShadow: '0 6px 24px rgba(0,0,0,0.22)',
           minWidth: Math.max(dropPos.minW, 240), maxWidth: 400,
-          maxHeight: 'min(520px, 60vh)', overflowY: 'auto',
+          maxHeight: dropPos.maxH, overflowY: 'auto',
         }}>
           <div onClick={() => emit('')}
             onMouseEnter={e => { if (value || value === 0) e.currentTarget.style.background = 'var(--color-bg)' }}

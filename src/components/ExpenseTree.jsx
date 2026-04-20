@@ -76,6 +76,40 @@ function RecurringRow({ r, projected, indent, showCat, catById, last }) {
   )
 }
 
+// ── Pivot helpers ────────────────────────────────────────────────────
+
+function getPivotKey(dateStr, gby) {
+  const [y, m] = dateStr.split('-')
+  if (gby === 'month')   return `${y}-${m}`
+  if (gby === 'quarter') return `${y}-Q${Math.ceil(parseInt(m) / 3)}`
+  return y
+}
+
+function pivotLabel(key, gby) {
+  if (gby === 'month') {
+    const [y, m] = key.split('-')
+    const mo = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez']
+    return `${mo[parseInt(m)-1]} ${y.slice(2)}`
+  }
+  if (gby === 'quarter') { const [y, q] = key.split('-'); return `${q} ${y.slice(2)}` }
+  return key
+}
+
+function genPivotPeriods(from, to, gby) {
+  if (!from || !to) return []
+  const ps = [], cur = new Date(from + 'T00:00:00'), end = new Date(to + 'T00:00:00')
+  while (cur <= end) {
+    const y = cur.getFullYear(), m = cur.getMonth() + 1
+    const p = n => String(n).padStart(2, '0')
+    const key = gby === 'month' ? `${y}-${p(m)}` : gby === 'quarter' ? `${y}-Q${Math.ceil(m/3)}` : String(y)
+    if (!ps.length || ps[ps.length-1] !== key) ps.push(key)
+    if (gby === 'month') cur.setMonth(cur.getMonth()+1)
+    else if (gby === 'quarter') cur.setMonth(cur.getMonth()+3)
+    else cur.setFullYear(cur.getFullYear()+1)
+  }
+  return ps
+}
+
 export default function ExpenseTree() {
   const [source,        setSource]        = useState('recurring')
   const [period,        setPeriod]        = useState('month')
@@ -91,6 +125,11 @@ export default function ExpenseTree() {
   const [filterType,      setFilterType]      = useState('all')
   const [filterFrequency, setFilterFrequency] = useState('')
   const [filterSearch,    setFilterSearch]    = useState('')
+
+  const [txViewMode,        setTxViewMode]        = useState('tree')
+  const [txFilterType,      setTxFilterType]      = useState('all')
+  const [pivotGroupBy,      setPivotGroupBy]      = useState('quarter')
+  const [pivotExpandedCats, setPivotExpandedCats] = useState(new Set())
 
   const recurrings  = JSON.parse(localStorage.getItem('recurringPayments')) || []
   const categories  = JSON.parse(localStorage.getItem('categories'))        || []
@@ -147,25 +186,43 @@ export default function ExpenseTree() {
   // ── Transaction mode data ─────────────────────────────────────────
   const nameToId = useMemo(() => Object.fromEntries(categories.map(c => [c.name, c.id])), [categories.length])
 
+  const typedFilteredTxs = useMemo(() => {
+    if (txFilterType === 'expense') return filteredTxs.filter(t => t.amount < 0)
+    if (txFilterType === 'income')  return filteredTxs.filter(t => t.amount > 0)
+    return filteredTxs
+  }, [filteredTxs, txFilterType])
+
   const txCatTotals = useMemo(() => {
     const totals = {}
-    for (const tx of filteredTxs) {
+    for (const tx of typedFilteredTxs) {
       const catId = tx.category ? (nameToId[tx.category] ?? null) : null
       const key = catId !== null ? catId : 'uncategorised'
       totals[key] = (totals[key] || 0) + tx.amount
     }
     return totals
-  }, [filteredTxs, nameToId])
+  }, [typedFilteredTxs, nameToId])
 
   const txsByCatId = useMemo(() => {
     const map = {}
-    for (const tx of filteredTxs) {
+    for (const tx of typedFilteredTxs) {
       const catId = tx.category ? (nameToId[tx.category] ?? 'uncategorised') : 'uncategorised'
       if (!map[catId]) map[catId] = []
       map[catId].push(tx)
     }
     return map
-  }, [filteredTxs, nameToId])
+  }, [typedFilteredTxs, nameToId])
+
+  const pivotPeriods = useMemo(() => genPivotPeriods(txFrom, txTo, pivotGroupBy), [txFrom, txTo, pivotGroupBy])
+  const pivotCellMap = useMemo(() => {
+    const map = {}
+    for (const tx of typedFilteredTxs) {
+      const catId = tx.category ? (nameToId[tx.category] ?? 'uncat') : 'uncat'
+      const pk = getPivotKey(tx.date, pivotGroupBy)
+      if (!map[catId]) map[catId] = {}
+      map[catId][pk] = (map[catId][pk] || 0) + tx.amount
+    }
+    return map
+  }, [typedFilteredTxs, nameToId, pivotGroupBy])
 
   function txSubtreeTotal(catId) {
     return (txCatTotals[catId] || 0)
@@ -173,13 +230,40 @@ export default function ExpenseTree() {
   }
 
   const txTotalExpense = useMemo(() =>
-    filteredTxs.filter(t => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0),
-    [filteredTxs]
+    typedFilteredTxs.filter(t => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0),
+    [typedFilteredTxs]
   )
   const txTotalIncome = useMemo(() =>
-    filteredTxs.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0),
-    [filteredTxs]
+    typedFilteredTxs.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0),
+    [typedFilteredTxs]
   )
+
+  // ── Pivot helpers (inside component to close over state) ──────────
+  function pivotSubtreeVal(catId, period) {
+    return (pivotCellMap[catId]?.[period] || 0) +
+      categories.filter(c => c.parent == catId).reduce((s, c) => s + pivotSubtreeVal(c.id, period), 0)
+  }
+  function pivotSubtreeHasData(catId) {
+    return pivotPeriods.some(p => pivotSubtreeVal(catId, p) !== 0)
+  }
+  function pivotRowTotal(catId) {
+    return pivotPeriods.reduce((s, p) => s + pivotSubtreeVal(catId, p), 0)
+  }
+  function buildPivotRows(parentId = null, level = 0) {
+    const rows = []
+    const nodes = categories
+      .filter(c => (c.parent ?? null) == parentId && pivotSubtreeHasData(c.id))
+      .sort((a, b) => Math.abs(pivotRowTotal(b.id)) - Math.abs(pivotRowTotal(a.id)))
+    for (const cat of nodes) {
+      const hasChildren = categories.some(c => c.parent == cat.id && pivotSubtreeHasData(c.id))
+      const isOpen = pivotExpandedCats.has(cat.id)
+      const vals = pivotPeriods.map(p => pivotSubtreeVal(cat.id, p))
+      const total = vals.reduce((s, v) => s + v, 0)
+      rows.push({ cat, level, hasChildren, isOpen, vals, total })
+      if (isOpen) rows.push(...buildPivotRows(cat.id, level + 1))
+    }
+    return rows
+  }
 
   // ── Toggle helpers ────────────────────────────────────────────────
   function toggleCat(id) {
@@ -448,47 +532,70 @@ export default function ExpenseTree() {
         </>
       ) : (
         <>
-          {/* Transaction mode: date range + filters */}
-          <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap', alignItems: 'center', marginBottom: '0.4rem' }}>
-            <span style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', fontWeight: 600, marginRight: '0.15rem' }}>Zeitraum:</span>
-            {RANGE_PRESETS.map(({ key, label }) => (
-              <button key={key} onClick={() => selectTxRange(key)} style={pill(txRangeKey === key)}>{label}</button>
-            ))}
-          </div>
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: '1rem' }}>
-            {accounts.length > 0 && (
+          {/* Transaction mode filter bar */}
+          <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, padding: '0.55rem 0.75rem', marginBottom: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+            {/* Row 1: date presets */}
+            <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', fontWeight: 600, marginRight: '0.1rem' }}>Zeitraum:</span>
+              {RANGE_PRESETS.map(({ key, label }) => (
+                <button key={key} onClick={() => selectTxRange(key)} style={pill(txRangeKey === key)}>{label}</button>
+              ))}
+            </div>
+            {/* Row 2: account, dates, type, view toggle */}
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+              {accounts.length > 0 && (
+                <div>
+                  <div style={{ fontSize: '0.69rem', color: 'var(--color-text-muted)', fontWeight: 600, marginBottom: 2 }}>Konto</div>
+                  <select value={filterAccount} onChange={e => setFilterAccount(e.target.value)}
+                    style={{ fontSize: '0.78rem', padding: '0.2rem 0.35rem', border: '1px solid var(--color-border)', borderRadius: 4 }}>
+                    <option value="">Alle Konten</option>
+                    {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                  </select>
+                </div>
+              )}
               <div>
-                <div style={{ fontSize: '0.69rem', color: 'var(--color-text-muted)', fontWeight: 600, marginBottom: 2 }}>Konto</div>
-                <select value={filterAccount} onChange={e => setFilterAccount(e.target.value)}
-                  style={{ fontSize: '0.78rem', padding: '0.2rem 0.35rem', border: '1px solid var(--color-border)', borderRadius: 4 }}>
-                  <option value="">Alle Konten</option>
-                  {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                </select>
+                <div style={{ fontSize: '0.69rem', color: 'var(--color-text-muted)', fontWeight: 600, marginBottom: 2 }}>Von</div>
+                <input type="date" value={txFrom} onChange={e => { setTxFrom(e.target.value); setTxRangeKey('') }}
+                  style={{ fontSize: '0.78rem', padding: '0.2rem 0.35rem', border: '1px solid var(--color-border)', borderRadius: 4 }} />
               </div>
-            )}
-            <div>
-              <div style={{ fontSize: '0.69rem', color: 'var(--color-text-muted)', fontWeight: 600, marginBottom: 2 }}>Von</div>
-              <input type="date" value={txFrom} onChange={e => { setTxFrom(e.target.value); setTxRangeKey('') }}
-                style={{ fontSize: '0.78rem', padding: '0.2rem 0.35rem', border: '1px solid var(--color-border)', borderRadius: 4 }} />
-            </div>
-            <div>
-              <div style={{ fontSize: '0.69rem', color: 'var(--color-text-muted)', fontWeight: 600, marginBottom: 2 }}>Bis</div>
-              <input type="date" value={txTo} onChange={e => { setTxTo(e.target.value); setTxRangeKey('') }}
-                style={{ fontSize: '0.78rem', padding: '0.2rem 0.35rem', border: '1px solid var(--color-border)', borderRadius: 4 }} />
-            </div>
-            <div style={{ display: 'flex', gap: '0.3rem', alignSelf: 'flex-end' }}>
-              <button onClick={expandAll}   style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', background: 'transparent', border: '1px solid var(--color-border)', color: 'var(--color-text-muted)', borderRadius: 6, cursor: 'pointer' }}>Aufklappen</button>
-              <button onClick={collapseAll} style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', background: 'transparent', border: '1px solid var(--color-border)', color: 'var(--color-text-muted)', borderRadius: 6, cursor: 'pointer' }}>Zuklappen</button>
+              <div>
+                <div style={{ fontSize: '0.69rem', color: 'var(--color-text-muted)', fontWeight: 600, marginBottom: 2 }}>Bis</div>
+                <input type="date" value={txTo} onChange={e => { setTxTo(e.target.value); setTxRangeKey('') }}
+                  style={{ fontSize: '0.78rem', padding: '0.2rem 0.35rem', border: '1px solid var(--color-border)', borderRadius: 4 }} />
+              </div>
+              <div>
+                <div style={{ fontSize: '0.69rem', color: 'var(--color-text-muted)', fontWeight: 600, marginBottom: 2 }}>Typ</div>
+                <div style={{ display: 'flex', gap: '0.2rem' }}>
+                  {[['all','Alle'],['expense','Ausgaben'],['income','Einnahmen']].map(([v,l]) => (
+                    <button key={v} onClick={() => setTxFilterType(v)} style={pill(txFilterType === v)}>{l}</button>
+                  ))}
+                </div>
+              </div>
+              <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.3rem', alignSelf: 'flex-end', flexWrap: 'wrap' }}>
+                {txViewMode === 'tree' && <>
+                  <button onClick={expandAll}   style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', background: 'transparent', border: '1px solid var(--color-border)', color: 'var(--color-text-muted)', borderRadius: 6, cursor: 'pointer' }}>Aufklappen</button>
+                  <button onClick={collapseAll} style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', background: 'transparent', border: '1px solid var(--color-border)', color: 'var(--color-text-muted)', borderRadius: 6, cursor: 'pointer' }}>Zuklappen</button>
+                </>}
+                {txViewMode === 'pivot' && [['month','Monat'],['quarter','Quartal'],['year','Jahr']].map(([v,l]) => (
+                  <button key={v} onClick={() => setPivotGroupBy(v)} style={pill(pivotGroupBy === v)}>{l}</button>
+                ))}
+                <span style={{ width: 1, background: 'var(--color-border)', alignSelf: 'stretch', margin: '0 0.1rem' }} />
+                {[['tree','Kategorienbaum'],['pivot','Pivot']].map(([v,l]) => (
+                  <button key={v} onClick={() => setTxViewMode(v)} style={filterBtnStyle(txViewMode === v)}>{l}</button>
+                ))}
+              </div>
             </div>
           </div>
 
-          {/* Transaction summary cards */}
+          {/* Summary cards */}
           <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
-            <div style={{ flex: 1, minWidth: 100, background: '#dc26260e', border: '1px solid #dc262628', borderRadius: 8, padding: '0.42rem 0.65rem' }}>
-              <div style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Ausgaben</div>
-              <div style={{ fontSize: '1rem', fontWeight: 700, color: '#dc2626', marginTop: 1 }}>{fmt(txTotalExpense)}</div>
-            </div>
-            {txTotalIncome > 0 && (
+            {txFilterType !== 'income' && (
+              <div style={{ flex: 1, minWidth: 100, background: '#dc26260e', border: '1px solid #dc262628', borderRadius: 8, padding: '0.42rem 0.65rem' }}>
+                <div style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Ausgaben</div>
+                <div style={{ fontSize: '1rem', fontWeight: 700, color: '#dc2626', marginTop: 1 }}>{fmt(txTotalExpense)}</div>
+              </div>
+            )}
+            {txFilterType !== 'expense' && txTotalIncome > 0 && (
               <div style={{ flex: 1, minWidth: 100, background: '#16a34a0e', border: '1px solid #16a34a28', borderRadius: 8, padding: '0.42rem 0.65rem' }}>
                 <div style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Einnahmen</div>
                 <div style={{ fontSize: '1rem', fontWeight: 700, color: '#16a34a', marginTop: 1 }}>+{fmt(txTotalIncome)}</div>
@@ -496,7 +603,7 @@ export default function ExpenseTree() {
             )}
             <div style={{ flex: 1, minWidth: 100, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, padding: '0.42rem 0.65rem' }}>
               <div style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Umsätze</div>
-              <div style={{ fontSize: '1rem', fontWeight: 700, marginTop: 1 }}>{filteredTxs.length}</div>
+              <div style={{ fontSize: '1rem', fontWeight: 700, marginTop: 1 }}>{typedFilteredTxs.length}</div>
             </div>
           </div>
 
@@ -504,11 +611,11 @@ export default function ExpenseTree() {
             <p style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '2rem 0', margin: 0 }}>
               Noch keine Umsätze vorhanden. Importieren Sie Kontoauszüge über den PDF-Import.
             </p>
-          ) : filteredTxs.length === 0 ? (
+          ) : typedFilteredTxs.length === 0 ? (
             <p style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '2rem 0', margin: 0 }}>
               Keine Umsätze im gewählten Zeitraum.
             </p>
-          ) : (
+          ) : txViewMode === 'tree' ? (
             <div style={{ border: '1px solid var(--color-border)', borderRadius: 8, overflow: 'hidden' }}>
               {renderTxCategoryTree()}
               {uncatTxs.length > 0 && (
@@ -518,6 +625,67 @@ export default function ExpenseTree() {
                 </div>
               )}
             </div>
+          ) : (
+            /* ── Pivot table ── */
+            (() => {
+              const pivotRows = buildPivotRows()
+              const ns = { padding: '0.26rem 0.55rem', fontSize: '0.79rem', textAlign: 'right', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', verticalAlign: 'middle' }
+              const cs = { padding: '0.26rem 0.55rem', fontSize: '0.79rem', verticalAlign: 'middle' }
+              const sticky = { position: 'sticky', left: 0, zIndex: 1 }
+              const clr = v => v > 0 ? '#16a34a' : v < 0 ? '#dc2626' : 'var(--color-text-muted)'
+              const uncatPVals  = pivotPeriods.map(p => pivotCellMap['uncat']?.[p] || 0)
+              const uncatPTotal = uncatPVals.reduce((s, v) => s + v, 0)
+              const grandByPeriod = pivotPeriods.map(p =>
+                typedFilteredTxs.filter(t => getPivotKey(t.date, pivotGroupBy) === p).reduce((s, t) => s + t.amount, 0)
+              )
+              const grandTotal = grandByPeriod.reduce((s, v) => s + v, 0)
+              return (
+                <div style={{ overflowX: 'auto', border: '1px solid var(--color-border)', borderRadius: 8 }}>
+                  <table style={{ borderCollapse: 'collapse', fontSize: '0.79rem' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '2px solid var(--color-border)', background: 'var(--color-bg)' }}>
+                        <th style={{ ...cs, ...sticky, background: 'var(--color-bg)', textAlign: 'left', fontWeight: 700, minWidth: 200, whiteSpace: 'nowrap', borderRight: '1px solid var(--color-border)' }}>Kategorie</th>
+                        {pivotPeriods.map(p => <th key={p} style={{ ...ns, fontWeight: 700 }}>{pivotLabel(p, pivotGroupBy)}</th>)}
+                        <th style={{ ...ns, fontWeight: 700, borderLeft: '2px solid var(--color-border)' }}>Gesamt</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pivotRows.map(({ cat, level, hasChildren, isOpen, vals, total }) => (
+                        <tr key={cat.id} style={{ borderBottom: '1px solid var(--color-border)', background: level === 0 ? 'var(--color-bg)' : 'var(--color-surface)' }}>
+                          <td style={{ ...cs, ...sticky, background: level === 0 ? 'var(--color-bg)' : 'var(--color-surface)', paddingLeft: (0.55 + level * 1.1) + 'rem', fontWeight: level === 0 ? 600 : 400, borderRight: '1px solid var(--color-border)', whiteSpace: 'nowrap' }}>
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                              {hasChildren
+                                ? <button onClick={() => setPivotExpandedCats(prev => { const n = new Set(prev); n.has(cat.id) ? n.delete(cat.id) : n.add(cat.id); return n })}
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.6rem', color: 'var(--color-text-muted)', padding: 0, lineHeight: 1, width: '0.9rem' }}>
+                                    {isOpen ? '▾' : '▸'}
+                                  </button>
+                                : <span style={{ display: 'inline-block', width: '0.9rem' }} />}
+                              {cat.name}
+                            </span>
+                          </td>
+                          {vals.map((v, i) => <td key={i} style={{ ...ns, color: v !== 0 ? clr(v) : 'var(--color-border)' }}>{v !== 0 ? fmt(v) : '–'}</td>)}
+                          <td style={{ ...ns, fontWeight: 700, color: clr(total), borderLeft: '2px solid var(--color-border)' }}>{total !== 0 ? fmt(total) : ''}</td>
+                        </tr>
+                      ))}
+                      {uncatPTotal !== 0 && (
+                        <tr style={{ borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface)' }}>
+                          <td style={{ ...cs, ...sticky, background: 'var(--color-surface)', paddingLeft: '1.5rem', color: 'var(--color-text-muted)', fontStyle: 'italic', borderRight: '1px solid var(--color-border)', whiteSpace: 'nowrap' }}>ohne Kategorie</td>
+                          {uncatPVals.map((v, i) => <td key={i} style={{ ...ns, color: v !== 0 ? clr(v) : 'var(--color-border)' }}>{v !== 0 ? fmt(v) : '–'}</td>)}
+                          <td style={{ ...ns, fontWeight: 700, color: clr(uncatPTotal), borderLeft: '2px solid var(--color-border)' }}>{fmt(uncatPTotal)}</td>
+                        </tr>
+                      )}
+                    </tbody>
+                    <tfoot>
+                      <tr style={{ borderTop: '2px solid var(--color-border)', background: 'var(--color-bg)', fontWeight: 700 }}>
+                        <td style={{ ...cs, ...sticky, background: 'var(--color-bg)', fontWeight: 700, borderRight: '1px solid var(--color-border)', whiteSpace: 'nowrap' }}>Gesamt</td>
+                        {grandByPeriod.map((v, i) => <td key={i} style={{ ...ns, fontWeight: 700, color: clr(v) }}>{v !== 0 ? fmt(v) : ''}</td>)}
+                        <td style={{ ...ns, fontWeight: 700, color: clr(grandTotal), borderLeft: '2px solid var(--color-border)' }}>{grandTotal !== 0 ? fmt(grandTotal) : ''}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              )
+            })()
           )}
         </>
       )}
