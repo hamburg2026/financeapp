@@ -319,14 +319,14 @@ export default function InsuranceContracts() {
   const [editId, setEditId] = useState(null)
   const [expandedHistory, setExpandedHistory] = useState(new Set())
   const [expandedContracts, setExpandedContracts] = useState(new Set())
-  const [collapsedGroups, setCollapsedGroups] = useState(new Set())
+  const [expandedGroups, setExpandedGroups] = useState(new Set())
   const [showAddPerson, setShowAddPerson] = useState(false)
   const [newPersonInput, setNewPersonInput] = useState('')
 
   const [filterPerson, setFilterPerson] = useState('')
   const [filterProvider, setFilterProvider] = useState('')
   const [filterCategory, setFilterCategory] = useState('')
-  const [groupBy, setGroupBy] = useState('none')
+  const [groupBy, setGroupBy] = useState('person')
 
   function getPersonColor(personName) {
     const idx = persons.indexOf(personName)
@@ -442,7 +442,7 @@ export default function InsuranceContracts() {
   }
 
   function toggleGroupCollapse(label) {
-    setCollapsedGroups(prev => {
+    setExpandedGroups(prev => {
       const n = new Set(prev); n.has(label) ? n.delete(label) : n.add(label); return n
     })
   }
@@ -731,7 +731,7 @@ export default function InsuranceContracts() {
         <>
           {getGroups(filtered).map(({ label, items }) => {
             const isGrouped = groupBy !== 'none' && label !== null
-            const isCollapsed = isGrouped && collapsedGroups.has(label)
+            const isCollapsed = isGrouped && !expandedGroups.has(label)
             const monthlyTotal = isGrouped ? groupMonthlyPremium(items) : 0
             return (
             <div key={label ?? '__all'} style={{ marginBottom: isGrouped ? '0.75rem' : 0 }}>
