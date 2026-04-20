@@ -32,7 +32,7 @@ export default function RecurringPayments() {
   const [filterFrequency,  setFilterFrequency]  = useState('')
   const [filterSearch,     setFilterSearch]     = useState('')
 
-  const [groupBy,        setGroupBy]        = useState('frequency')
+  const [groupBy,        setGroupBy]        = useState('category')
   const [expandedGroups, setExpandedGroups] = useState(new Set(FREQ_ORDER))
 
   function field(key) { return { value: form[key], onChange: e => setForm(f => ({ ...f, [key]: e.target.value })) } }
