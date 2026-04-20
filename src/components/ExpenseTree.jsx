@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { fmt } from '../fmt'
-import { TransactionModal } from './BankAccounts'
+import CategorySelect from './CategorySelect'
 
 const FREQ_FACTOR = {
   month:   { monthly: 1,  quarterly: 1/3, halfyearly: 1/6,  yearly: 1/12 },
@@ -109,6 +109,222 @@ function genPivotPeriods(from, to, gby) {
     else cur.setFullYear(cur.getFullYear()+1)
   }
   return ps
+}
+
+function PivotDrilldownModal({ txSubset, categories, accounts, title, onClose, onUpdateAccounts, onUpdateTransactions }) {
+  const [expandedGroups, setExpandedGroups] = useState(new Set())
+  const [editId,    setEditId]    = useState(null)
+  const [editAccId, setEditAccId] = useState('')
+  const [editDate,  setEditDate]  = useState('')
+  const [editDesc,  setEditDesc]  = useState('')
+  const [editRecip, setEditRecip] = useState('')
+  const [editAmt,   setEditAmt]   = useState('')
+  const [editSign,  setEditSign]  = useState(-1)
+  const [editCat,   setEditCat]   = useState('')
+
+  const groups = useMemo(() => {
+    const map = {}
+    for (const t of txSubset) {
+      const key = t.category || ''
+      if (!map[key]) map[key] = { name: key || null, txs: [], total: 0 }
+      map[key].txs.push(t)
+      map[key].total += t.amount
+    }
+    for (const g of Object.values(map)) {
+      g.txs.sort((a, b) => {
+        const r = (a.recipient || '').localeCompare(b.recipient || '')
+        return r !== 0 ? r : a.date.localeCompare(b.date)
+      })
+    }
+    return Object.values(map).sort((a, b) => Math.abs(b.total) - Math.abs(a.total))
+  }, [txSubset])
+
+  function toggleGroup(key) {
+    setExpandedGroups(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n })
+  }
+
+  function startEdit(t) {
+    setEditId(t.id); setEditAccId(String(t.accountId)); setEditDate(t.date)
+    setEditDesc(t.description); setEditRecip(t.recipient || '')
+    setEditAmt(String(Math.abs(t.amount))); setEditSign(t.amount >= 0 ? 1 : -1)
+    setEditCat(t.category || '')
+  }
+
+  function saveEdit() {
+    const old = txSubset.find(t => t.id === editId)
+    const newAmt = editSign * (Math.abs(parseFloat(editAmt)) || 0)
+    const newAcc = parseInt(editAccId)
+    let accs = accounts.map(a => a.id === old.accountId ? { ...a, balance: a.balance - old.amount } : a)
+    accs = accs.map(a => a.id === newAcc ? { ...a, balance: a.balance + newAmt } : a)
+    onUpdateAccounts(accs)
+    onUpdateTransactions(txSubset.map(t =>
+      t.id === editId
+        ? { ...t, accountId: newAcc, date: editDate, description: editDesc, recipient: editRecip, amount: newAmt, category: editCat }
+        : t
+    ))
+    setEditId(null)
+  }
+
+  function deleteTx(id) {
+    const tx = txSubset.find(t => t.id === id)
+    if (!tx) return
+    onUpdateAccounts(accounts.map(a => a.id === tx.accountId ? { ...a, balance: a.balance - tx.amount } : a))
+    onUpdateTransactions(txSubset.filter(t => t.id !== id))
+  }
+
+  const totalSum = txSubset.reduce((s, t) => s + t.amount, 0)
+  const clr = v => v > 0 ? '#16a34a' : v < 0 ? '#dc2626' : 'var(--color-text-muted)'
+  const lbl = { fontSize: '0.71rem', color: 'var(--color-text-muted)', fontWeight: 600, marginBottom: 2, display: 'block' }
+  const btn = { fontSize: '0.73rem', padding: '0.15rem 0.45rem', border: 'none', borderRadius: 4, cursor: 'pointer', fontWeight: 600 }
+
+  return (
+    <div
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1100,
+        display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+        padding: '1.5rem', overflowY: 'auto' }}
+      onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div style={{ background: 'var(--color-surface)', borderRadius: 12, width: '100%', maxWidth: 820,
+        boxShadow: '0 24px 64px rgba(0,0,0,0.35)', display: 'flex', flexDirection: 'column',
+        maxHeight: 'calc(100vh - 3rem)' }}>
+
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '0.85rem 1.25rem', borderBottom: '1px solid var(--color-border)', flexShrink: 0 }}>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: '1rem' }}>{title}</div>
+            <div style={{ fontSize: '0.73rem', color: 'var(--color-text-muted)', marginTop: 2 }}>
+              {txSubset.length} Umsätze &nbsp;
+              <span style={{ color: clr(totalSum), fontWeight: 600 }}>
+                {totalSum > 0 ? '+' : ''}{fmt(totalSum)}
+              </span>
+            </div>
+          </div>
+          <button onClick={onClose}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.3rem',
+              color: 'var(--color-text-muted)', padding: '0.2rem 0.5rem' }}>✕</button>
+        </div>
+
+        {/* Category groups */}
+        <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
+          {groups.map(g => {
+            const key = g.name ?? '__uncat__'
+            const isOpen = expandedGroups.has(key)
+            return (
+              <div key={key} style={{ borderBottom: '1px solid var(--color-border)' }}>
+
+                {/* Group header */}
+                <div onClick={() => toggleGroup(key)}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.5rem',
+                    padding: '0.52rem 1rem', cursor: 'pointer',
+                    background: 'var(--color-bg)', userSelect: 'none' }}>
+                  <span style={{ fontSize: '0.6rem', color: 'var(--color-text-muted)', width: '0.8rem', flexShrink: 0 }}>
+                    {isOpen ? '▾' : '▸'}
+                  </span>
+                  <span style={{ flex: 1, fontWeight: 600, fontSize: '0.87rem' }}>
+                    {g.name || 'Ohne Kategorie'}
+                  </span>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', marginRight: '0.5rem' }}>
+                    {g.txs.length} {g.txs.length === 1 ? 'Eintrag' : 'Einträge'}
+                  </span>
+                  <span style={{ fontWeight: 700, fontSize: '0.9rem', color: clr(g.total) }}>
+                    {g.total > 0 ? '+' : ''}{fmt(g.total)}
+                  </span>
+                </div>
+
+                {/* Individual transaction rows */}
+                {isOpen && g.txs.map(t => (
+                  editId === t.id ? (
+                    <div key={t.id} style={{ padding: '0.75rem 1rem 0.85rem', background: '#eff6ff',
+                      borderTop: '1px solid var(--color-border)' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem 0.75rem', marginBottom: '0.5rem' }}>
+                        <div>
+                          <label style={lbl}>Datum</label>
+                          <input type="date" value={editDate} onChange={e => setEditDate(e.target.value)}
+                            style={{ width: '100%', fontSize: '0.82rem', padding: '0.28rem 0.4rem', boxSizing: 'border-box', border: '1px solid var(--color-border)', borderRadius: 4 }} />
+                        </div>
+                        <div>
+                          <label style={lbl}>Empfänger</label>
+                          <input value={editRecip} onChange={e => setEditRecip(e.target.value)}
+                            style={{ width: '100%', fontSize: '0.82rem', padding: '0.28rem 0.4rem', boxSizing: 'border-box', border: '1px solid var(--color-border)', borderRadius: 4 }} />
+                        </div>
+                        <div>
+                          <label style={lbl}>Buchungstext</label>
+                          <input value={editDesc} onChange={e => setEditDesc(e.target.value)}
+                            style={{ width: '100%', fontSize: '0.82rem', padding: '0.28rem 0.4rem', boxSizing: 'border-box', border: '1px solid var(--color-border)', borderRadius: 4 }} />
+                        </div>
+                        <div>
+                          <label style={lbl}>Betrag (€)</label>
+                          <div style={{ display: 'flex', gap: '0.3rem' }}>
+                            <button onClick={() => setEditSign(s => -s)}
+                              style={{ padding: '0.28rem 0.6rem', border: 'none', borderRadius: 4, cursor: 'pointer',
+                                fontWeight: 700, flexShrink: 0,
+                                background: editSign < 0 ? '#fee2e2' : '#dcfce7',
+                                color: editSign < 0 ? '#dc2626' : '#16a34a' }}>
+                              {editSign < 0 ? '−' : '+'}
+                            </button>
+                            <input type="number" value={editAmt} onChange={e => setEditAmt(e.target.value)}
+                              step="0.01" min="0"
+                              style={{ flex: 1, fontSize: '0.82rem', padding: '0.28rem 0.4rem', border: '1px solid var(--color-border)', borderRadius: 4 }} />
+                          </div>
+                        </div>
+                        <div>
+                          <label style={lbl}>Kategorie</label>
+                          <CategorySelect value={editCat} onChange={e => setEditCat(e.target.value)}
+                            categories={categories} valueKey="name" placeholder="– keine –"
+                            style={{ width: '100%', fontSize: '0.82rem', padding: '0.28rem 0.4rem' }} />
+                        </div>
+                        {accounts.length > 1 && (
+                          <div>
+                            <label style={lbl}>Konto</label>
+                            <select value={editAccId} onChange={e => setEditAccId(e.target.value)}
+                              style={{ width: '100%', fontSize: '0.82rem', padding: '0.28rem 0.4rem', border: '1px solid var(--color-border)', borderRadius: 4 }}>
+                              {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                            </select>
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end' }}>
+                        <button onClick={saveEdit}
+                          style={{ ...btn, background: 'var(--color-primary)', color: '#fff', padding: '0.3rem 0.9rem' }}>
+                          Speichern
+                        </button>
+                        <button onClick={() => setEditId(null)}
+                          style={{ ...btn, background: '#e5e7eb', color: '#374151', padding: '0.3rem 0.9rem' }}>
+                          Abbrechen
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div key={t.id}
+                      style={{ display: 'flex', alignItems: 'center', gap: '0.5rem',
+                        padding: '0.3rem 1rem 0.3rem 2rem',
+                        borderTop: '1px solid var(--color-border)',
+                        background: 'var(--color-surface)', fontSize: '0.79rem' }}>
+                      <span style={{ color: 'var(--color-text-muted)', whiteSpace: 'nowrap',
+                        fontVariantNumeric: 'tabular-nums', width: 82, flexShrink: 0 }}>{t.date}</span>
+                      <span style={{ color: 'var(--color-text-muted)', width: 120, flexShrink: 0,
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                        title={t.recipient || ''}>{t.recipient || '–'}</span>
+                      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap', fontSize: '0.75rem' }}
+                        title={t.description}>{t.description}</span>
+                      <span style={{ fontWeight: 700, color: clr(t.amount), whiteSpace: 'nowrap',
+                        fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{fmt(t.amount)}</span>
+                      <button onClick={() => startEdit(t)}
+                        style={{ ...btn, background: '#e5e7eb', color: '#374151' }}>✎</button>
+                      <button onClick={() => { if (window.confirm('Umsatz löschen?')) deleteTx(t.id) }}
+                        style={{ ...btn, background: '#fee2e2', color: '#dc2626' }}>✕</button>
+                    </div>
+                  )
+                ))}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export default function ExpenseTree() {
@@ -790,10 +1006,10 @@ export default function ExpenseTree() {
       )}
 
       {drilldown && (
-        <TransactionModal
-          accountId={null}
+        <PivotDrilldownModal
+          title={drilldown.title}
+          txSubset={drilldown.txSubset}
           accounts={allAccounts}
-          transactions={drilldown.txSubset}
           categories={categories}
           onClose={() => setDrilldown(null)}
           onUpdateAccounts={saveAccounts}
@@ -802,7 +1018,6 @@ export default function ExpenseTree() {
             saveTransactions([...base, ...newSubset])
             setDrilldown(prev => ({ ...prev, txSubset: newSubset, txIds: new Set(newSubset.map(t => t.id)) }))
           }}
-          initialDateDim="all"
         />
       )}
     </div>
