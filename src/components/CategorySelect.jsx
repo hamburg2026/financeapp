@@ -10,6 +10,7 @@ export default function CategorySelect({
   style = {},
 }) {
   const [open, setOpen]       = useState(false)
+  const [openUp, setOpenUp]   = useState(false)
   const [expanded, setExpanded] = useState(new Set())
   const ref = useRef()
 
@@ -18,6 +19,12 @@ export default function CategorySelect({
     function outside(e) { if (!ref.current?.contains(e.target)) setOpen(false) }
     document.addEventListener('mousedown', outside)
     return () => document.removeEventListener('mousedown', outside)
+  }, [open])
+
+  useEffect(() => {
+    if (!open || !ref.current) return
+    const rect = ref.current.getBoundingClientRect()
+    setOpenUp(window.innerHeight - rect.bottom < 340)
   }, [open])
 
   const getVal = cat => valueKey === 'name' ? cat.name : String(cat.id)
@@ -120,10 +127,15 @@ export default function CategorySelect({
       </div>
       {open && (
         <div style={{
-          position: 'absolute', top: 'calc(100% + 3px)', left: 0, zIndex: 9999,
+          position: 'absolute',
+          ...(openUp
+            ? { bottom: 'calc(100% + 3px)', top: 'auto' }
+            : { top: 'calc(100% + 3px)',    bottom: 'auto' }),
+          left: 0, zIndex: 9999,
           background: 'var(--color-surface)', border: '1px solid var(--color-border)',
           borderRadius: 6, boxShadow: '0 6px 24px rgba(0,0,0,0.22)',
-          minWidth: 'max(100%, 240px)', maxWidth: 400, maxHeight: 360, overflowY: 'auto',
+          minWidth: 'max(100%, 240px)', maxWidth: 400,
+          maxHeight: 'min(520px, 60vh)', overflowY: 'auto',
         }}>
           <div
             onClick={() => emit('')}
