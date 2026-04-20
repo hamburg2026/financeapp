@@ -23,12 +23,13 @@ export default function CategorySelect({
         setOpen(false)
     }
     const onClose = () => setOpen(false)
+    const onScroll = (e) => { if (!dropRef.current?.contains(e.target)) setOpen(false) }
     document.addEventListener('mousedown', onDown)
-    window.addEventListener('scroll', onClose, true)
+    window.addEventListener('scroll', onScroll, true)
     window.addEventListener('resize', onClose)
     return () => {
       document.removeEventListener('mousedown', onDown)
-      window.removeEventListener('scroll', onClose, true)
+      window.removeEventListener('scroll', onScroll, true)
       window.removeEventListener('resize', onClose)
     }
   }, [open])
