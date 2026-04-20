@@ -70,6 +70,11 @@ function TransactionModal({ accountId, accounts, transactions, categories, onClo
   const [filterType,      setFilterType]      = useState('all')
   const [filterRecipient, setFilterRecipient] = useState('')
   const [filterSearch,    setFilterSearch]    = useState('')
+  const [filterAmtMin,    setFilterAmtMin]    = useState('')
+  const [filterAmtMax,    setFilterAmtMax]    = useState('')
+
+  const [sortCol, setSortCol] = useState('date')
+  const [sortDir, setSortDir] = useState('desc')
 
   const [editId,    setEditId]    = useState(null)
   const [editAccId, setEditAccId] = useState('')
@@ -106,8 +111,23 @@ function TransactionModal({ accountId, accounts, transactions, categories, onClo
     if (filterType === 'expense' && t.amount >= 0) return false
     if (filterRecipient && !(t.recipient || '').toLowerCase().includes(filterRecipient.toLowerCase())) return false
     if (filterSearch    && !t.description.toLowerCase().includes(filterSearch.toLowerCase())) return false
+    if (filterAmtMin !== '' && t.amount < parseFloat(filterAmtMin)) return false
+    if (filterAmtMax !== '' && t.amount > parseFloat(filterAmtMax)) return false
     return true
-  }).sort((a, b) => b.date.localeCompare(a.date))
+  }).sort((a, b) => {
+    let av, bv
+    switch (sortCol) {
+      case 'date':        av = a.date;                              bv = b.date;                              break
+      case 'recipient':   av = (a.recipient   || '').toLowerCase(); bv = (b.recipient   || '').toLowerCase(); break
+      case 'description': av = (a.description || '').toLowerCase(); bv = (b.description || '').toLowerCase(); break
+      case 'amount':      av = a.amount;                            bv = b.amount;                            break
+      case 'category':    av = (a.category    || '').toLowerCase(); bv = (b.category    || '').toLowerCase(); break
+      default:            av = a.date;                              bv = b.date
+    }
+    if (av < bv) return sortDir === 'asc' ? -1 : 1
+    if (av > bv) return sortDir === 'asc' ?  1 : -1
+    return 0
+  })
 
   const totalIn  = filtered.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0)
   const totalOut = filtered.filter(t => t.amount < 0).reduce((s, t) => s + t.amount, 0)
@@ -247,7 +267,15 @@ function TransactionModal({ accountId, accounts, transactions, categories, onClo
             <div style={fl}>Suche</div>
             <input value={filterSearch} onChange={e => setFilterSearch(e.target.value)} placeholder="Buchungstext…" style={{ fontSize: '0.78rem', padding: '0.2rem 0.35rem', width: 130 }} />
           </div>
-          <button onClick={() => { setFilterCat(''); setFilterType('all'); setFilterRecipient(''); setFilterSearch('') }}
+          <div>
+            <div style={fl}>Betrag von</div>
+            <input type="number" value={filterAmtMin} onChange={e => setFilterAmtMin(e.target.value)} placeholder="Min" step="0.01" style={{ fontSize: '0.78rem', padding: '0.2rem 0.35rem', width: 75, border: '1px solid var(--color-border)', borderRadius: 4 }} />
+          </div>
+          <div>
+            <div style={fl}>Betrag bis</div>
+            <input type="number" value={filterAmtMax} onChange={e => setFilterAmtMax(e.target.value)} placeholder="Max" step="0.01" style={{ fontSize: '0.78rem', padding: '0.2rem 0.35rem', width: 75, border: '1px solid var(--color-border)', borderRadius: 4 }} />
+          </div>
+          <button onClick={() => { setFilterCat(''); setFilterType('all'); setFilterRecipient(''); setFilterSearch(''); setFilterAmtMin(''); setFilterAmtMax('') }}
             style={{ ...btnSm, background: '#e5e7eb', color: '#374151', padding: '0.23rem 0.6rem', alignSelf: 'flex-end' }}>
             Zurücksetzen
           </button>
@@ -336,12 +364,28 @@ function TransactionModal({ accountId, accounts, transactions, categories, onClo
                     onChange={toggleSelectAll}
                     style={{ cursor: 'pointer' }} />
                 </th>
-                {['Datum', 'Empfänger', 'Buchungstext', 'Betrag', 'Kategorie', ''].map((h, i) => (
-                  <th key={i} style={{ ...c, fontWeight: 700, textAlign: i === 3 ? 'right' : 'left',
-                    whiteSpace: 'nowrap', position: 'sticky', top: 0, background: 'var(--color-surface)', zIndex: 1 }}>
-                    {h}
-                  </th>
-                ))}
+                {[
+                  { key: 'date',        label: 'Datum',        align: 'left'  },
+                  { key: 'recipient',   label: 'Empfänger',    align: 'left'  },
+                  { key: 'description', label: 'Buchungstext', align: 'left'  },
+                  { key: 'amount',      label: 'Betrag',       align: 'right' },
+                  { key: 'category',    label: 'Kategorie',    align: 'left'  },
+                ].map(col => {
+                  const active = sortCol === col.key
+                  return (
+                    <th key={col.key} onClick={() => {
+                      if (sortCol === col.key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+                      else { setSortCol(col.key); setSortDir('asc') }
+                    }} style={{ ...c, fontWeight: 700, textAlign: col.align,
+                      whiteSpace: 'nowrap', position: 'sticky', top: 0, background: 'var(--color-surface)', zIndex: 1,
+                      cursor: 'pointer', userSelect: 'none',
+                      color: active ? 'var(--color-primary)' : undefined,
+                    }}>
+                      {col.label}{active ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ' ⇅'}
+                    </th>
+                  )
+                })}
+                <th style={{ ...c, position: 'sticky', top: 0, background: 'var(--color-surface)', zIndex: 1 }}></th>
               </tr>
             </thead>
             <tbody>
