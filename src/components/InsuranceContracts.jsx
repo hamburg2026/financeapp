@@ -319,6 +319,7 @@ export default function InsuranceContracts() {
   const [editId, setEditId] = useState(null)
   const [expandedHistory, setExpandedHistory] = useState(new Set())
   const [expandedContracts, setExpandedContracts] = useState(new Set())
+  const [collapsedGroups, setCollapsedGroups] = useState(new Set())
   const [showAddPerson, setShowAddPerson] = useState(false)
   const [newPersonInput, setNewPersonInput] = useState('')
 
@@ -438,6 +439,18 @@ export default function InsuranceContracts() {
       next.has(id) ? next.delete(id) : next.add(id)
       return next
     })
+  }
+
+  function toggleGroupCollapse(label) {
+    setCollapsedGroups(prev => {
+      const n = new Set(prev); n.has(label) ? n.delete(label) : n.add(label); return n
+    })
+  }
+
+  const MONTHLY_FACTOR = { monthly: 1, quarterly: 1/3, halfyearly: 1/6, yearly: 1/12 }
+  function groupMonthlyPremium(items) {
+    return items.filter(c => c.active !== false && c.premium > 0)
+      .reduce((s, c) => s + c.premium * (MONTHLY_FACTOR[c.premiumFrequency || 'monthly'] ?? 1), 0)
   }
 
   function updateHistory(contractId, newHistory) {
@@ -716,14 +729,44 @@ export default function InsuranceContracts() {
         </p>
       ) : (
         <>
-          {getGroups(filtered).map(({ label, items }) => (
-            <div key={label ?? '__all'} style={{ marginBottom: groupBy !== 'none' ? '1rem' : 0 }}>
-              {label !== null && (
-                <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', padding: '0.25rem 0.5rem', background: 'var(--color-bg)', borderRadius: 5, marginBottom: '0.4rem', borderLeft: '3px solid var(--color-border)' }}>
-                  {label}
+          {getGroups(filtered).map(({ label, items }) => {
+            const isGrouped = groupBy !== 'none' && label !== null
+            const isCollapsed = isGrouped && collapsedGroups.has(label)
+            const monthlyTotal = isGrouped ? groupMonthlyPremium(items) : 0
+            return (
+            <div key={label ?? '__all'} style={{ marginBottom: isGrouped ? '0.75rem' : 0 }}>
+              {isGrouped && (
+                <div
+                  onClick={() => toggleGroupCollapse(label)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '0.6rem',
+                    padding: '0.55rem 0.75rem',
+                    background: 'var(--color-bg)',
+                    border: '1px solid var(--color-border)',
+                    borderLeft: '4px solid var(--color-primary)',
+                    borderRadius: isCollapsed ? 8 : '8px 8px 0 0',
+                    cursor: 'pointer', userSelect: 'none',
+                    marginBottom: isCollapsed ? 0 : 0,
+                  }}>
+                  <span style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)', width: '0.8rem', flexShrink: 0 }}>
+                    {isCollapsed ? '▸' : '▾'}
+                  </span>
+                  <span style={{ fontWeight: 700, fontSize: '0.95rem', flex: 1 }}>{label}</span>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                    {items.length} {items.length === 1 ? 'Vertrag' : 'Verträge'}
+                  </span>
+                  {monthlyTotal > 0 && (
+                    <span style={{ fontSize: '0.78rem', color: '#dc2626', fontWeight: 600 }}>
+                      {fmt(monthlyTotal)} mtl.
+                    </span>
+                  )}
                 </div>
               )}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+          {!isCollapsed && (
+          <div style={{
+            display: 'flex', flexDirection: 'column', gap: '0.6rem',
+            ...(isGrouped ? { border: '1px solid var(--color-border)', borderTop: 'none', borderRadius: '0 0 8px 8px', padding: '0.6rem' } : {}),
+          }}>
             {items.map(c => {
               const displayVal = getDisplayValue(c)
               const histOpen = expandedHistory.has(c.id)
@@ -870,8 +913,9 @@ export default function InsuranceContracts() {
               )
             })}
           </div>
+          )}
             </div>
-          ))}
+          )})}
 
           {filtered.filter(c => !isNurVerrentung(c) && !isNichtRelevant(c)).length > 1 && (
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.75rem', padding: '0.4rem 0.75rem', background: 'var(--color-bg)', borderRadius: 6, fontSize: '0.85rem' }}>
