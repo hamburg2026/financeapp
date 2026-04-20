@@ -80,7 +80,9 @@ export default function Categories() {
   function collapseAll() { setExpanded(new Set()) }
 
   function renderTree(parentId = null, level = 0) {
-    return categories.filter(c => c.parent == parentId).map((c, idx, siblings) => {
+    return categories.filter(c => c.parent == parentId)
+      .sort((a, b) => a.name.localeCompare(b.name, 'de'))
+      .map((c, idx, siblings) => {
       const isLast = idx === siblings.length - 1
       const hasChildren = categories.some(ch => ch.parent == c.id)
       const isOpen = expanded.has(c.id)

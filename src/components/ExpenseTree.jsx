@@ -112,7 +112,7 @@ function genPivotPeriods(from, to, gby) {
 }
 
 export default function ExpenseTree() {
-  const [source,        setSource]        = useState('recurring')
+  const [source,        setSource]        = useState('transactions')
   const [period,        setPeriod]        = useState('month')
   const initRange = getDateRange('thisYear')
   const [txRangeKey,    setTxRangeKey]    = useState('thisYear')
@@ -127,7 +127,7 @@ export default function ExpenseTree() {
   const [filterFrequency, setFilterFrequency] = useState('')
   const [filterSearch,    setFilterSearch]    = useState('')
 
-  const [txViewMode,        setTxViewMode]        = useState('tree')
+  const [txViewMode,        setTxViewMode]        = useState('pivot')
   const [txFilterType,      setTxFilterType]      = useState('all')
   const [pivotGroupBy,      setPivotGroupBy]      = useState('quarter')
   const [pivotExpandedCats, setPivotExpandedCats] = useState(new Set())
@@ -251,19 +251,28 @@ export default function ExpenseTree() {
   function pivotRowTotal(catId) {
     return pivotPeriods.reduce((s, p) => s + pivotSubtreeVal(catId, p), 0)
   }
-  function buildPivotRows(parentId = null, level = 0) {
+  function buildCatPivotRows(cat, level) {
     const rows = []
-    const nodes = categories
-      .filter(c => (c.parent ?? null) == parentId && pivotSubtreeHasData(c.id))
-      .sort((a, b) => Math.abs(pivotRowTotal(b.id)) - Math.abs(pivotRowTotal(a.id)))
-    for (const cat of nodes) {
-      const hasChildren = categories.some(c => c.parent == cat.id && pivotSubtreeHasData(c.id))
-      const isOpen = pivotExpandedCats.has(cat.id)
-      const vals = pivotPeriods.map(p => pivotSubtreeVal(cat.id, p))
-      const total = vals.reduce((s, v) => s + v, 0)
-      rows.push({ cat, level, hasChildren, isOpen, vals, total })
-      if (isOpen) rows.push(...buildPivotRows(cat.id, level + 1))
+    const hasChildren = categories.some(c => c.parent == cat.id && pivotSubtreeHasData(c.id))
+    const isOpen = pivotExpandedCats.has(cat.id)
+    const vals = pivotPeriods.map(p => pivotSubtreeVal(cat.id, p))
+    const total = vals.reduce((s, v) => s + v, 0)
+    rows.push({ cat, level, hasChildren, isOpen, vals, total })
+    if (isOpen) {
+      categories.filter(c => c.parent == cat.id && pivotSubtreeHasData(c.id))
+        .sort((a, b) => a.name.localeCompare(b.name, 'de'))
+        .forEach(child => rows.push(...buildCatPivotRows(child, level + 1)))
     }
+    return rows
+  }
+  function buildPivotRows() {
+    const top = categories.filter(c => c.parent == null && pivotSubtreeHasData(c.id))
+    const byType = (type) => top.filter(c => c.type === type).sort((a, b) => a.name.localeCompare(b.name, 'de'))
+    const other  = top.filter(c => c.type !== 'Einnahme').sort((a, b) => a.name.localeCompare(b.name, 'de'))
+    const income = byType('Einnahme')
+    const rows = []
+    if (income.length) { rows.push({ header: 'Einnahmen' }); income.forEach(c => rows.push(...buildCatPivotRows(c, 0))) }
+    if (other.length)  { rows.push({ header: 'Ausgaben' });  other.forEach(c  => rows.push(...buildCatPivotRows(c, 0))) }
     return rows
   }
 
@@ -472,12 +481,27 @@ export default function ExpenseTree() {
     <div className="module">
       <h2>Ausgabenübersicht</h2>
 
-      {/* Source toggle */}
-      <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '1rem', alignItems: 'center' }}>
-        <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', fontWeight: 600 }}>Quelle:</span>
-        {[['recurring', 'Daueraufträge'], ['transactions', 'Umsätze']].map(([val, label]) => (
-          <button key={val} onClick={() => setSource(val)} style={pill(source === val)}>{label}</button>
-        ))}
+      {/* Unified view selector */}
+      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+        {[
+          ['recurring', 'Daueraufträge'],
+          ['tree',      'Kategorienbaum'],
+          ['pivot',     'Pivot'],
+        ].map(([v, l]) => {
+          const active = v === 'recurring' ? source === 'recurring' : source === 'transactions' && txViewMode === v
+          return (
+            <button key={v} onClick={() => {
+              if (v === 'recurring') setSource('recurring')
+              else { setSource('transactions'); setTxViewMode(v) }
+            }} style={{
+              padding: '0.35rem 1rem', borderRadius: 8, cursor: 'pointer', fontSize: '0.88rem',
+              fontWeight: active ? 600 : 400,
+              border: `1px solid ${active ? 'var(--color-primary)' : 'var(--color-border)'}`,
+              background: active ? 'var(--color-primary)' : 'var(--color-surface)',
+              color: active ? '#fff' : 'inherit',
+            }}>{l}</button>
+          )
+        })}
       </div>
 
       {source === 'recurring' ? (
@@ -594,8 +618,8 @@ export default function ExpenseTree() {
                 <button key={key} onClick={() => selectTxRange(key)} style={pill(txRangeKey === key)}>{label}</button>
               ))}
             </div>
-            {/* Row 2: account, dates, type, view toggle */}
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+            {/* Row 2: account, dates, type */}
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
               {accounts.length > 0 && (
                 <div>
                   <div style={{ fontSize: '0.69rem', color: 'var(--color-text-muted)', fontWeight: 600, marginBottom: 2 }}>Konto</div>
@@ -624,17 +648,13 @@ export default function ExpenseTree() {
                   ))}
                 </div>
               </div>
-              <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.3rem', alignSelf: 'flex-end', flexWrap: 'wrap' }}>
+              <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.3rem', alignSelf: 'flex-start', flexWrap: 'wrap' }}>
                 {txViewMode === 'tree' && <>
                   <button onClick={expandAll}   style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', background: 'transparent', border: '1px solid var(--color-border)', color: 'var(--color-text-muted)', borderRadius: 6, cursor: 'pointer' }}>Aufklappen</button>
                   <button onClick={collapseAll} style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', background: 'transparent', border: '1px solid var(--color-border)', color: 'var(--color-text-muted)', borderRadius: 6, cursor: 'pointer' }}>Zuklappen</button>
                 </>}
                 {txViewMode === 'pivot' && [['month','Monat'],['quarter','Quartal'],['year','Jahr']].map(([v,l]) => (
                   <button key={v} onClick={() => setPivotGroupBy(v)} style={pill(pivotGroupBy === v)}>{l}</button>
-                ))}
-                <span style={{ width: 1, background: 'var(--color-border)', alignSelf: 'stretch', margin: '0 0.1rem' }} />
-                {[['tree','Kategorienbaum'],['pivot','Pivot']].map(([v,l]) => (
-                  <button key={v} onClick={() => setTxViewMode(v)} style={filterBtnStyle(txViewMode === v)}>{l}</button>
                 ))}
               </div>
             </div>
@@ -703,7 +723,19 @@ export default function ExpenseTree() {
                       </tr>
                     </thead>
                     <tbody>
-                      {pivotRows.map(({ cat, level, hasChildren, isOpen, vals, total }) => (
+                      {pivotRows.map(row => {
+                        if (row.header) {
+                          const hc = row.header === 'Einnahmen' ? '#16a34a' : '#dc2626'
+                          return (
+                            <tr key={`h-${row.header}`} style={{ background: hc + '0d', borderBottom: `1px solid ${hc}30` }}>
+                              <td style={{ ...cs, ...sticky, background: hc + '0d', borderRight: '1px solid var(--color-border)', fontWeight: 700, color: hc, fontSize: '0.75rem', letterSpacing: '0.05em', textTransform: 'uppercase' }}>{row.header}</td>
+                              {pivotPeriods.map((_, i) => <td key={i} />)}
+                              <td style={{ borderLeft: '2px solid var(--color-border)' }} />
+                            </tr>
+                          )
+                        }
+                        const { cat, level, hasChildren, isOpen, vals, total } = row
+                        return (
                         <tr key={cat.id} style={{ borderBottom: '1px solid var(--color-border)', background: level === 0 ? 'var(--color-bg)' : 'var(--color-surface)' }}>
                           <td style={{ ...cs, ...sticky, background: level === 0 ? 'var(--color-bg)' : 'var(--color-surface)', paddingLeft: (0.55 + level * 1.1) + 'rem', fontWeight: level === 0 ? 600 : 400, borderRight: '1px solid var(--color-border)', whiteSpace: 'nowrap' }}>
                             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
@@ -727,7 +759,8 @@ export default function ExpenseTree() {
                             {total !== 0 ? fmt(total) : ''}
                           </td>
                         </tr>
-                      ))}
+                        )
+                      })}
                       {uncatPTotal !== 0 && (
                         <tr style={{ borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface)' }}>
                           <td style={{ ...cs, ...sticky, background: 'var(--color-surface)', paddingLeft: '1.5rem', color: 'var(--color-text-muted)', fontStyle: 'italic', borderRight: '1px solid var(--color-border)', whiteSpace: 'nowrap' }}>ohne Kategorie</td>
