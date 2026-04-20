@@ -473,7 +473,7 @@ export default function ExpenseTree() {
     const totals = {}
     for (const tx of typedFilteredTxs) {
       const catId = tx.category ? (nameToId[tx.category] ?? null) : null
-      const key = catId !== null ? catId : (tx.category ? '_unknown_' : 'uncategorised')
+      const key = catId !== null ? catId : (tx.category ? `__orphan__:${tx.category}` : 'uncategorised')
       totals[key] = (totals[key] || 0) + tx.amount
     }
     return totals
@@ -482,7 +482,7 @@ export default function ExpenseTree() {
   const txsByCatId = useMemo(() => {
     const map = {}
     for (const tx of typedFilteredTxs) {
-      const catId = tx.category ? (nameToId[tx.category] ?? '_unknown_') : 'uncategorised'
+      const catId = tx.category ? (nameToId[tx.category] ?? `__orphan__:${tx.category}`) : 'uncategorised'
       if (!map[catId]) map[catId] = []
       map[catId].push(tx)
     }
@@ -493,7 +493,7 @@ export default function ExpenseTree() {
   const pivotCellMap = useMemo(() => {
     const map = {}
     for (const tx of typedFilteredTxs) {
-      const catId = tx.category ? (nameToId[tx.category] ?? '_unknown_') : 'uncat'
+      const catId = tx.category ? (nameToId[tx.category] ?? `__orphan__:${tx.category}`) : 'uncat'
       const pk = getPivotKey(tx.date, pivotGroupBy)
       if (!map[catId]) map[catId] = {}
       map[catId][pk] = (map[catId][pk] || 0) + tx.amount
@@ -606,6 +606,17 @@ export default function ExpenseTree() {
     const { from, to } = pivotPeriodToDateRange(periodKey, pivotGroupBy)
     const subset = typedFilteredTxs.filter(t => t.date >= from && t.date <= to && !t.category)
     setDrilldown({ title: `Ohne Kategorie – ${pivotLabel(periodKey, pivotGroupBy)}`, txSubset: subset, txIds: new Set(subset.map(t => t.id)) })
+  }
+
+  function openOrphanDrilldown(catName, periodKey) {
+    const { from, to } = pivotPeriodToDateRange(periodKey, pivotGroupBy)
+    const subset = typedFilteredTxs.filter(t => t.date >= from && t.date <= to && t.category === catName && !nameToId[catName])
+    setDrilldown({ title: `⚠ ${catName} – ${pivotLabel(periodKey, pivotGroupBy)}`, txSubset: subset, txIds: new Set(subset.map(t => t.id)) })
+  }
+
+  function openOrphanCatDrilldown(catName) {
+    const subset = typedFilteredTxs.filter(t => t.category === catName && !nameToId[catName])
+    setDrilldown({ title: `⚠ ${catName} (Kategorie nicht mehr vorhanden)`, txSubset: subset, txIds: new Set(subset.map(t => t.id)) })
   }
 
   function selectTxRange(key) {
@@ -983,6 +994,15 @@ export default function ExpenseTree() {
               const clr = v => v > 0 ? '#16a34a' : v < 0 ? '#dc2626' : 'var(--color-text-muted)'
               const uncatPVals  = pivotPeriods.map(p => pivotCellMap['uncat']?.[p] || 0)
               const uncatPTotal = uncatPVals.reduce((s, v) => s + v, 0)
+              const orphanRows  = Object.keys(pivotCellMap)
+                .filter(k => k.startsWith('__orphan__:'))
+                .map(k => {
+                  const name = k.slice('__orphan__:'.length)
+                  const vals = pivotPeriods.map(p => pivotCellMap[k]?.[p] || 0)
+                  const total = vals.reduce((s, v) => s + v, 0)
+                  return { key: k, name, vals, total }
+                })
+                .filter(r => r.total !== 0)
               const grandByPeriod = pivotPeriods.map(p =>
                 typedFilteredTxs.filter(t => getPivotKey(t.date, pivotGroupBy) === p).reduce((s, t) => s + t.amount, 0)
               )
@@ -1036,6 +1056,24 @@ export default function ExpenseTree() {
                         </tr>
                         )
                       })}
+                      {orphanRows.map(r => (
+                        <tr key={r.key} style={{ borderBottom: '1px solid var(--color-border)', background: '#fffbeb' }}>
+                          <td style={{ ...cs, ...sticky, background: '#fffbeb', paddingLeft: '1.5rem', color: '#92400e', fontStyle: 'italic', borderRight: '1px solid var(--color-border)', whiteSpace: 'nowrap' }}
+                            title="Kategorie existiert nicht mehr – bitte neu zuordnen">
+                            ⚠ {r.name}
+                          </td>
+                          {r.vals.map((v, i) => (
+                            <td key={i} onClick={() => v !== 0 && openOrphanDrilldown(r.name, pivotPeriods[i])}
+                              style={{ ...ns, color: v !== 0 ? clr(v) : 'var(--color-border)', cursor: v !== 0 ? 'pointer' : undefined }}>
+                              {v !== 0 ? fmt(v) : '–'}
+                            </td>
+                          ))}
+                          <td onClick={() => r.total !== 0 && openOrphanCatDrilldown(r.name)}
+                            style={{ ...ns, fontWeight: 700, color: '#92400e', borderLeft: '2px solid var(--color-border)', cursor: r.total !== 0 ? 'pointer' : undefined }}>
+                            {r.total !== 0 ? fmt(r.total) : ''}
+                          </td>
+                        </tr>
+                      ))}
                       {uncatPTotal !== 0 && (
                         <tr style={{ borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface)' }}>
                           <td style={{ ...cs, ...sticky, background: 'var(--color-surface)', paddingLeft: '1.5rem', color: 'var(--color-text-muted)', fontStyle: 'italic', borderRight: '1px solid var(--color-border)', whiteSpace: 'nowrap' }}>ohne Kategorie</td>
