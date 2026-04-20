@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { fmt } from '../fmt'
+import { TransactionModal } from './BankAccounts'
 
 const FREQ_FACTOR = {
   month:   { monthly: 1,  quarterly: 1/3, halfyearly: 1/6,  yearly: 1/12 },
@@ -130,17 +131,18 @@ export default function ExpenseTree() {
   const [txFilterType,      setTxFilterType]      = useState('all')
   const [pivotGroupBy,      setPivotGroupBy]      = useState('quarter')
   const [pivotExpandedCats, setPivotExpandedCats] = useState(new Set())
+  const [drilldown,         setDrilldown]         = useState(null)
 
   const recurrings  = JSON.parse(localStorage.getItem('recurringPayments')) || []
   const categories  = JSON.parse(localStorage.getItem('categories'))        || []
-  const allTxs      = useMemo(() =>
-    source === 'transactions' ? JSON.parse(localStorage.getItem('transactions')) || [] : [],
-    [source]
-  )
-  const accounts    = useMemo(() =>
-    source === 'transactions' ? JSON.parse(localStorage.getItem('bankAccounts')) || [] : [],
-    [source]
-  )
+  const [allTransactions, setAllTransactions] = useState(() => JSON.parse(localStorage.getItem('transactions')) || [])
+  const [allAccounts,     setAllAccounts]     = useState(() => JSON.parse(localStorage.getItem('bankAccounts')) || [])
+
+  function saveTransactions(txs) { localStorage.setItem('transactions', JSON.stringify(txs)); setAllTransactions(txs) }
+  function saveAccounts(accs)    { localStorage.setItem('bankAccounts', JSON.stringify(accs)); setAllAccounts(accs) }
+
+  const allTxs   = useMemo(() => source === 'transactions' ? allTransactions : [], [source, allTransactions])
+  const accounts = useMemo(() => source === 'transactions' ? allAccounts : [],     [source, allAccounts])
 
   const filteredTxs = useMemo(() =>
     allTxs.filter(t => {
@@ -278,11 +280,62 @@ export default function ExpenseTree() {
   }
   function collapseAll() { setExpandedCats(new Set()); setExpandedFreqs(new Set()) }
 
+  // ── Pivot drilldown helpers ───────────────────────────────────────
+  function pivotPeriodToDateRange(key, gby) {
+    const pad = n => String(n).padStart(2, '0')
+    if (gby === 'year') return { from: `${key}-01-01`, to: `${key}-12-31` }
+    if (gby === 'quarter') {
+      const [y, q] = key.split('-'); const qn = parseInt(q.slice(1))
+      const sm = (qn - 1) * 3, em = sm + 2
+      return { from: `${y}-${pad(sm+1)}-01`, to: `${y}-${pad(em+1)}-${pad(new Date(parseInt(y), em+1, 0).getDate())}` }
+    }
+    if (gby === 'month') {
+      const [y, m] = key.split('-')
+      return { from: `${y}-${m}-01`, to: `${y}-${m}-${pad(new Date(parseInt(y), parseInt(m), 0).getDate())}` }
+    }
+    return { from: '', to: '' }
+  }
+
+  function getAllDescendantNames(catId) {
+    const result = new Set()
+    const cat = catById[catId]
+    if (cat) result.add(cat.name)
+    for (const c of categories.filter(c => c.parent == catId))
+      for (const name of getAllDescendantNames(c.id)) result.add(name)
+    return result
+  }
+
+  function openDrilldown(cat, periodKey) {
+    const catNames = getAllDescendantNames(cat.id)
+    const { from, to } = pivotPeriodToDateRange(periodKey, pivotGroupBy)
+    const subset = typedFilteredTxs.filter(t => t.date >= from && t.date <= to && catNames.has(t.category))
+    setDrilldown({ title: `${cat.name} – ${pivotLabel(periodKey, pivotGroupBy)}`, txSubset: subset, txIds: new Set(subset.map(t => t.id)) })
+  }
+
+  function openCatDrilldown(cat) {
+    const catNames = getAllDescendantNames(cat.id)
+    const subset = typedFilteredTxs.filter(t => catNames.has(t.category))
+    setDrilldown({ title: cat.name, txSubset: subset, txIds: new Set(subset.map(t => t.id)) })
+  }
+
+  function openUncatDrilldown(periodKey) {
+    const { from, to } = pivotPeriodToDateRange(periodKey, pivotGroupBy)
+    const subset = typedFilteredTxs.filter(t => t.date >= from && t.date <= to && !t.category)
+    setDrilldown({ title: `Ohne Kategorie – ${pivotLabel(periodKey, pivotGroupBy)}`, txSubset: subset, txIds: new Set(subset.map(t => t.id)) })
+  }
+
   function selectTxRange(key) {
     setTxRangeKey(key)
-    const r = getDateRange(key)
-    setTxFrom(r.from)
-    setTxTo(r.to)
+    if (key === 'all') {
+      const dates = allTransactions.map(t => t.date).filter(Boolean).sort()
+      const firstYear = dates.length > 0 ? parseInt(dates[0].slice(0, 4)) : new Date().getFullYear()
+      setTxFrom(`${firstYear}-01-01`)
+      setTxTo(`${new Date().getFullYear()}-12-31`)
+    } else {
+      const r = getDateRange(key)
+      setTxFrom(r.from)
+      setTxTo(r.to)
+    }
   }
 
   // ── Recurring category tree ───────────────────────────────────────
@@ -663,14 +716,27 @@ export default function ExpenseTree() {
                               {cat.name}
                             </span>
                           </td>
-                          {vals.map((v, i) => <td key={i} style={{ ...ns, color: v !== 0 ? clr(v) : 'var(--color-border)' }}>{v !== 0 ? fmt(v) : '–'}</td>)}
-                          <td style={{ ...ns, fontWeight: 700, color: clr(total), borderLeft: '2px solid var(--color-border)' }}>{total !== 0 ? fmt(total) : ''}</td>
+                          {vals.map((v, i) => (
+                            <td key={i} onClick={() => v !== 0 && openDrilldown(cat, pivotPeriods[i])}
+                              style={{ ...ns, color: v !== 0 ? clr(v) : 'var(--color-border)', cursor: v !== 0 ? 'pointer' : undefined }}>
+                              {v !== 0 ? fmt(v) : '–'}
+                            </td>
+                          ))}
+                          <td onClick={() => total !== 0 && openCatDrilldown(cat)}
+                            style={{ ...ns, fontWeight: 700, color: clr(total), borderLeft: '2px solid var(--color-border)', cursor: total !== 0 ? 'pointer' : undefined }}>
+                            {total !== 0 ? fmt(total) : ''}
+                          </td>
                         </tr>
                       ))}
                       {uncatPTotal !== 0 && (
                         <tr style={{ borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface)' }}>
                           <td style={{ ...cs, ...sticky, background: 'var(--color-surface)', paddingLeft: '1.5rem', color: 'var(--color-text-muted)', fontStyle: 'italic', borderRight: '1px solid var(--color-border)', whiteSpace: 'nowrap' }}>ohne Kategorie</td>
-                          {uncatPVals.map((v, i) => <td key={i} style={{ ...ns, color: v !== 0 ? clr(v) : 'var(--color-border)' }}>{v !== 0 ? fmt(v) : '–'}</td>)}
+                          {uncatPVals.map((v, i) => (
+                            <td key={i} onClick={() => v !== 0 && openUncatDrilldown(pivotPeriods[i])}
+                              style={{ ...ns, color: v !== 0 ? clr(v) : 'var(--color-border)', cursor: v !== 0 ? 'pointer' : undefined }}>
+                              {v !== 0 ? fmt(v) : '–'}
+                            </td>
+                          ))}
                           <td style={{ ...ns, fontWeight: 700, color: clr(uncatPTotal), borderLeft: '2px solid var(--color-border)' }}>{fmt(uncatPTotal)}</td>
                         </tr>
                       )}
@@ -688,6 +754,23 @@ export default function ExpenseTree() {
             })()
           )}
         </>
+      )}
+
+      {drilldown && (
+        <TransactionModal
+          accountId={null}
+          accounts={allAccounts}
+          transactions={drilldown.txSubset}
+          categories={categories}
+          onClose={() => setDrilldown(null)}
+          onUpdateAccounts={saveAccounts}
+          onUpdateTransactions={newSubset => {
+            const base = allTransactions.filter(t => !drilldown.txIds.has(t.id))
+            saveTransactions([...base, ...newSubset])
+            setDrilldown(prev => ({ ...prev, txSubset: newSubset, txIds: new Set(newSubset.map(t => t.id)) }))
+          }}
+          initialDateDim="all"
+        />
       )}
     </div>
   )

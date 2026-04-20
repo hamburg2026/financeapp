@@ -58,14 +58,15 @@ function getDateRange(key) {
 
 // ── Transaction modal ──────────────────────────────────────────────────
 
-function TransactionModal({ accountId, accounts, transactions, categories, onClose, onUpdateAccounts, onUpdateTransactions }) {
-  const init = getDateRange('thisMonth')
-  const [dateDim,  setDateDim]  = useState('thisMonth')
+export function TransactionModal({ accountId, accounts, transactions, categories, onClose, onUpdateAccounts, onUpdateTransactions,
+  initialDateDim = 'thisMonth', initialCategory = '' }) {
+  const init = getDateRange(initialDateDim)
+  const [dateDim,  setDateDim]  = useState(initialDateDim)
   const [dateFrom, setDateFrom] = useState(init.from)
   const [dateTo,   setDateTo]   = useState(init.to)
 
   const [filterAcc,       setFilterAcc]       = useState(accountId ? String(accountId) : '')
-  const [filterCat,       setFilterCat]       = useState('')
+  const [filterCat,       setFilterCat]       = useState(initialCategory)
   const [filterType,      setFilterType]      = useState('all')
   const [filterRecipient, setFilterRecipient] = useState('')
   const [filterSearch,    setFilterSearch]    = useState('')
