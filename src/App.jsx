@@ -14,7 +14,6 @@ import ExpenseChart from './components/ExpenseChart'
 import PortfolioPerformance from './components/PortfolioPerformance'
 import PrintDialog from './components/PrintDialog'
 import PdfImport from './components/PdfImport'
-import TransactionPivot from './components/TransactionPivot'
 import { THEMES, applyTheme, loadTheme } from './theme'
 
 const NAV_GROUPS = [
@@ -45,7 +44,6 @@ const NAV_GROUPS = [
       { id: 'expenseChart', label: 'Ausgaben-Grafik', icon: '🎯', component: ExpenseChart },
       { id: 'portfolioPerf',label: 'Wertentwicklung', icon: '💹', component: PortfolioPerformance },
       { id: 'expenseTree',    label: 'Ausgaben',          icon: '📉', component: ExpenseTree },
-      { id: 'txPivot',        label: 'Pivot-Auswertung',  icon: '⊞',  component: TransactionPivot },
     ],
   },
 ]
