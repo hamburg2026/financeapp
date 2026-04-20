@@ -34,7 +34,7 @@ function syncRecurring(sub, isActive) {
   }
 }
 
-const EMPTY = { name: '', cost: '', frequency: 'monthly', cancel: '', cancelDate: '', aktiv: true, categoryId: '', type: 'Ausgabe' }
+const EMPTY = { name: '', cost: '', frequency: 'monthly', cancel: '', cancelDate: '', aktiv: true, gekuendigt: false, categoryId: '', type: 'Ausgabe' }
 
 export default function Subscriptions() {
   const [subscriptions, setSubscriptions] = useLocalStorage('subscriptions', [])
@@ -55,7 +55,7 @@ export default function Subscriptions() {
 
   function openAdd() { setForm(EMPTY); setModal('add') }
   function openEdit(s) {
-    setForm({ name: s.name, cost: String(s.cost), frequency: s.frequency, cancel: s.cancel || '', cancelDate: s.cancelDate || '', aktiv: s.aktiv ?? true, categoryId: s.categoryId ? String(s.categoryId) : '', type: s.type || 'Ausgabe' })
+    setForm({ name: s.name, cost: String(s.cost), frequency: s.frequency, cancel: s.cancel || '', cancelDate: s.cancelDate || '', aktiv: s.aktiv ?? true, gekuendigt: s.gekuendigt || false, categoryId: s.categoryId ? String(s.categoryId) : '', type: s.type || 'Ausgabe' })
     setModal(s.id)
   }
   function closeModal() { setModal(null) }
@@ -65,7 +65,7 @@ export default function Subscriptions() {
     const sub = {
       id: modal === 'add' ? Date.now() : modal,
       name: form.name, cost: parseFloat(form.cost), frequency: form.frequency,
-      cancel: form.cancel, cancelDate: form.cancelDate, aktiv: form.aktiv,
+      cancel: form.cancel, cancelDate: form.cancelDate, aktiv: form.aktiv, gekuendigt: form.gekuendigt,
       categoryId: form.categoryId ? parseInt(form.categoryId) : null, type: form.type,
     }
     if (modal === 'add') {
@@ -121,7 +121,14 @@ export default function Subscriptions() {
               fontSize: '0.85rem', opacity: s.aktiv ? 1 : 0.55,
             }}>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                  <span style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</span>
+                  {s.gekuendigt && (
+                    <span style={{ fontSize: '0.68rem', fontWeight: 600, background: '#fef3c7', color: '#b45309', borderRadius: 4, padding: '0.1rem 0.4rem', flexShrink: 0 }}>
+                      Gekündigt
+                    </span>
+                  )}
+                </div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
                   {FREQ_LABELS[s.frequency] || s.frequency}
                   {getCategoryLabel(s.categoryId) && <span style={{ marginLeft: '0.5rem' }}>· {getCategoryLabel(s.categoryId)}</span>}
@@ -185,10 +192,16 @@ export default function Subscriptions() {
                 <input type="date" {...field('cancelDate')} style={{ width: '100%' }} />
               </div>
             </div>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', cursor: 'pointer' }}>
-              <input type="checkbox" {...check('aktiv')} />
-              Aktiv (als Dauerauftrag übernehmen)
-            </label>
+            <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', cursor: 'pointer' }}>
+                <input type="checkbox" {...check('aktiv')} />
+                Aktiv (als Dauerauftrag übernehmen)
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', cursor: 'pointer' }}>
+                <input type="checkbox" {...check('gekuendigt')} />
+                Gekündigt
+              </label>
+            </div>
             <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
               <button type="submit" style={{ flex: 1 }}>{isEditing ? 'Änderungen speichern' : 'Abonnement hinzufügen'}</button>
               <button type="button" onClick={closeModal} style={{ background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: 8, padding: '0.6rem 1rem', cursor: 'pointer' }}>Abbrechen</button>
