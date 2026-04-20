@@ -13,15 +13,16 @@ const DATE_DIMS = [
 
 function getDateRange(key) {
   const n = new Date()
-  const y = n.getFullYear()
-  const m = n.getMonth() + 1
-  const q = Math.ceil(m / 3)
-  const p = s => String(s).padStart(2, '0')
+  const y = n.getFullYear(), m = n.getMonth()   // m is 0-indexed
+  const p   = s  => String(s).padStart(2, '0')
+  const iso = (yr, mo, day) => `${yr}-${p(mo + 1)}-${p(day)}`
+  const end = (yr, mo)      => new Date(yr, mo + 1, 0).getDate()
+  const q = Math.floor(m / 3)
   switch (key) {
-    case 'thisMonth': return { from: `${y}-${p(m)}-01`, to: `${y}-${p(m)}-31` }
-    case 'lastMonth': { const lm = m === 1 ? 12 : m - 1, ly = m === 1 ? y - 1 : y; return { from: `${ly}-${p(lm)}-01`, to: `${ly}-${p(lm)}-31` } }
-    case 'thisQ':  return { from: `${y}-${p((q-1)*3+1)}-01`, to: `${y}-${p(q*3)}-31` }
-    case 'lastQ':  { const lq = q === 1 ? 4 : q - 1, lqy = q === 1 ? y - 1 : y; return { from: `${lqy}-${p((lq-1)*3+1)}-01`, to: `${lqy}-${p(lq*3)}-31` } }
+    case 'thisMonth': return { from: iso(y, m, 1), to: iso(y, m, end(y, m)) }
+    case 'lastMonth': { const lm = m === 0 ? 11 : m - 1, ly = m === 0 ? y - 1 : y; return { from: iso(ly, lm, 1), to: iso(ly, lm, end(ly, lm)) } }
+    case 'thisQ':  return { from: iso(y, q*3, 1), to: iso(y, q*3+2, end(y, q*3+2)) }
+    case 'lastQ':  { const lq = q === 0 ? 3 : q - 1, lqy = q === 0 ? y - 1 : y; return { from: iso(lqy, lq*3, 1), to: iso(lqy, lq*3+2, end(lqy, lq*3+2)) } }
     case 'thisYear': return { from: `${y}-01-01`, to: `${y}-12-31` }
     case 'lastYear': return { from: `${y-1}-01-01`, to: `${y-1}-12-31` }
     default: return { from: '', to: '' }
@@ -54,7 +55,12 @@ function generatePeriods(from, to, groupBy) {
   const cur = new Date(from + 'T00:00:00')
   const end = new Date(to   + 'T00:00:00')
   while (cur <= end) {
-    const key = getPeriodKey(cur.toISOString().slice(0, 10), groupBy)
+    const y = cur.getFullYear()
+    const m = cur.getMonth() + 1  // 1-indexed, local time
+    const p = n => String(n).padStart(2, '0')
+    const key = groupBy === 'month'   ? `${y}-${p(m)}`
+               : groupBy === 'quarter' ? `${y}-Q${Math.ceil(m / 3)}`
+               : String(y)
     if (!periods.length || periods[periods.length - 1] !== key) periods.push(key)
     if (groupBy === 'month')        cur.setMonth(cur.getMonth() + 1)
     else if (groupBy === 'quarter') cur.setMonth(cur.getMonth() + 3)
