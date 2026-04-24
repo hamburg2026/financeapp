@@ -30,8 +30,10 @@ function parseGermanDate(str) {
 function parseGermanAmount(str) {
   if (!str) return null
   let s = str.replace(/\s/g, '')
-  const trailing = s.endsWith('-')
-  if (trailing) s = '-' + s.slice(0, -1)
+  // S = Soll (debit, negative), H = Haben (credit, positive), trailing - also means negative
+  const last = s[s.length - 1]
+  if (last === '-' || last === 'S') s = '-' + s.slice(0, -1)
+  else if (last === 'H' || last === '+') s = s.slice(0, -1)
   // Remove thousand separators (dots before commas): "1.234,56" → "1234.56"
   s = s.replace(/\.(?=\d{3}[,\d])/g, '').replace(',', '.')
   const n = parseFloat(s)
@@ -121,7 +123,7 @@ async function extractPdfLines(file) {
 }
 
 const DATE_ANYWHERE = /\b(\d{2}\.\d{2}\.(?:20|19)?\d{2})\b/g
-const AMOUNT_RE = /(-?\s*\d{1,3}(?:\.\d{3})*,\d{2}\s*[-+]?)/g
+const AMOUNT_RE = /(-?\s*\d{1,3}(?:\.\d{3})*,\d{2}\s*[-+SH]?)/g
 
 // Parse transactions from raw text lines
 function parseTransactions(lines) {
