@@ -17,6 +17,22 @@ function latestBalance(account) {
   return account.balance ?? 0
 }
 
+function closestImportDate(accountId, transactions) {
+  const txs = transactions.filter(t => t.accountId === accountId)
+  if (!txs.length) return null
+  const todayMs = new Date(today()).getTime()
+  return txs.reduce((best, t) => {
+    if (!best) return t.date
+    return Math.abs(new Date(t.date) - todayMs) < Math.abs(new Date(best) - todayMs) ? t.date : best
+  }, null)
+}
+
+function fmtDate(iso) {
+  if (!iso) return '–'
+  const [y, m, d] = iso.split('-')
+  return `${d}.${m}.${y}`
+}
+
 const btnSm = { border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: '0.72rem', padding: '0.2rem 0.45rem', lineHeight: 1.4 }
 const lbl = { fontSize: '0.78rem', color: 'var(--color-text-muted)', marginBottom: '0.3rem', display: 'block', fontWeight: 500 }
 
@@ -478,6 +494,7 @@ export default function BankAccounts() {
                 <th style={{ ...c, textAlign: 'left' }}>Konto</th>
                 <th style={{ ...c, textAlign: 'right' }}>Saldo</th>
                 <th style={{ ...c, textAlign: 'right', color: 'var(--color-text-muted)' }}>Umsätze</th>
+                <th style={{ ...c, textAlign: 'right', color: 'var(--color-text-muted)' }}>Importstand</th>
                 <th style={c}></th>
               </tr>
             </thead>
@@ -486,7 +503,7 @@ export default function BankAccounts() {
                 if (editAccId === a.id) return (
                   <tr key={a.id} style={{ background: '#fefce8', borderBottom: '1px solid var(--color-border)' }}>
                     <td style={c}><input value={editAccName} onChange={e => setEditAccName(e.target.value)} style={{ fontSize: '0.82rem', padding: '0.2rem 0.4rem', width: '100%' }} /></td>
-                    <td style={c} colSpan={2}><input type="number" value={editAccBalance} onChange={e => setEditAccBalance(e.target.value)} step="0.01" style={{ fontSize: '0.82rem', padding: '0.2rem 0.4rem', width: 120 }} /></td>
+                    <td style={c} colSpan={3}><input type="number" value={editAccBalance} onChange={e => setEditAccBalance(e.target.value)} step="0.01" style={{ fontSize: '0.82rem', padding: '0.2rem 0.4rem', width: 120 }} /></td>
                     <td style={{ ...c, whiteSpace: 'nowrap' }}>
                       <button onClick={saveEditAcc} style={{ ...btnSm, background: 'var(--color-primary)', color: '#fff', marginRight: 4 }}>Speichern</button>
                       <button onClick={() => setEditAccId(null)} style={{ ...btnSm, background: '#e5e7eb', color: '#374151' }}>Abbrechen</button>
@@ -495,11 +512,13 @@ export default function BankAccounts() {
                 )
                 const bal = latestBalance(a)
                 const cnt = txCount(a.id)
+                const importDate = closestImportDate(a.id, transactions)
                 return (
                   <tr key={a.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
                     <td style={{ ...c, fontWeight: 500 }}>{a.name}</td>
                     <td style={{ ...c, textAlign: 'right', fontWeight: 700, color: bal >= 0 ? '#16a34a' : '#dc2626', fontVariantNumeric: 'tabular-nums' }}>{fmt(bal)}</td>
                     <td style={{ ...c, textAlign: 'right', color: 'var(--color-text-muted)', fontSize: '0.78rem' }}>{cnt > 0 ? cnt : '–'}</td>
+                    <td style={{ ...c, textAlign: 'right', color: 'var(--color-text-muted)', fontSize: '0.78rem' }}>{fmtDate(importDate)}</td>
                     <td style={{ ...c, whiteSpace: 'nowrap', textAlign: 'right' }}>
                       <button onClick={() => setTxModal(a.id)} style={{ ...btnSm, background: 'var(--color-primary)', color: '#fff', marginRight: 4 }}>Umsätze</button>
                       <button onClick={() => startEditAcc(a)} style={{ ...btnSm, background: '#e5e7eb', color: '#374151', marginRight: 4 }}>✎</button>
