@@ -35,7 +35,7 @@ function isoToGerman(iso) {
 }
 
 const todayIso = () => new Date().toISOString().slice(0, 10)
-const EMPTY_ENTRY = { date: todayIso(), serviceTypeId: '', quantity: '', pricePerUnit: '', notes: '' }
+const EMPTY_ENTRY = { date: todayIso(), serviceTypeId: '', quantity: '', pricePerUnit: '', notes: '', status: 'offen' }
 const EMPTY_TYPE  = { name: '', unit: 'Stück', defaultPrice: '' }
 
 export default function ServiceCostCalculator() {
@@ -45,9 +45,10 @@ export default function ServiceCostCalculator() {
   const [activeTab, setActiveTab] = useState('entries')
   const [modal,     setModal]     = useState(null)
 
-  const [filterType, setFilterType] = useState('')
-  const [filterFrom, setFilterFrom] = useState('')
-  const [filterTo,   setFilterTo]   = useState('')
+  const [filterType,   setFilterType]   = useState('')
+  const [filterFrom,   setFilterFrom]   = useState('')
+  const [filterTo,     setFilterTo]     = useState('')
+  const [filterStatus, setFilterStatus] = useState('')
 
   const [entryForm, setEntryForm] = useState(EMPTY_ENTRY)
   const [typeForm,  setTypeForm]  = useState(EMPTY_TYPE)
@@ -68,9 +69,10 @@ export default function ServiceCostCalculator() {
 
   const filteredEntries = entries
     .filter(e => {
-      if (filterType && String(e.serviceTypeId) !== filterType) return false
-      if (filterFrom && e.date < filterFrom) return false
-      if (filterTo   && e.date > filterTo)   return false
+      if (filterType   && String(e.serviceTypeId) !== filterType) return false
+      if (filterFrom   && e.date < filterFrom) return false
+      if (filterTo     && e.date > filterTo)   return false
+      if (filterStatus && (e.status || 'offen') !== filterStatus) return false
       return true
     })
     .sort((a, b) => b.date.localeCompare(a.date))
@@ -82,7 +84,7 @@ export default function ServiceCostCalculator() {
 
   function openAddEntry()  { setEntryForm({ ...EMPTY_ENTRY, date: todayIso() }); setModal('addEntry') }
   function openEditEntry(e) {
-    setEntryForm({ date: e.date, serviceTypeId: String(e.serviceTypeId), quantity: String(e.quantity), pricePerUnit: String(e.pricePerUnit), notes: e.notes || '' })
+    setEntryForm({ date: e.date, serviceTypeId: String(e.serviceTypeId), quantity: String(e.quantity), pricePerUnit: String(e.pricePerUnit), notes: e.notes || '', status: e.status || 'offen' })
     setModal(`editEntry:${e.id}`)
   }
   function saveEntry(ev) {
@@ -90,7 +92,7 @@ export default function ServiceCostCalculator() {
     const quantity     = parseFloat(entryForm.quantity)
     const pricePerUnit = parseFloat(entryForm.pricePerUnit)
     const isNew        = modal === 'addEntry'
-    const entry = { id: isNew ? Date.now() : parseInt(modal.split(':')[1]), date: entryForm.date, serviceTypeId: parseInt(entryForm.serviceTypeId), quantity, pricePerUnit, total: quantity * pricePerUnit, notes: entryForm.notes }
+    const entry = { id: isNew ? Date.now() : parseInt(modal.split(':')[1]), date: entryForm.date, serviceTypeId: parseInt(entryForm.serviceTypeId), quantity, pricePerUnit, total: quantity * pricePerUnit, notes: entryForm.notes, status: entryForm.status || 'offen' }
     setEntries(isNew ? [...entries, entry] : entries.map(e => e.id === entry.id ? entry : e))
     setModal(null)
   }
@@ -125,6 +127,15 @@ export default function ServiceCostCalculator() {
 
   const thStyle = { padding: '0.5rem 0.75rem', textAlign: 'left', fontWeight: 600, fontSize: '0.78rem', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }
   const tdStyle = { padding: '0.45rem 0.75rem', verticalAlign: 'middle' }
+
+  function StatusBadge({ status }) {
+    const paid = (status || 'offen') === 'bezahlt'
+    return (
+      <span style={{ display: 'inline-block', padding: '0.1rem 0.45rem', borderRadius: 10, fontSize: '0.72rem', fontWeight: 600, background: paid ? '#dcfce7' : '#fef3c7', color: paid ? '#16a34a' : '#d97706' }}>
+        {paid ? 'bezahlt' : 'offen'}
+      </span>
+    )
+  }
 
   const selectedUnit = entryForm.serviceTypeId ? getTypeUnit(parseInt(entryForm.serviceTypeId)) : ''
 
@@ -172,8 +183,16 @@ export default function ServiceCostCalculator() {
               <label style={lbl}>Bis</label>
               <input type="date" value={filterTo} onChange={e => setFilterTo(e.target.value)} style={{ fontSize: '0.82rem', padding: '0.28rem 0.5rem' }} />
             </div>
-            {(filterType || filterFrom || filterTo) && (
-              <button onClick={() => { setFilterType(''); setFilterFrom(''); setFilterTo('') }}
+            <div>
+              <label style={lbl}>Status</label>
+              <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={{ fontSize: '0.82rem', padding: '0.28rem 0.5rem' }}>
+                <option value="">Alle</option>
+                <option value="offen">offen</option>
+                <option value="bezahlt">bezahlt</option>
+              </select>
+            </div>
+            {(filterType || filterFrom || filterTo || filterStatus) && (
+              <button onClick={() => { setFilterType(''); setFilterFrom(''); setFilterTo(''); setFilterStatus('') }}
                 style={{ ...btnS, background: '#fee2e2', color: '#dc2626', padding: '0.28rem 0.7rem' }}>
                 Zurücksetzen
               </button>
@@ -205,6 +224,7 @@ export default function ServiceCostCalculator() {
                     <th style={{ ...thStyle, textAlign: 'right' }}>Preis/Einheit</th>
                     <th style={{ ...thStyle, textAlign: 'right' }}>Summe</th>
                     <th style={thStyle}>Notizen</th>
+                    <th style={thStyle}>Status</th>
                     <th style={{ ...thStyle, width: 64 }}></th>
                   </tr>
                 </thead>
@@ -218,6 +238,7 @@ export default function ServiceCostCalculator() {
                       <td style={{ ...tdStyle, textAlign: 'right' }}>{fmt(e.pricePerUnit)}</td>
                       <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>{fmt(e.total)}</td>
                       <td style={{ ...tdStyle, fontSize: '0.78rem', color: 'var(--color-text-muted)', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.notes || '–'}</td>
+                      <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}><StatusBadge status={e.status} /></td>
                       <td style={{ ...tdStyle, textAlign: 'right', whiteSpace: 'nowrap' }}>
                         <button onClick={() => openEditEntry(e)} style={{ ...btnS, background: '#e5e7eb', color: '#374151', marginRight: '0.2rem' }} title="Bearbeiten">✎</button>
                         <button onClick={() => deleteEntry(e.id)} style={{ background: 'none', border: 'none', color: '#dc2626', padding: '0.15rem 0.3rem', fontSize: '0.8rem', cursor: 'pointer' }} title="Löschen">✕</button>
@@ -231,7 +252,7 @@ export default function ServiceCostCalculator() {
                       Gesamt ({filteredEntries.length} Einträge)
                     </td>
                     <td style={{ padding: '0.5rem 0.75rem', textAlign: 'right', fontWeight: 700, color: 'var(--color-primary)' }}>{fmt(totalSum)}</td>
-                    <td colSpan={2}></td>
+                    <td colSpan={3}></td>
                   </tr>
                 </tfoot>
               </table>
@@ -321,10 +342,19 @@ export default function ServiceCostCalculator() {
               <span style={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--color-primary)' }}>{fmt(entryTotal)}</span>
             </div>
 
-            {/* Notes */}
-            <div>
-              <label style={lbl}>Notizen</label>
-              <input {...entryField('notes')} placeholder="Optionale Notizen..." style={{ width: '100%', boxSizing: 'border-box' }} />
+            {/* Row 3: Status + Notes */}
+            <div style={row2}>
+              <div style={{ ...col, flex: '0 0 auto' }}>
+                <label style={lbl}>Status *</label>
+                <select {...entryField('status')} style={{ width: '100%', boxSizing: 'border-box' }}>
+                  <option value="offen">offen</option>
+                  <option value="bezahlt">bezahlt</option>
+                </select>
+              </div>
+              <div style={col}>
+                <label style={lbl}>Notizen</label>
+                <input {...entryField('notes')} placeholder="Optionale Notizen..." style={{ width: '100%', boxSizing: 'border-box' }} />
+              </div>
             </div>
 
             <div style={{ display: 'flex', gap: '0.5rem' }}>

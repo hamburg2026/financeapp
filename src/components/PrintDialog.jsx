@@ -367,7 +367,7 @@ function PrintServiceCosts({ entries, serviceTypes, filterType, filterFrom, filt
   return (
     <>
       <PrintTable
-        headers={['Datum', 'Art der Dienstleistung', 'Einheit', 'Menge', 'Preis/Einheit', 'Summe', 'Notizen']}
+        headers={['Datum', 'Art der Dienstleistung', 'Einheit', 'Menge', 'Preis/Einheit', 'Summe', 'Status', 'Notizen']}
         rows={filtered.map(e => [
           isoToGerman(e.date),
           getName(e.serviceTypeId),
@@ -375,6 +375,7 @@ function PrintServiceCosts({ entries, serviceTypes, filterType, filterFrom, filt
           fmtNum(e.quantity, 2),
           fmt(e.pricePerUnit),
           fmt(e.total),
+          e.status || 'offen',
           e.notes || '–',
         ])}
       />
