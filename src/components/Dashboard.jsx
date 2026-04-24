@@ -22,6 +22,7 @@ const BACKUP_KEYS = [
   'bankAccounts', 'transactions', 'categories', 'recurringPayments',
   'depots', 'depotTransactions', 'securityPrices', 'securities', 'fxRates',
   'insuranceContracts', 'realEstate', 'companyShares', 'subscriptions',
+  'serviceEntries', 'serviceTypes',
   'liquidityLevels',
 ]
 
@@ -34,6 +35,7 @@ const BACKUP_SECTIONS = [
   { label: 'Abonnements',           keys: ['subscriptions'] },
   { label: 'Immobilien',            keys: ['realEstate'] },
   { label: 'Firmenbeteiligungen',   keys: ['companyShares'] },
+  { label: 'Dienstleistungskosten', keys: ['serviceEntries', 'serviceTypes'] },
   { label: 'Einstellungen',         keys: ['liquidityLevels'] },
 ]
 
