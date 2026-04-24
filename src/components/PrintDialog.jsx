@@ -9,14 +9,15 @@ const FREQ_LABELS = {
 }
 
 const PRINT_SECTIONS = [
-  { id: 'bankAccounts',       label: 'Bankkonten',           icon: '🏦' },
-  { id: 'insuranceContracts', label: 'Versicherungen',       icon: '🛡️' },
-  { id: 'securities',         label: 'Wertpapiere & Depots', icon: '📈' },
-  { id: 'realEstate',         label: 'Immobilien',           icon: '🏠' },
-  { id: 'companyShares',      label: 'Firmenbeteiligungen',  icon: '🏢' },
-  { id: 'subscriptions',      label: 'Abonnements',          icon: '📱' },
-  { id: 'recurringPayments',  label: 'Daueraufträge',        icon: '🔄' },
-  { id: 'categories',         label: 'Kategorien',           icon: '🏷️' },
+  { id: 'bankAccounts',       label: 'Bankkonten',              icon: '🏦' },
+  { id: 'insuranceContracts', label: 'Versicherungen',          icon: '🛡️' },
+  { id: 'securities',         label: 'Wertpapiere & Depots',    icon: '📈' },
+  { id: 'realEstate',         label: 'Immobilien',              icon: '🏠' },
+  { id: 'companyShares',      label: 'Firmenbeteiligungen',     icon: '🏢' },
+  { id: 'subscriptions',      label: 'Abonnements',             icon: '📱' },
+  { id: 'recurringPayments',  label: 'Daueraufträge',           icon: '🔄' },
+  { id: 'serviceCosts',       label: 'Dienstleistungskosten',   icon: '🧹' },
+  { id: 'categories',         label: 'Kategorien',              icon: '🏷️' },
 ]
 
 function isoToGerman(iso) {
@@ -348,6 +349,43 @@ function PrintRecurringPayments({ recurrings, categories }) {
   )
 }
 
+function PrintServiceCosts({ entries, serviceTypes, filterType, filterFrom, filterTo }) {
+  const filtered = entries
+    .filter(e => {
+      if (filterType && String(e.serviceTypeId) !== filterType) return false
+      if (filterFrom && e.date < filterFrom) return false
+      if (filterTo && e.date > filterTo) return false
+      return true
+    })
+    .sort((a, b) => b.date.localeCompare(a.date))
+
+  const total = filtered.reduce((s, e) => s + (e.total || 0), 0)
+  const getName = id => serviceTypes.find(t => t.id === id)?.name || '–'
+  const getUnit = id => serviceTypes.find(t => t.id === id)?.unit || ''
+
+  return (
+    <>
+      <PrintTable
+        headers={['Datum', 'Dienstleistung', 'Einheit', 'Menge', 'Preis/Einheit', 'Summe', 'Notizen']}
+        rows={filtered.map(e => [
+          isoToGerman(e.date),
+          getName(e.serviceTypeId),
+          getUnit(e.serviceTypeId),
+          fmtNum(e.quantity, 2),
+          fmt(e.pricePerUnit),
+          fmt(e.total),
+          e.notes || '–',
+        ])}
+      />
+      {filtered.length > 0 && (
+        <div style={{ textAlign: 'right', fontSize: '0.77rem', fontWeight: 700, padding: '0.2rem 0.5rem', borderTop: '1px solid #d1d5db' }}>
+          Gesamt ({filtered.length} Einträge): {fmt(total)}
+        </div>
+      )}
+    </>
+  )
+}
+
 function PrintCategories({ categories }) {
   if (!categories.length) return <p style={{ fontSize: '0.78rem', color: '#6b7280', margin: '0.2rem 0 0.5rem' }}>Keine Kategorien vorhanden.</p>
 
@@ -376,6 +414,9 @@ function PrintCategories({ categories }) {
 export default function PrintDialog({ onClose }) {
   const initialSelected = Object.fromEntries(PRINT_SECTIONS.map(s => [s.id, true]))
   const [selected, setSelected] = useState(initialSelected)
+  const [svcFilterType, setSvcFilterType] = useState('')
+  const [svcFilterFrom, setSvcFilterFrom] = useState('')
+  const [svcFilterTo,   setSvcFilterTo]   = useState('')
 
   const accounts          = JSON.parse(localStorage.getItem('bankAccounts'))       || []
   const insurances        = JSON.parse(localStorage.getItem('insuranceContracts'))  || []
@@ -388,6 +429,8 @@ export default function PrintDialog({ onClose }) {
   const subscriptions     = JSON.parse(localStorage.getItem('subscriptions'))       || []
   const recurrings        = JSON.parse(localStorage.getItem('recurringPayments'))   || []
   const categories        = JSON.parse(localStorage.getItem('categories'))          || []
+  const serviceEntries    = JSON.parse(localStorage.getItem('serviceEntries'))      || []
+  const serviceTypes      = JSON.parse(localStorage.getItem('serviceTypes'))        || []
 
   const anySelected = Object.values(selected).some(Boolean)
   const printDate   = new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -449,6 +492,30 @@ export default function PrintDialog({ onClose }) {
               </label>
             ))}
           </div>
+
+          {/* ── Service cost filters (only shown when section is selected) ── */}
+          {selected.serviceCosts && (
+            <div style={{ marginBottom: '0.75rem', padding: '0.65rem 0.75rem', background: '#f9fafb', border: '1px solid var(--color-border)', borderRadius: 8 }}>
+              <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: '0.5rem' }}>🧹 Filter Dienstleistungskosten</div>
+              <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                <div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', marginBottom: '0.2rem' }}>Art</div>
+                  <select value={svcFilterType} onChange={e => setSvcFilterType(e.target.value)} style={{ fontSize: '0.8rem', padding: '0.22rem 0.45rem' }}>
+                    <option value="">Alle</option>
+                    {serviceTypes.map(t => <option key={t.id} value={String(t.id)}>{t.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', marginBottom: '0.2rem' }}>Von</div>
+                  <input type="date" value={svcFilterFrom} onChange={e => setSvcFilterFrom(e.target.value)} style={{ fontSize: '0.8rem', padding: '0.22rem 0.45rem' }} />
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', marginBottom: '0.2rem' }}>Bis</div>
+                  <input type="date" value={svcFilterTo} onChange={e => setSvcFilterTo(e.target.value)} style={{ fontSize: '0.8rem', padding: '0.22rem 0.45rem' }} />
+                </div>
+              </div>
+            </div>
+          )}
 
           <div style={{ display: 'flex', gap: '0.5rem' }}>
             <button
@@ -528,6 +595,19 @@ export default function PrintDialog({ onClose }) {
             <>
               <SectionTitle icon="🔄" label="Daueraufträge" />
               <PrintRecurringPayments recurrings={recurrings} categories={categories} />
+            </>
+          )}
+
+          {selected.serviceCosts && (
+            <>
+              <SectionTitle icon="🧹" label="Dienstleistungskosten" />
+              <PrintServiceCosts
+                entries={serviceEntries}
+                serviceTypes={serviceTypes}
+                filterType={svcFilterType}
+                filterFrom={svcFilterFrom}
+                filterTo={svcFilterTo}
+              />
             </>
           )}
 

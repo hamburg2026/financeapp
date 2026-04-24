@@ -14,6 +14,7 @@ import ExpenseChart from './components/ExpenseChart'
 import PortfolioPerformance from './components/PortfolioPerformance'
 import PrintDialog from './components/PrintDialog'
 import PdfImport from './components/PdfImport'
+import ServiceCostCalculator from './components/ServiceCostCalculator'
 import { THEMES, applyTheme, loadTheme } from './theme'
 
 const NAV_GROUPS = [
@@ -31,9 +32,10 @@ const NAV_GROUPS = [
   {
     label: 'Allgemeines',
     items: [
-      { id: 'categories',        label: 'Kategorien',    icon: '🏷️', component: Categories },
-      { id: 'pdfImport',         label: 'PDF-Import',    icon: '📥', component: PdfImport },
-      { id: 'recurringPayments', label: 'Daueraufträge', icon: '🔄', component: RecurringPayments },
+      { id: 'categories',        label: 'Kategorien',           icon: '🏷️', component: Categories },
+      { id: 'pdfImport',         label: 'PDF-Import',           icon: '📥', component: PdfImport },
+      { id: 'recurringPayments', label: 'Daueraufträge',        icon: '🔄', component: RecurringPayments },
+      { id: 'serviceCosts',      label: 'Dienstleistungskosten', icon: '🧹', component: ServiceCostCalculator },
     ],
   },
   {
