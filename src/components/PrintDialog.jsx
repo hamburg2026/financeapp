@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { fmt, fmtNum } from '../fmt'
+import { DEFAULT_SERVICE_TYPES } from './ServiceCostCalculator'
 
 const FREQ_LABELS = {
   monthly:    'Monatlich',
@@ -366,7 +367,7 @@ function PrintServiceCosts({ entries, serviceTypes, filterType, filterFrom, filt
   return (
     <>
       <PrintTable
-        headers={['Datum', 'Dienstleistung', 'Einheit', 'Menge', 'Preis/Einheit', 'Summe', 'Notizen']}
+        headers={['Datum', 'Art der Dienstleistung', 'Einheit', 'Menge', 'Preis/Einheit', 'Summe', 'Notizen']}
         rows={filtered.map(e => [
           isoToGerman(e.date),
           getName(e.serviceTypeId),
@@ -429,8 +430,8 @@ export default function PrintDialog({ onClose }) {
   const subscriptions     = JSON.parse(localStorage.getItem('subscriptions'))       || []
   const recurrings        = JSON.parse(localStorage.getItem('recurringPayments'))   || []
   const categories        = JSON.parse(localStorage.getItem('categories'))          || []
-  const serviceEntries    = JSON.parse(localStorage.getItem('serviceEntries'))      || []
-  const serviceTypes      = JSON.parse(localStorage.getItem('serviceTypes'))        || []
+  const serviceEntries    = JSON.parse(localStorage.getItem('serviceEntries'))                           || []
+  const serviceTypes      = JSON.parse(localStorage.getItem('serviceTypes'))                           || DEFAULT_SERVICE_TYPES
 
   const anySelected = Object.values(selected).some(Boolean)
   const printDate   = new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
