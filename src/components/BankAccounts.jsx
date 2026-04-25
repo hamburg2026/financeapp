@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { fmt } from '../fmt'
 import CategorySelect from './CategorySelect'
 import Modal from './Modal'
+import { useDragSort, DragHandle } from '../useDragSort'
 
 function useLocalStorage(key, initial) {
   const [value, setValue] = useState(() => JSON.parse(localStorage.getItem(key)) || initial)
@@ -472,6 +473,7 @@ export default function BankAccounts() {
 
   const txCount = id => transactions.filter(t => t.accountId === id).length
   const c = { padding: '0.35rem 0.6rem', fontSize: '0.82rem' }
+  const { dragProps, isDragOver } = useDragSort(accounts, setAccounts)
 
   return (
     <div className="module">
@@ -491,6 +493,7 @@ export default function BankAccounts() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)' }}>
+                <th style={{ ...c, width: 24 }}></th>
                 <th style={{ ...c, textAlign: 'left' }}>Konto</th>
                 <th style={{ ...c, textAlign: 'right' }}>Saldo</th>
                 <th style={{ ...c, textAlign: 'right', color: 'var(--color-text-muted)' }}>Umsätze</th>
@@ -499,9 +502,10 @@ export default function BankAccounts() {
               </tr>
             </thead>
             <tbody>
-              {accounts.map(a => {
+              {accounts.map((a, i) => {
                 if (editAccId === a.id) return (
                   <tr key={a.id} style={{ background: '#fefce8', borderBottom: '1px solid var(--color-border)' }}>
+                    <td style={c}></td>
                     <td style={c}><input value={editAccName} onChange={e => setEditAccName(e.target.value)} style={{ fontSize: '0.82rem', padding: '0.2rem 0.4rem', width: '100%' }} /></td>
                     <td style={c} colSpan={3}><input type="number" value={editAccBalance} onChange={e => setEditAccBalance(e.target.value)} step="0.01" style={{ fontSize: '0.82rem', padding: '0.2rem 0.4rem', width: 120 }} /></td>
                     <td style={{ ...c, whiteSpace: 'nowrap' }}>
@@ -514,7 +518,8 @@ export default function BankAccounts() {
                 const cnt = txCount(a.id)
                 const importDate = closestImportDate(a.id, transactions)
                 return (
-                  <tr key={a.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                  <tr key={a.id} {...dragProps(i)} style={{ borderBottom: '1px solid var(--color-border)', borderTop: isDragOver(i) ? '2px solid var(--color-primary)' : undefined }}>
+                    <td style={{ ...c, color: 'var(--color-border)' }}><DragHandle /></td>
                     <td style={{ ...c, fontWeight: 500 }}>{a.name}</td>
                     <td style={{ ...c, textAlign: 'right', fontWeight: 700, color: bal >= 0 ? '#16a34a' : '#dc2626', fontVariantNumeric: 'tabular-nums' }}>{fmt(bal)}</td>
                     <td style={{ ...c, textAlign: 'right', color: 'var(--color-text-muted)', fontSize: '0.78rem' }}>{cnt > 0 ? cnt : '–'}</td>

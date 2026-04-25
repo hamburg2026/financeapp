@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { fmt } from '../fmt'
 import CategorySelect from './CategorySelect'
 import Modal from './Modal'
+import { DragHandle, reorderSubset } from '../useDragSort'
 
 function useLocalStorage(key, initial) {
   const [value, setValue] = useState(() => JSON.parse(localStorage.getItem(key)) || initial)
@@ -34,6 +35,30 @@ export default function RecurringPayments() {
 
   const [groupBy,        setGroupBy]        = useState('category')
   const [expandedGroups, setExpandedGroups] = useState(new Set(FREQ_ORDER))
+
+  const dragRef = useRef(null)
+  const [dragOver, setDragOver] = useState(null)
+
+  function recDragProps(groupKey, idx, groupItems) {
+    return {
+      draggable: true,
+      onDragStart: (e) => { e.stopPropagation(); dragRef.current = { groupKey, idx } },
+      onDragOver: (e) => { e.preventDefault(); e.stopPropagation(); setDragOver({ groupKey, idx }) },
+      onDrop: (e) => {
+        e.preventDefault(); e.stopPropagation()
+        const from = dragRef.current
+        if (from && from.groupKey === groupKey && from.idx !== idx) {
+          setRecurrings(reorderSubset(recurrings, groupItems, from.idx, idx))
+        }
+        dragRef.current = null; setDragOver(null)
+      },
+      onDragEnd: () => { dragRef.current = null; setDragOver(null) },
+    }
+  }
+
+  function isRecDragOver(groupKey, idx) {
+    return dragOver?.groupKey === groupKey && dragOver?.idx === idx
+  }
 
   function field(key) { return { value: form[key], onChange: e => setForm(f => ({ ...f, [key]: e.target.value })) } }
 
@@ -116,16 +141,19 @@ export default function RecurringPayments() {
     return node.items.reduce((s, r) => s + r.amount, 0) + node.children.reduce((s, ch) => s + catTreeTotal(ch), 0)
   }
 
-  function renderRecurringRow(r, ri, total, indent, groupKey) {
-    const isLast = ri === total - 1
+  function renderRecurringRow(r, ri, groupItems, indent, groupKey) {
+    const isLast = ri === groupItems.length - 1
+    const draggable = !r.insuranceId && !r.subscriptionId
     return (
-      <div key={r.id} style={{
+      <div key={r.id} {...(draggable ? recDragProps(groupKey, ri, groupItems) : {})} style={{
         display: 'flex', alignItems: 'center', gap: '0.5rem',
         padding: `0.32rem 0.75rem 0.32rem ${indent}rem`,
         borderBottom: isLast ? 'none' : '1px solid var(--color-border)',
+        borderTop: isRecDragOver(groupKey, ri) ? '2px solid var(--color-primary)' : undefined,
         fontSize: '0.85rem',
         background: r.insuranceId ? '#f0fdf4' : r.subscriptionId ? '#f5f3ff' : undefined,
       }}>
+        {draggable ? <DragHandle /> : <span style={{ width: '1.1rem', flexShrink: 0 }} />}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {r.description}
@@ -166,7 +194,7 @@ export default function RecurringPayments() {
         {isOpen && (
           <div>
             {node.children.map(ch => renderCategoryNode(ch, depth + 1))}
-            {node.items.map((r, ri) => renderRecurringRow(r, ri, node.items.length, indent + 1.1, `cat_${node.cat.id}`))}
+            {node.items.map((r, ri) => renderRecurringRow(r, ri, node.items, indent + 1.1, `cat_${node.cat.id}`))}
           </div>
         )}
       </div>
@@ -248,7 +276,7 @@ export default function RecurringPayments() {
                     <span style={{ flex: 1, fontSize: '0.82rem', fontWeight: 700, color: 'var(--color-text)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Ohne Kategorie</span>
                     <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>{fmt(uncategorized.reduce((s, r) => s + r.amount, 0))}</span>
                   </div>
-                  {expandedGroups.has('cat_none') && uncategorized.map((r, ri) => renderRecurringRow(r, ri, uncategorized.length, 1.85, 'cat_none'))}
+                  {expandedGroups.has('cat_none') && uncategorized.map((r, ri) => renderRecurringRow(r, ri, uncategorized, 1.85, 'cat_none'))}
                 </div>
               )}
             </>
@@ -267,14 +295,18 @@ export default function RecurringPayments() {
                   )}
                   {isOpen && group.items.map((r, ri) => {
                     const isLast = ri === group.items.length - 1 && gi === groups.length - 1
+                    const draggable = !r.insuranceId && !r.subscriptionId
+                    const gk = group.key
                     return (
-                      <div key={r.id} style={{
+                      <div key={r.id} {...(draggable ? recDragProps(gk, ri, group.items) : {})} style={{
                         display: 'flex', alignItems: 'center', gap: '0.5rem',
                         padding: '0.32rem 0.75rem', paddingLeft: group.label ? '1.75rem' : '0.75rem',
                         borderBottom: isLast ? 'none' : '1px solid var(--color-border)',
+                        borderTop: isRecDragOver(gk, ri) ? '2px solid var(--color-primary)' : undefined,
                         fontSize: '0.85rem',
                         background: r.insuranceId ? '#f0fdf4' : r.subscriptionId ? '#f5f3ff' : undefined,
                       }}>
+                        {draggable ? <DragHandle /> : <span style={{ width: '1.1rem', flexShrink: 0 }} />}
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {r.description}

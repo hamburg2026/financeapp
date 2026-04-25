@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { fmt } from '../fmt'
 import CategorySelect from './CategorySelect'
 import Modal from './Modal'
+import { DragHandle, reorderSubset } from '../useDragSort'
 
 function useLocalStorage(key, initial) {
   const [value, setValue] = useState(() => JSON.parse(localStorage.getItem(key)) || initial)
@@ -327,6 +328,30 @@ export default function InsuranceContracts() {
   const [filterProvider, setFilterProvider] = useState('')
   const [filterCategory, setFilterCategory] = useState('')
   const [groupBy, setGroupBy] = useState('person')
+
+  const dragRef = useRef(null)
+  const [dragOver, setDragOver] = useState(null)
+
+  function contractDragProps(groupKey, idx, groupItems) {
+    return {
+      draggable: true,
+      onDragStart: (e) => { e.stopPropagation(); dragRef.current = { groupKey, idx } },
+      onDragOver: (e) => { e.preventDefault(); e.stopPropagation(); setDragOver({ groupKey, idx }) },
+      onDrop: (e) => {
+        e.preventDefault(); e.stopPropagation()
+        const from = dragRef.current
+        if (from && from.groupKey === groupKey && from.idx !== idx) {
+          setContracts(reorderSubset(contracts, groupItems, from.idx, idx))
+        }
+        dragRef.current = null; setDragOver(null)
+      },
+      onDragEnd: () => { dragRef.current = null; setDragOver(null) },
+    }
+  }
+
+  function isContractDragOver(groupKey, idx) {
+    return dragOver?.groupKey === groupKey && dragOver?.idx === idx
+  }
 
   function getPersonColor(personName) {
     const idx = persons.indexOf(personName)
@@ -767,7 +792,7 @@ export default function InsuranceContracts() {
             display: 'flex', flexDirection: 'column', gap: '0.6rem',
             ...(isGrouped ? { border: '1px solid var(--color-border)', borderTop: 'none', borderRadius: '0 0 8px 8px', padding: '0.6rem' } : {}),
           }}>
-            {items.map(c => {
+            {items.map((c, ci) => {
               const displayVal = getDisplayValue(c)
               const histOpen = expandedHistory.has(c.id)
               const contractOpen = expandedContracts.has(c.id)
@@ -779,11 +804,13 @@ export default function InsuranceContracts() {
                 : null
               const monatlicheRente = jaehrlicheRente != null ? jaehrlicheRente / 12 : null
               const personColor = getPersonColor(c.person)
+              const groupKey = label ?? '__all'
               return (
-                <div key={c.id} style={{
-                  border: '1px solid var(--color-border)', borderRadius: 8,
+                <div key={c.id} {...contractDragProps(groupKey, ci, items)} style={{
+                  border: isContractDragOver(groupKey, ci) ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
+                  borderRadius: 8,
                   overflow: 'hidden', opacity: c.active === false ? 0.6 : 1,
-                  borderLeft: personColor ? `3px solid ${personColor.border}` : undefined,
+                  borderLeft: isContractDragOver(groupKey, ci) ? undefined : (personColor ? `3px solid ${personColor.border}` : undefined),
                 }}>
                   {/* Header row */}
                   <div style={{
@@ -791,6 +818,7 @@ export default function InsuranceContracts() {
                     padding: '0.5rem 0.75rem', background: 'var(--color-bg)',
                     borderBottom: '1px solid var(--color-border)',
                   }}>
+                    <DragHandle />
                     <span style={{
                       width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
                       background: c.active !== false ? '#16a34a' : '#9ca3af',

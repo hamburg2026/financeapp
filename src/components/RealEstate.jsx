@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { fmt } from '../fmt'
 import Modal from './Modal'
+import { useDragSort, DragHandle } from '../useDragSort'
 
 function useLocalStorage(key, initial) {
   const [value, setValue] = useState(() => JSON.parse(localStorage.getItem(key)) || initial)
@@ -160,6 +161,7 @@ export default function RealEstate() {
   }
 
   const getDisplayCurrent = p => latestHistoryValue(p.currentHistory, p.current)
+  const { dragProps, isDragOver } = useDragSort(properties, setProperties)
 
   return (
     <div className="module">
@@ -176,15 +178,16 @@ export default function RealEstate() {
         </p>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-          {properties.map(p => {
+          {properties.map((p, i) => {
             const displayCurrent = getDisplayCurrent(p)
             const pnl = displayCurrent - p.purchase
             const pnlPct = p.purchase > 0 ? (pnl / p.purchase) * 100 : null
             const histOpen = expandedHistory.has(p.id)
             return (
-              <div key={p.id} style={{ border: '1px solid var(--color-border)', borderRadius: 8, overflow: 'hidden' }}>
+              <div key={p.id} {...dragProps(i)} style={{ border: isDragOver(i) ? '2px solid var(--color-primary)' : '1px solid var(--color-border)', borderRadius: 8, overflow: 'hidden' }}>
                 {/* Header */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 0.75rem', background: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)' }}>
+                  <DragHandle />
                   <span style={{ fontWeight: 600, fontSize: '0.9rem', flex: 1 }}>{p.name}</span>
                   <button onClick={() => startEdit(p)} style={{ ...btnSm, background: '#e5e7eb', color: '#374151' }}>✎</button>
                   <button onClick={() => removeProperty(p.id)} style={{ ...btnSm, background: 'none', color: '#dc2626' }}>✕</button>

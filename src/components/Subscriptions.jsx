@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { fmt } from '../fmt'
 import CategorySelect from './CategorySelect'
 import Modal from './Modal'
+import { useDragSort, DragHandle } from '../useDragSort'
 
 function useLocalStorage(key, initial) {
   const [value, setValue] = useState(() => JSON.parse(localStorage.getItem(key)) || initial)
@@ -99,6 +100,7 @@ export default function Subscriptions() {
 
   const btnS = { border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: '0.75rem', padding: '0.2rem 0.45rem' }
   const isEditing = modal !== null && modal !== 'add'
+  const { dragProps, isDragOver } = useDragSort(subscriptions, setSubscriptions)
 
   return (
     <div className="module">
@@ -115,11 +117,12 @@ export default function Subscriptions() {
         ) : subscriptions.map((s, i) => {
           const border = i < subscriptions.length - 1 ? '1px solid var(--color-border)' : 'none'
           return (
-            <div key={s.id} style={{
+            <div key={s.id} {...dragProps(i)} style={{
               display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap',
               padding: '0.45rem 0.75rem', borderBottom: border,
               fontSize: '0.85rem', opacity: s.aktiv ? 1 : 0.55,
-            }}>
+              borderTop: isDragOver(i) ? '2px solid var(--color-primary)' : undefined,
+            }}><DragHandle />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
                   <span style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</span>

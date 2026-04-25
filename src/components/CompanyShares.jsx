@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { fmt, fmtNum } from '../fmt'
 import Modal from './Modal'
+import { useDragSort, DragHandle } from '../useDragSort'
 
 function useLocalStorage(key, initial) {
   const [value, setValue] = useState(() => JSON.parse(localStorage.getItem(key)) || initial)
@@ -161,6 +162,7 @@ export default function CompanyShares() {
 
   const getDisplayValue = s => latestHistoryValue(s.valueHistory, s.value)
   const total = shares.reduce((sum, s) => sum + (getDisplayValue(s) || 0), 0)
+  const { dragProps, isDragOver } = useDragSort(shares, setShares)
 
   return (
     <div className="module">
@@ -178,13 +180,14 @@ export default function CompanyShares() {
       ) : (
         <>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-            {shares.map(s => {
+            {shares.map((s, i) => {
               const displayVal = getDisplayValue(s)
               const histOpen = expandedHistory.has(s.id)
               return (
-                <div key={s.id} style={{ border: '1px solid var(--color-border)', borderRadius: 8, overflow: 'hidden' }}>
+                <div key={s.id} {...dragProps(i)} style={{ border: isDragOver(i) ? '2px solid var(--color-primary)' : '1px solid var(--color-border)', borderRadius: 8, overflow: 'hidden' }}>
                   {/* Header */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 0.75rem', background: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)' }}>
+                    <DragHandle />
                     <span style={{ fontWeight: 600, fontSize: '0.9rem', flex: 1 }}>{s.company}</span>
                     <span style={{ fontSize: '0.78rem', background: '#e0f2fe', color: '#0369a1', borderRadius: 4, padding: '0.1rem 0.4rem', fontWeight: 600 }}>
                       {fmtNum(s.percentage)} %
