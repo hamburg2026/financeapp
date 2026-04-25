@@ -816,6 +816,11 @@ export default function InsuranceContracts() {
                         Rente nach Todesfall
                       </span>
                     )}
+                    {monatlicheRente != null && (
+                      <span style={{ fontSize: '0.72rem', color: '#065f46', background: '#d1fae5', borderRadius: 4, padding: '0.1rem 0.4rem', fontWeight: 600 }}>
+                        {fmt(monatlicheRente)}/Monat
+                      </span>
+                    )}
                     {c.categoryId && (() => {
                       const cat = allCategories.find(x => x.id === c.categoryId)
                       return cat ? <span style={{ fontSize: '0.72rem', color: '#0369a1', background: '#e0f2fe', borderRadius: 4, padding: '0.1rem 0.4rem' }}>{cat.name}</span> : null
