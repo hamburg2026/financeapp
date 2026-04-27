@@ -192,6 +192,12 @@ export function TransactionModal({ accountId, accounts, transactions, categories
     setBulkCat('')
   }
 
+  function bulkFlipSign() {
+    if (selectedIds.size === 0) return
+    onUpdateTransactions(transactions.map(t => selectedIds.has(t.id) ? { ...t, amount: -t.amount } : t))
+    setSelectedIds(new Set())
+  }
+
   const title = accountId ? `Umsätze – ${accLabel(accountId)}` : 'Alle Umsätze'
   const c = { padding: '0.28rem 0.5rem', fontSize: '0.79rem', verticalAlign: 'middle' }
   const fl = { fontSize: '0.69rem', color: 'var(--color-text-muted)', fontWeight: 600, marginBottom: 2 }
@@ -308,6 +314,10 @@ export function TransactionModal({ accountId, accounts, transactions, categories
             <button onClick={bulkAssign} disabled={!bulkCat}
               style={{ ...btnSm, background: bulkCat ? 'var(--color-primary)' : '#e5e7eb', color: bulkCat ? '#fff' : '#9ca3af', padding: '0.23rem 0.7rem' }}>
               Zuordnen
+            </button>
+            <button onClick={bulkFlipSign}
+              style={{ ...btnSm, background: '#fef9c3', color: '#92400e', padding: '0.23rem 0.7rem' }}>
+              +/− Vorzeichen wechseln
             </button>
             <button onClick={() => setSelectedIds(new Set())}
               style={{ ...btnSm, background: 'none', color: 'var(--color-text-muted)', padding: '0.23rem 0.5rem' }}>
