@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { fmt } from '../fmt'
+import Modal from './Modal'
 
 function useLocalStorage(key, initial) {
   const [value, setValue] = useState(() => JSON.parse(localStorage.getItem(key)) || initial)
@@ -157,6 +158,10 @@ export default function Securities() {
   const [fetchingFx,     setFetchingFx]     = useState({})
   const [fetchFxErr,     setFetchFxErr]     = useState({})
 
+  // ── Modal visibility ──
+  const [showAddSec, setShowAddSec] = useState(false)
+  const [showAddFx,  setShowAddFx]  = useState(false)
+
   // ─── Security CRUD ───────────────────────────────────────────────────────────
   function addSecurity(e) {
     e.preventDefault()
@@ -165,6 +170,7 @@ export default function Securities() {
       isin: secIsin.trim(), type: secType, currency: secCur,
     }])
     setSecName(''); setSecSymbol(''); setSecIsin(''); setSecType('Aktie'); setSecCur('EUR')
+    setShowAddSec(false)
   }
 
   function startEditSec(s) {
@@ -391,6 +397,7 @@ export default function Securities() {
       .sort((a, b) => new Date(b.date) - new Date(a.date))
     setFxRates({ ...fxRates, [fxPair]: list })
     setFxDate(today()); setFxValue('')
+    setShowAddFx(false)
   }
 
   function startEditFx(pair, idx) {
@@ -447,7 +454,10 @@ export default function Securities() {
 
   return (
     <div className="module">
-      <h2>Wertpapiere &amp; Depots</h2>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+        <h2 style={{ margin: 0 }}>Wertpapiere &amp; Depots</h2>
+        <button onClick={() => setShowAddSec(true)} style={{ padding: '0.4rem 0.9rem', fontSize: '0.85rem' }}>+ Wertpapier</button>
+      </div>
 
       {/* ── Depot-Positionen ── */}
       <p style={sectionHead}>Depot-Positionen</p>
@@ -825,38 +835,11 @@ export default function Securities() {
         )}
       </div>
 
-      {/* ── Add security form (unterhalb der Liste) ── */}
-      <p style={sectionHead}>Wertpapier hinzufügen</p>
-      <form onSubmit={addSecurity} style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end', marginBottom: '1.5rem' }}>
-        <label style={{ display: 'flex', flexDirection: 'column', flex: 2, minWidth: 140 }}>
-          <span style={labelStyle}>Name</span>
-          <input value={secName} onChange={e => setSecName(e.target.value)} placeholder="z. B. Apple Inc." required />
-        </label>
-        <label style={{ display: 'flex', flexDirection: 'column', minWidth: 90 }}>
-          <span style={labelStyle}>Ticker / Symbol</span>
-          <input value={secSymbol} onChange={e => setSecSymbol(e.target.value)} placeholder="AAPL" required />
-        </label>
-        <label style={{ display: 'flex', flexDirection: 'column', minWidth: 120 }}>
-          <span style={labelStyle}>ISIN (optional)</span>
-          <input value={secIsin} onChange={e => setSecIsin(e.target.value)} placeholder="US0378331005" maxLength={12} />
-        </label>
-        <label style={{ display: 'flex', flexDirection: 'column', minWidth: 120 }}>
-          <span style={labelStyle}>Typ</span>
-          <select value={secType} onChange={e => setSecType(e.target.value)}>
-            {SEC_TYPES.map(t => <option key={t}>{t}</option>)}
-          </select>
-        </label>
-        <label style={{ display: 'flex', flexDirection: 'column', minWidth: 80 }}>
-          <span style={labelStyle}>Währung</span>
-          <select value={secCur} onChange={e => setSecCur(e.target.value)}>
-            {CURRENCIES.map(c => <option key={c}>{c}</option>)}
-          </select>
-        </label>
-        <button type="submit" style={{ alignSelf: 'flex-end' }}>+ Wertpapier</button>
-      </form>
-
       {/* ── Devisenkurse: Liste ── */}
-      <p style={{ ...sectionHead, marginTop: '0.5rem' }}>Devisenkurse (je 1 Fremdwährung in EUR)</p>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '1rem', marginBottom: '0.5rem' }}>
+        <p style={{ ...sectionHead, margin: 0 }}>Devisenkurse (je 1 Fremdwährung in EUR)</p>
+        <button onClick={() => setShowAddFx(true)} style={{ padding: '0.3rem 0.75rem', fontSize: '0.8rem' }}>+ Devisenkurs</button>
+      </div>
       {usedFxPairs.length > 0 && (
         <div style={{ border: '1px solid var(--color-border)', borderRadius: 8, overflow: 'hidden', marginBottom: '0.5rem' }}>
           {usedFxPairs.map((pair, pi) => {
@@ -912,24 +895,69 @@ export default function Securities() {
         </div>
       )}
 
-      {/* ── Devisenkurs hinzufügen (unterhalb der Liste) ── */}
-      <form onSubmit={addFxRate} style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end' }}>
-        <label style={{ display: 'flex', flexDirection: 'column', minWidth: 90 }}>
-          <span style={labelStyle}>Währung</span>
-          <select value={fxPair} onChange={e => setFxPair(e.target.value)}>
-            {CURRENCIES.filter(c => c !== 'EUR').map(c => <option key={c}>{c}</option>)}
-          </select>
-        </label>
-        <label style={{ display: 'flex', flexDirection: 'column' }}>
-          <span style={labelStyle}>Datum</span>
-          <input type="date" value={fxDate} onChange={e => setFxDate(e.target.value)} required />
-        </label>
-        <label style={{ display: 'flex', flexDirection: 'column', minWidth: 100 }}>
-          <span style={labelStyle}>Kurs (EUR)</span>
-          <input type="number" value={fxValue} onChange={e => setFxValue(e.target.value)} placeholder="0.9200" step="0.0001" min="0" required />
-        </label>
-        <button type="submit" style={{ alignSelf: 'flex-end' }}>+ Devisenkurs</button>
-      </form>
+      {showAddSec && (
+        <Modal title="Wertpapier hinzufügen" onClose={() => setShowAddSec(false)} maxWidth={540}>
+          <form onSubmit={addSecurity} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={labelStyle}>Name *</label>
+                <input value={secName} onChange={e => setSecName(e.target.value)} placeholder="z. B. Apple Inc." required style={{ width: '100%', fontSize: '0.85rem', padding: '0.35rem 0.5rem' }} />
+              </div>
+              <div>
+                <label style={labelStyle}>Ticker / Symbol *</label>
+                <input value={secSymbol} onChange={e => setSecSymbol(e.target.value)} placeholder="AAPL" required style={{ width: '100%', fontSize: '0.85rem', padding: '0.35rem 0.5rem' }} />
+              </div>
+              <div>
+                <label style={labelStyle}>ISIN (optional)</label>
+                <input value={secIsin} onChange={e => setSecIsin(e.target.value)} placeholder="US0378331005" maxLength={12} style={{ width: '100%', fontSize: '0.85rem', padding: '0.35rem 0.5rem' }} />
+              </div>
+              <div>
+                <label style={labelStyle}>Typ</label>
+                <select value={secType} onChange={e => setSecType(e.target.value)} style={{ width: '100%', fontSize: '0.85rem', padding: '0.35rem 0.5rem' }}>
+                  {SEC_TYPES.map(t => <option key={t}>{t}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>Währung</label>
+                <select value={secCur} onChange={e => setSecCur(e.target.value)} style={{ width: '100%', fontSize: '0.85rem', padding: '0.35rem 0.5rem' }}>
+                  {CURRENCIES.map(c => <option key={c}>{c}</option>)}
+                </select>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
+              <button type="submit" style={{ flex: 1 }}>Wertpapier hinzufügen</button>
+              <button type="button" onClick={() => setShowAddSec(false)} style={{ background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: 8, padding: '0.6rem 1rem', cursor: 'pointer' }}>Abbrechen</button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {showAddFx && (
+        <Modal title="Devisenkurs hinzufügen" onClose={() => setShowAddFx(false)} maxWidth={400}>
+          <form onSubmit={addFxRate} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+              <div>
+                <label style={labelStyle}>Währung</label>
+                <select value={fxPair} onChange={e => setFxPair(e.target.value)} style={{ width: '100%', fontSize: '0.85rem', padding: '0.35rem 0.5rem' }}>
+                  {CURRENCIES.filter(c => c !== 'EUR').map(c => <option key={c}>{c}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>Datum</label>
+                <input type="date" value={fxDate} onChange={e => setFxDate(e.target.value)} required style={{ width: '100%', fontSize: '0.85rem', padding: '0.35rem 0.5rem' }} />
+              </div>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={labelStyle}>Kurs (je 1 Fremdwährung in EUR)</label>
+                <input type="number" value={fxValue} onChange={e => setFxValue(e.target.value)} placeholder="0.9200" step="0.0001" min="0" required style={{ width: '100%', fontSize: '0.85rem', padding: '0.35rem 0.5rem' }} />
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
+              <button type="submit" style={{ flex: 1 }}>Kurs hinzufügen</button>
+              <button type="button" onClick={() => setShowAddFx(false)} style={{ background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: 8, padding: '0.6rem 1rem', cursor: 'pointer' }}>Abbrechen</button>
+            </div>
+          </form>
+        </Modal>
+      )}
     </div>
   )
 }

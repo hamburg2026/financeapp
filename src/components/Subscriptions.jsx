@@ -42,6 +42,8 @@ export default function Subscriptions() {
 
   const [modal, setModal] = useState(null) // null | 'add' | subId
   const [form, setForm] = useState(EMPTY)
+  const [sortBy, setSortBy] = useState('name')
+  const [sortDir, setSortDir] = useState('asc')
 
   function field(key) { return { value: form[key], onChange: e => setForm(f => ({ ...f, [key]: e.target.value })) } }
   function check(key) { return { checked: form[key], onChange: e => setForm(f => ({ ...f, [key]: e.target.checked })) } }
@@ -97,6 +99,18 @@ export default function Subscriptions() {
     return parent ? `${parent.name} → ${cat.name}` : cat.name
   }
 
+  const FREQ_ORDER = { monthly: 0, quarterly: 1, halfyearly: 2, yearly: 3 }
+  const sortedSubs = [...subscriptions].sort((a, b) => {
+    let va, vb
+    if (sortBy === 'name') { va = (a.name || '').toLowerCase(); vb = (b.name || '').toLowerCase() }
+    else if (sortBy === 'cost') { va = a.cost || 0; vb = b.cost || 0 }
+    else if (sortBy === 'frequency') { va = FREQ_ORDER[a.frequency] ?? 99; vb = FREQ_ORDER[b.frequency] ?? 99 }
+    else { va = 0; vb = 0 }
+    if (va < vb) return sortDir === 'asc' ? -1 : 1
+    if (va > vb) return sortDir === 'asc' ? 1 : -1
+    return 0
+  })
+
   const btnS = { border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: '0.75rem', padding: '0.2rem 0.45rem' }
   const isEditing = modal !== null && modal !== 'add'
 
@@ -107,13 +121,29 @@ export default function Subscriptions() {
         <button onClick={openAdd} style={{ padding: '0.4rem 0.9rem', fontSize: '0.85rem' }}>+ Neu</button>
       </div>
 
+      {subscriptions.length > 0 && (
+        <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', marginBottom: '0.6rem', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>Sortieren:</span>
+          <select value={sortBy} onChange={e => setSortBy(e.target.value)} style={{ fontSize: '0.78rem', padding: '0.22rem 0.4rem', border: '1px solid var(--color-border)', borderRadius: 5 }}>
+            <option value="name">Name</option>
+            <option value="cost">Kosten</option>
+            <option value="frequency">Frequenz</option>
+          </select>
+          <button onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')}
+            title={sortDir === 'asc' ? 'Aufsteigend' : 'Absteigend'}
+            style={{ fontSize: '0.78rem', padding: '0.22rem 0.45rem', border: '1px solid var(--color-border)', borderRadius: 5, cursor: 'pointer', background: 'var(--color-surface)', lineHeight: 1 }}>
+            {sortDir === 'asc' ? '↑' : '↓'}
+          </button>
+        </div>
+      )}
+
       <div style={{ border: '1px solid var(--color-border)', borderRadius: 8, overflow: 'hidden' }}>
         {subscriptions.length === 0 ? (
           <p style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '2rem', margin: 0, fontSize: '0.875rem' }}>
             Noch keine Abonnements angelegt
           </p>
-        ) : subscriptions.map((s, i) => {
-          const border = i < subscriptions.length - 1 ? '1px solid var(--color-border)' : 'none'
+        ) : sortedSubs.map((s, i) => {
+          const border = i < sortedSubs.length - 1 ? '1px solid var(--color-border)' : 'none'
           return (
             <div key={s.id} style={{
               display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap',

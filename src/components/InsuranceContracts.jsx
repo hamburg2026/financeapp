@@ -327,6 +327,8 @@ export default function InsuranceContracts() {
   const [filterProvider, setFilterProvider] = useState('')
   const [filterCategory, setFilterCategory] = useState('')
   const [groupBy, setGroupBy] = useState('person')
+  const [sortBy, setSortBy] = useState('name')
+  const [sortDir, setSortDir] = useState('asc')
 
   function getPersonColor(personName) {
     const idx = persons.indexOf(personName)
@@ -477,10 +479,25 @@ export default function InsuranceContracts() {
   })
   const hasActiveFilter = !!(filterPerson || filterProvider || filterCategory)
 
+  function sortedItems(list) {
+    return [...list].sort((a, b) => {
+      let va, vb
+      if (sortBy === 'name') { va = (a.name || '').toLowerCase(); vb = (b.name || '').toLowerCase() }
+      else if (sortBy === 'provider') { va = (a.provider || '').toLowerCase(); vb = (b.provider || '').toLowerCase() }
+      else if (sortBy === 'value') { va = getDisplayValue(a) ?? -Infinity; vb = getDisplayValue(b) ?? -Infinity }
+      else if (sortBy === 'premium') { va = a.premium || 0; vb = b.premium || 0 }
+      else { va = 0; vb = 0 }
+      if (va < vb) return sortDir === 'asc' ? -1 : 1
+      if (va > vb) return sortDir === 'asc' ? 1 : -1
+      return 0
+    })
+  }
+
   function getGroups(list) {
-    if (groupBy === 'none') return [{ label: null, items: list }]
+    const sorted = sortedItems(list)
+    if (groupBy === 'none') return [{ label: null, items: sorted }]
     const map = new Map()
-    list.forEach(c => {
+    sorted.forEach(c => {
       let key
       if (groupBy === 'person') key = c.person || '(Keine Person)'
       else if (groupBy === 'provider') key = c.provider || '(Kein Anbieter)'
@@ -491,7 +508,7 @@ export default function InsuranceContracts() {
       if (!map.has(key)) map.set(key, [])
       map.get(key).push(c)
     })
-    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0], 'de')).map(([label, items]) => ({ label, items }))
+    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0], 'de')).map(([label, items]) => ({ label, items: sortedItems(items) }))
   }
 
   // "Nur Verrentung" and "Nicht relevant" not counted as asset
@@ -716,6 +733,18 @@ export default function InsuranceContracts() {
             <option value="provider">Anbieter</option>
             <option value="category">Kategorie</option>
           </select>
+          <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', marginLeft: '0.25rem' }}>Sortieren:</span>
+          <select value={sortBy} onChange={e => setSortBy(e.target.value)} style={{ fontSize: '0.78rem', padding: '0.22rem 0.4rem', border: '1px solid var(--color-border)', borderRadius: 5 }}>
+            <option value="name">Name</option>
+            <option value="provider">Anbieter</option>
+            <option value="value">Wert</option>
+            <option value="premium">Beitrag</option>
+          </select>
+          <button onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')}
+            title={sortDir === 'asc' ? 'Aufsteigend' : 'Absteigend'}
+            style={{ fontSize: '0.78rem', padding: '0.22rem 0.45rem', border: '1px solid var(--color-border)', borderRadius: 5, cursor: 'pointer', background: 'var(--color-surface)', lineHeight: 1 }}>
+            {sortDir === 'asc' ? '↑' : '↓'}
+          </button>
         </div>
       )}
 
