@@ -2,6 +2,109 @@ import { useState } from 'react'
 import { fmt } from '../fmt'
 import Modal from './Modal'
 
+function smoothPath(xys) {
+  if (xys.length < 2) return ''
+  let d = `M${xys[0][0].toFixed(1)},${xys[0][1].toFixed(1)}`
+  for (let i = 0; i < xys.length - 1; i++) {
+    const p0 = xys[Math.max(0, i - 1)]
+    const p1 = xys[i]
+    const p2 = xys[i + 1]
+    const p3 = xys[Math.min(xys.length - 1, i + 2)]
+    const cp1x = p1[0] + (p2[0] - p0[0]) / 6
+    const cp1y = p1[1] + (p2[1] - p0[1]) / 6
+    const cp2x = p2[0] - (p3[0] - p1[0]) / 6
+    const cp2y = p2[1] - (p3[1] - p1[1]) / 6
+    d += ` C${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`
+  }
+  return d
+}
+
+function PriceChart({ priceList, currency }) {
+  const sorted = [...priceList].sort((a, b) => new Date(a.date) - new Date(b.date))
+  if (sorted.length < 2) {
+    return (
+      <p style={{ color: 'var(--color-text-muted)', fontSize: '0.8rem', margin: 0, fontStyle: 'italic' }}>
+        Mindestens 2 Kurse für Grafik erforderlich.
+      </p>
+    )
+  }
+
+  const W = 560, H = 160
+  const PAD = { t: 12, r: 16, b: 28, l: 56 }
+  const iW = W - PAD.l - PAD.r
+  const iH = H - PAD.t - PAD.b
+
+  const vals = sorted.map(p => p.value)
+  const minV = Math.min(...vals)
+  const maxV = Math.max(...vals)
+  const range = maxV - minV || 1
+  const n = sorted.length
+
+  const xys = sorted.map((p, i) => [
+    PAD.l + (i / (n - 1)) * iW,
+    PAD.t + (1 - (p.value - minV) / range) * iH,
+  ])
+
+  const linePath = smoothPath(xys)
+  const areaPath = linePath
+    + ` L${xys[xys.length - 1][0].toFixed(1)},${(PAD.t + iH).toFixed(1)}`
+    + ` L${xys[0][0].toFixed(1)},${(PAD.t + iH).toFixed(1)} Z`
+
+  const isUp = sorted[sorted.length - 1].value >= sorted[0].value
+  const color = isUp ? '#16a34a' : '#dc2626'
+  const gradId = `price-grad-${Math.random().toString(36).slice(2)}`
+
+  // Y-axis labels (3 ticks)
+  const yTicks = [minV, minV + range / 2, maxV]
+
+  // X-axis labels: first, middle, last
+  const xLabels = [0, Math.floor((n - 1) / 2), n - 1].filter((v, i, a) => a.indexOf(v) === i)
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', display: 'block' }}>
+      <defs>
+        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.25" />
+          <stop offset="100%" stopColor={color} stopOpacity="0.02" />
+        </linearGradient>
+      </defs>
+
+      {/* Grid lines */}
+      {yTicks.map((_, i) => {
+        const y = PAD.t + (i === 0 ? iH : i === 1 ? iH / 2 : 0)
+        return <line key={i} x1={PAD.l} y1={y} x2={PAD.l + iW} y2={y}
+          stroke="var(--color-border)" strokeWidth="1" strokeDasharray="3 3" />
+      })}
+
+      {/* Area fill */}
+      <path d={areaPath} fill={`url(#${gradId})`} />
+
+      {/* Line */}
+      <path d={linePath} fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+
+      {/* Dots at first and last */}
+      {[xys[0], xys[xys.length - 1]].map(([x, y], i) => (
+        <circle key={i} cx={x} cy={y} r="3.5" fill={color} />
+      ))}
+
+      {/* Y labels */}
+      {yTicks.map((v, i) => {
+        const y = PAD.t + (i === 0 ? iH : i === 1 ? iH / 2 : 0)
+        return (
+          <text key={i} x={PAD.l - 6} y={y + 4} textAnchor="end"
+            fontSize="10" fill="var(--color-text-muted)">{fmt(v)}</text>
+        )
+      })}
+
+      {/* X labels */}
+      {xLabels.map(i => (
+        <text key={i} x={xys[i][0]} y={H - 6} textAnchor="middle"
+          fontSize="10" fill="var(--color-text-muted)">{sorted[i].date}</text>
+      ))}
+    </svg>
+  )
+}
+
 function useLocalStorage(key, initial) {
   const [value, setValue] = useState(() => JSON.parse(localStorage.getItem(key)) || initial)
   const set = (newVal) => {
@@ -1149,6 +1252,20 @@ export default function Securities() {
               </p>
             )}
           </div>
+
+          {/* Price chart */}
+          {(() => {
+            const priceList = prices[isinPopupSec.id] || []
+            if (priceList.length === 0) return null
+            return (
+              <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, padding: '0.75rem 1rem', marginBottom: '1rem' }}>
+                <p style={{ margin: '0 0 0.6rem', fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-text-muted)' }}>
+                  Kursverlauf ({priceList.length} Einträge)
+                </p>
+                <PriceChart priceList={priceList} currency={isinPopupSec.currency || 'EUR'} />
+              </div>
+            )
+          })()}
 
           {/* News section */}
           <div>
