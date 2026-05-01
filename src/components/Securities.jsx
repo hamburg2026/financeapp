@@ -159,8 +159,24 @@ export default function Securities() {
   const [fetchFxErr,     setFetchFxErr]     = useState({})
 
   // ── Modal visibility ──
-  const [showAddSec, setShowAddSec] = useState(false)
-  const [showAddFx,  setShowAddFx]  = useState(false)
+  const [showAddSec,   setShowAddSec]   = useState(false)
+  const [showAddFx,    setShowAddFx]    = useState(false)
+  const [showAddPrice, setShowAddPrice] = useState(false)
+  const [showAddTxModal, setShowAddTxModal] = useState(false)
+
+  // ── Modal: new price ──
+  const [modalPriceSecId, setModalPriceSecId] = useState('')
+  const [modalPriceDate,  setModalPriceDate]  = useState(today)
+  const [modalPriceValue, setModalPriceValue] = useState('')
+
+  // ── Modal: new transaction ──
+  const [modalTxSecId,  setModalTxSecId]  = useState('')
+  const [modalTxDate,   setModalTxDate]   = useState(today)
+  const [modalTxDepot,  setModalTxDepot]  = useState('')
+  const [modalTxType,   setModalTxType]   = useState('buy')
+  const [modalTxQty,    setModalTxQty]    = useState('')
+  const [modalTxPrice,  setModalTxPrice]  = useState('')
+  const [modalTxFees,   setModalTxFees]   = useState('')
 
   // ─── Security CRUD ───────────────────────────────────────────────────────────
   function addSecurity(e) {
@@ -447,6 +463,57 @@ export default function Securities() {
     ...securities.filter(s => s.currency && s.currency !== 'EUR').map(s => s.currency),
   ])]
 
+  function openAddPrice() {
+    setModalPriceSecId(securities[0]?.id ? String(securities[0].id) : '')
+    setModalPriceDate(today())
+    setModalPriceValue('')
+    setShowAddPrice(true)
+  }
+
+  function submitAddPrice(e) {
+    e.preventDefault()
+    if (!modalPriceSecId) return
+    const secId = parseInt(modalPriceSecId)
+    const list = [...(prices[secId] || []), { date: modalPriceDate, value: parseFloat(modalPriceValue) }]
+      .sort((a, b) => new Date(b.date) - new Date(a.date))
+    setPrices({ ...prices, [secId]: list })
+    setShowAddPrice(false)
+  }
+
+  function openAddTxModal() {
+    setModalTxSecId(securities[0]?.id ? String(securities[0].id) : '')
+    setModalTxDate(today())
+    setModalTxDepot(depots[0]?.id ? String(depots[0].id) : '')
+    setModalTxType('buy')
+    setModalTxQty('')
+    setModalTxPrice('')
+    setModalTxFees('')
+    setShowAddTxModal(true)
+  }
+
+  function submitAddTxModal(e) {
+    e.preventDefault()
+    const depotId = parseInt(modalTxDepot)
+    const secId   = parseInt(modalTxSecId)
+    if (!depotId || !secId) return
+    const isIncome = INCOME_TX.has(modalTxType)
+    const qty   = isIncome ? 1 : parseFloat(modalTxQty)
+    const price = parseFloat(modalTxPrice)
+    if (!isIncome && (isNaN(qty) || qty <= 0)) return
+    if (isNaN(price) || price < 0) return
+    setDepotTransactions([...depotTransactions, {
+      id:         Date.now(),
+      depotId,
+      securityId: secId,
+      type:       modalTxType,
+      quantity:   qty,
+      price,
+      fees:       parseFloat(modalTxFees) || 0,
+      date:       modalTxDate,
+    }])
+    setShowAddTxModal(false)
+  }
+
   const sectionHead = { fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-text-muted)', marginBottom: '0.5rem', marginTop: '1.5rem' }
 
   const cellR = { padding: '0.3rem 0.5rem', textAlign: 'right', fontSize: '0.78rem' }
@@ -454,9 +521,13 @@ export default function Securities() {
 
   return (
     <div className="module">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
         <h2 style={{ margin: 0 }}>Wertpapiere &amp; Depots</h2>
-        <button onClick={() => setShowAddSec(true)} style={{ padding: '0.4rem 0.9rem', fontSize: '0.85rem' }}>+ Wertpapier</button>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <button onClick={() => setShowAddSec(true)} style={{ padding: '0.4rem 0.9rem', fontSize: '0.85rem' }}>+ Wertpapier</button>
+          <button onClick={openAddPrice} disabled={securities.length === 0} style={{ padding: '0.4rem 0.9rem', fontSize: '0.85rem', background: '#e0f2fe', color: '#0369a1', border: 'none', borderRadius: 8, cursor: securities.length === 0 ? 'not-allowed' : 'pointer' }}>+ Kurs</button>
+          <button onClick={openAddTxModal} disabled={securities.length === 0 || depots.length === 0} style={{ padding: '0.4rem 0.9rem', fontSize: '0.85rem', background: '#dcfce7', color: '#166534', border: 'none', borderRadius: 8, cursor: (securities.length === 0 || depots.length === 0) ? 'not-allowed' : 'pointer' }}>+ Transaktion</button>
+        </div>
       </div>
 
       {/* ── Depot-Positionen ── */}
@@ -927,6 +998,98 @@ export default function Securities() {
             <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
               <button type="submit" style={{ flex: 1 }}>Wertpapier hinzufügen</button>
               <button type="button" onClick={() => setShowAddSec(false)} style={{ background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: 8, padding: '0.6rem 1rem', cursor: 'pointer' }}>Abbrechen</button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {showAddPrice && (
+        <Modal title="Neuer Kurs" onClose={() => setShowAddPrice(false)} maxWidth={400}>
+          <form onSubmit={submitAddPrice} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={labelStyle}>Wertpapier *</label>
+                <select value={modalPriceSecId} onChange={e => setModalPriceSecId(e.target.value)} required
+                  style={{ width: '100%', fontSize: '0.85rem', padding: '0.35rem 0.5rem' }}>
+                  {securities.map(s => <option key={s.id} value={s.id}>{s.name} ({s.symbol})</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>Datum *</label>
+                <input type="date" value={modalPriceDate} onChange={e => setModalPriceDate(e.target.value)} required
+                  style={{ width: '100%', fontSize: '0.85rem', padding: '0.35rem 0.5rem' }} />
+              </div>
+              <div>
+                <label style={labelStyle}>Kurs *</label>
+                <input type="number" value={modalPriceValue} onChange={e => setModalPriceValue(e.target.value)}
+                  placeholder="0.0000" step="0.0001" min="0" required
+                  style={{ width: '100%', fontSize: '0.85rem', padding: '0.35rem 0.5rem' }} />
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
+              <button type="submit" style={{ flex: 1 }}>Kurs speichern</button>
+              <button type="button" onClick={() => setShowAddPrice(false)}
+                style={{ background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: 8, padding: '0.6rem 1rem', cursor: 'pointer' }}>Abbrechen</button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {showAddTxModal && (
+        <Modal title="Neue Wertpapiertransaktion" onClose={() => setShowAddTxModal(false)} maxWidth={500}>
+          <form onSubmit={submitAddTxModal} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={labelStyle}>Wertpapier *</label>
+                <select value={modalTxSecId} onChange={e => setModalTxSecId(e.target.value)} required
+                  style={{ width: '100%', fontSize: '0.85rem', padding: '0.35rem 0.5rem' }}>
+                  {securities.map(s => <option key={s.id} value={s.id}>{s.name} ({s.symbol})</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>Depot *</label>
+                <select value={modalTxDepot} onChange={e => setModalTxDepot(e.target.value)} required
+                  style={{ width: '100%', fontSize: '0.85rem', padding: '0.35rem 0.5rem' }}>
+                  {depots.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>Datum *</label>
+                <input type="date" value={modalTxDate} onChange={e => setModalTxDate(e.target.value)} required
+                  style={{ width: '100%', fontSize: '0.85rem', padding: '0.35rem 0.5rem' }} />
+              </div>
+              <div>
+                <label style={labelStyle}>Art</label>
+                <select value={modalTxType} onChange={e => setModalTxType(e.target.value)}
+                  style={{ width: '100%', fontSize: '0.85rem', padding: '0.35rem 0.5rem' }}>
+                  {Object.entries(TX_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                </select>
+              </div>
+              {!INCOME_TX.has(modalTxType) && (
+                <div>
+                  <label style={labelStyle}>Anzahl *</label>
+                  <input type="number" value={modalTxQty} onChange={e => setModalTxQty(e.target.value)}
+                    placeholder="0" step="0.0001" min="0.0001" required={!INCOME_TX.has(modalTxType)}
+                    style={{ width: '100%', fontSize: '0.85rem', padding: '0.35rem 0.5rem' }} />
+                </div>
+              )}
+              <div style={INCOME_TX.has(modalTxType) ? { gridColumn: '1 / -1' } : {}}>
+                <label style={labelStyle}>{INCOME_TX.has(modalTxType) ? 'Betrag *' : 'Kurs/Stk. *'}</label>
+                <input type="number" value={modalTxPrice} onChange={e => setModalTxPrice(e.target.value)}
+                  placeholder="0.00" step="0.0001" min="0" required
+                  style={{ width: '100%', fontSize: '0.85rem', padding: '0.35rem 0.5rem' }} />
+              </div>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={labelStyle}>Gebühren</label>
+                <input type="number" value={modalTxFees} onChange={e => setModalTxFees(e.target.value)}
+                  placeholder="0.00" step="0.01" min="0"
+                  style={{ width: '100%', fontSize: '0.85rem', padding: '0.35rem 0.5rem' }} />
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
+              <button type="submit" style={{ flex: 1 }}>Transaktion speichern</button>
+              <button type="button" onClick={() => setShowAddTxModal(false)}
+                style={{ background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: 8, padding: '0.6rem 1rem', cursor: 'pointer' }}>Abbrechen</button>
             </div>
           </form>
         </Modal>
