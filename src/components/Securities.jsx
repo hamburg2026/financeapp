@@ -560,8 +560,8 @@ export default function Securities() {
     }
   }
 
-  function openAddPrice() {
-    setModalPriceSecId(securities[0]?.id ? String(securities[0].id) : '')
+  function openAddPrice(secId) {
+    setModalPriceSecId(secId ? String(secId) : (securities[0]?.id ? String(securities[0].id) : ''))
     setModalPriceDate(today())
     setModalPriceValue('')
     setShowAddPrice(true)
@@ -577,8 +577,8 @@ export default function Securities() {
     setShowAddPrice(false)
   }
 
-  function openAddTxModal() {
-    setModalTxSecId(securities[0]?.id ? String(securities[0].id) : '')
+  function openAddTxModal(secId) {
+    setModalTxSecId(secId ? String(secId) : (securities[0]?.id ? String(securities[0].id) : ''))
     setModalTxDate(today())
     setModalTxDepot(depots[0]?.id ? String(depots[0].id) : '')
     setModalTxType('buy')
@@ -618,13 +618,9 @@ export default function Securities() {
 
   return (
     <div className="module">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
         <h2 style={{ margin: 0 }}>Wertpapiere &amp; Depots</h2>
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-          <button onClick={() => setShowAddSec(true)} style={{ padding: '0.4rem 0.9rem', fontSize: '0.85rem' }}>+ Wertpapier</button>
-          <button onClick={openAddPrice} disabled={securities.length === 0} style={{ padding: '0.4rem 0.9rem', fontSize: '0.85rem', background: '#e0f2fe', color: '#0369a1', border: 'none', borderRadius: 8, cursor: securities.length === 0 ? 'not-allowed' : 'pointer' }}>+ Kurs</button>
-          <button onClick={openAddTxModal} disabled={securities.length === 0 || depots.length === 0} style={{ padding: '0.4rem 0.9rem', fontSize: '0.85rem', background: '#dcfce7', color: '#166534', border: 'none', borderRadius: 8, cursor: (securities.length === 0 || depots.length === 0) ? 'not-allowed' : 'pointer' }}>+ Transaktion</button>
-        </div>
+        <button onClick={() => setShowAddSec(true)} style={{ padding: '0.4rem 0.9rem', fontSize: '0.85rem' }}>+ Wertpapier</button>
       </div>
 
       {/* ── Depot-Positionen ── */}
@@ -790,6 +786,8 @@ export default function Securities() {
                           {isLeewayFetching ? '…' : '↓ Leeway'}
                         </button>
                       )}
+                      <button onClick={() => openAddPrice(s.id)} style={{ ...btnBase, background: '#e0f2fe', color: '#0369a1' }} title="Neuer Kurs">+ Kurs</button>
+                      <button onClick={() => openAddTxModal(s.id)} disabled={depots.length === 0} style={{ ...btnBase, background: '#dcfce7', color: '#166534', cursor: depots.length === 0 ? 'not-allowed' : 'pointer' }} title={depots.length === 0 ? 'Zuerst ein Depot anlegen' : 'Neue Transaktion'}>+ Tx</button>
                       <button onClick={() => startEditSec(s)} style={{ ...btnBase, background: '#e5e7eb', color: '#374151' }} title="Bearbeiten">✎</button>
                       <button onClick={() => removeSecurity(s.id)} style={{ ...btnBase, background: '#fee2e2', color: '#dc2626' }} title="Löschen">✕</button>
                     </div>
