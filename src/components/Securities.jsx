@@ -164,6 +164,17 @@ export default function Securities() {
   const [showAddPrice, setShowAddPrice] = useState(false)
   const [showAddTxModal, setShowAddTxModal] = useState(false)
 
+  // ── ISIN-Popup ──
+  const [isinPopupSec,        setIsinPopupSec]        = useState(null)
+  const [isinPrice,           setIsinPrice]           = useState(null)
+  const [isinPriceDate,       setIsinPriceDate]       = useState('')
+  const [isinPriceSource,     setIsinPriceSource]     = useState('')
+  const [isinPriceLoading,    setIsinPriceLoading]    = useState(false)
+  const [isinPriceErr,        setIsinPriceErr]        = useState('')
+  const [isinNews,            setIsinNews]            = useState([])
+  const [isinNewsLoading,     setIsinNewsLoading]     = useState(false)
+  const [isinNewsErr,         setIsinNewsErr]         = useState('')
+
   // ── Modal: new price ──
   const [modalPriceSecId, setModalPriceSecId] = useState('')
   const [modalPriceDate,  setModalPriceDate]  = useState(today)
@@ -463,8 +474,94 @@ export default function Securities() {
     ...securities.filter(s => s.currency && s.currency !== 'EUR').map(s => s.currency),
   ])]
 
-  function openAddPrice() {
-    setModalPriceSecId(securities[0]?.id ? String(securities[0].id) : '')
+  async function fetchIsinNews(symbol) {
+    // Alpha Vantage NEWS_SENTIMENT (if key available)
+    if (alphaKey) {
+      const url = `https://www.alphavantage.co/query?function=NEWS_SENTIMENT&tickers=${encodeURIComponent(symbol)}&apikey=${encodeURIComponent(alphaKey)}&limit=8`
+      const res = await fetch(url)
+      if (res.ok) {
+        const data = await res.json()
+        if (Array.isArray(data.feed) && data.feed.length > 0) {
+          return data.feed.slice(0, 8).map(item => ({
+            title:   item.title,
+            url:     item.url,
+            date:    item.time_published ? item.time_published.slice(0, 10) : '',
+            source:  item.source,
+            summary: item.summary ? item.summary.slice(0, 220) : '',
+          }))
+        }
+      }
+    }
+    // Fallback: Yahoo Finance RSS via rss2json (kein API-Key nötig)
+    const rssUrl = `https://feeds.finance.yahoo.com/rss/2.0/headline?s=${encodeURIComponent(symbol)}&region=DE&lang=de-DE`
+    const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}&count=8`
+    const res2 = await fetch(apiUrl)
+    if (!res2.ok) throw new Error(`HTTP ${res2.status}`)
+    const data2 = await res2.json()
+    if (data2.status !== 'ok' || !data2.items?.length) throw new Error('Keine News gefunden.')
+    return data2.items.slice(0, 8).map(item => ({
+      title:   item.title,
+      url:     item.link,
+      date:    item.pubDate ? item.pubDate.slice(0, 10) : '',
+      source:  item.author || 'Yahoo Finance',
+      summary: item.description ? item.description.replace(/<[^>]+>/g, '').slice(0, 220) : '',
+    }))
+  }
+
+  async function openIsinPopup(sec) {
+    setIsinPopupSec(sec)
+    setIsinPrice(null)
+    setIsinPriceDate('')
+    setIsinPriceSource('')
+    setIsinPriceErr('')
+    setIsinNews([])
+    setIsinNewsErr('')
+
+    // ── Kurs abrufen ──
+    if (sec.symbol && (alphaKey || leewayKey)) {
+      setIsinPriceLoading(true)
+      try {
+        let result
+        if (alphaKey) {
+          result = await fetchAlphaVantagePrice(sec.symbol, alphaKey)
+          setIsinPriceSource('Alpha Vantage')
+        } else {
+          result = await fetchLeewayPrice(sec.symbol, leewayKey)
+          setIsinPriceSource('Leeway')
+        }
+        setIsinPrice(result.price)
+        setIsinPriceDate(result.date)
+      } catch (err) {
+        setIsinPriceErr(err.message)
+        // Lokalen Kurs als Fallback zeigen
+        const local = getCurrentPrice(sec.id)
+        if (local !== null) { setIsinPrice(local); setIsinPriceSource('lokal') }
+      } finally {
+        setIsinPriceLoading(false)
+      }
+    } else {
+      // Nur lokaler Kurs verfügbar
+      const local = getCurrentPrice(sec.id)
+      if (local !== null) { setIsinPrice(local); setIsinPriceSource('lokal') }
+      else setIsinPriceErr('Kein API-Schlüssel konfiguriert und kein lokaler Kurs vorhanden.')
+    }
+
+    // ── News abrufen ──
+    if (sec.symbol) {
+      setIsinNewsLoading(true)
+      try {
+        const items = await fetchIsinNews(sec.symbol)
+        setIsinNews(items)
+      } catch (err) {
+        setIsinNewsErr(err.message)
+      } finally {
+        setIsinNewsLoading(false)
+      }
+    }
+  }
+
+  function openAddPrice(secId) {
+    setModalPriceSecId(secId ? String(secId) : (securities[0]?.id ? String(securities[0].id) : ''))
     setModalPriceDate(today())
     setModalPriceValue('')
     setShowAddPrice(true)
@@ -480,8 +577,8 @@ export default function Securities() {
     setShowAddPrice(false)
   }
 
-  function openAddTxModal() {
-    setModalTxSecId(securities[0]?.id ? String(securities[0].id) : '')
+  function openAddTxModal(secId) {
+    setModalTxSecId(secId ? String(secId) : (securities[0]?.id ? String(securities[0].id) : ''))
     setModalTxDate(today())
     setModalTxDepot(depots[0]?.id ? String(depots[0].id) : '')
     setModalTxType('buy')
@@ -521,13 +618,9 @@ export default function Securities() {
 
   return (
     <div className="module">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
         <h2 style={{ margin: 0 }}>Wertpapiere &amp; Depots</h2>
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-          <button onClick={() => setShowAddSec(true)} style={{ padding: '0.4rem 0.9rem', fontSize: '0.85rem' }}>+ Wertpapier</button>
-          <button onClick={openAddPrice} disabled={securities.length === 0} style={{ padding: '0.4rem 0.9rem', fontSize: '0.85rem', background: '#e0f2fe', color: '#0369a1', border: 'none', borderRadius: 8, cursor: securities.length === 0 ? 'not-allowed' : 'pointer' }}>+ Kurs</button>
-          <button onClick={openAddTxModal} disabled={securities.length === 0 || depots.length === 0} style={{ padding: '0.4rem 0.9rem', fontSize: '0.85rem', background: '#dcfce7', color: '#166534', border: 'none', borderRadius: 8, cursor: (securities.length === 0 || depots.length === 0) ? 'not-allowed' : 'pointer' }}>+ Transaktion</button>
-        </div>
+        <button onClick={() => setShowAddSec(true)} style={{ padding: '0.4rem 0.9rem', fontSize: '0.85rem' }}>+ Wertpapier</button>
       </div>
 
       {/* ── Depot-Positionen ── */}
@@ -659,15 +752,13 @@ export default function Securities() {
                       <span style={{ flex: 1, fontWeight: 600, fontSize: '0.9rem' }}>{s.name}</span>
                       <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{s.symbol}</span>
                       {isinVal ? (
-                        <a
-                          href={`https://finance.yahoo.com/quote/${isinVal}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{ fontSize: '0.72rem', color: 'var(--color-primary)', textDecoration: 'underline', fontFamily: 'monospace' }}
-                          title="ISIN auf Yahoo Finance öffnen"
+                        <span
+                          onClick={() => openIsinPopup(s)}
+                          style={{ fontSize: '0.72rem', color: 'var(--color-primary)', textDecoration: 'underline', fontFamily: 'monospace', cursor: 'pointer' }}
+                          title="Kurs & News abrufen"
                         >
                           {isinVal}
-                        </a>
+                        </span>
                       ) : (
                         <span style={{ fontSize: '0.68rem', color: '#d97706', background: '#fef9c3', borderRadius: 4, padding: '0.05rem 0.35rem', cursor: 'pointer' }}
                           onClick={() => startEditSec(s)} title="ISIN hinterlegen">
@@ -695,6 +786,8 @@ export default function Securities() {
                           {isLeewayFetching ? '…' : '↓ Leeway'}
                         </button>
                       )}
+                      <button onClick={() => openAddPrice(s.id)} style={{ ...btnBase, background: '#e0f2fe', color: '#0369a1' }} title="Neuer Kurs">+ Kurs</button>
+                      <button onClick={() => openAddTxModal(s.id)} disabled={depots.length === 0} style={{ ...btnBase, background: '#dcfce7', color: '#166534', cursor: depots.length === 0 ? 'not-allowed' : 'pointer' }} title={depots.length === 0 ? 'Zuerst ein Depot anlegen' : 'Neue Transaktion'}>+ Tx</button>
                       <button onClick={() => startEditSec(s)} style={{ ...btnBase, background: '#e5e7eb', color: '#374151' }} title="Bearbeiten">✎</button>
                       <button onClick={() => removeSecurity(s.id)} style={{ ...btnBase, background: '#fee2e2', color: '#dc2626' }} title="Löschen">✕</button>
                     </div>
@@ -1092,6 +1185,75 @@ export default function Securities() {
                 style={{ background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: 8, padding: '0.6rem 1rem', cursor: 'pointer' }}>Abbrechen</button>
             </div>
           </form>
+        </Modal>
+      )}
+
+      {isinPopupSec && (
+        <Modal title={`${isinPopupSec.name} – Kurs & News`} onClose={() => setIsinPopupSec(null)} maxWidth={600}>
+          {/* Security meta */}
+          <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '1rem', alignItems: 'center' }}>
+            <span style={{ fontFamily: 'monospace', fontSize: '0.78rem', background: 'var(--color-border)', borderRadius: 4, padding: '0.1rem 0.4rem' }}>{isinPopupSec.symbol}</span>
+            {isinPopupSec.isin && <span style={{ fontFamily: 'monospace', fontSize: '0.78rem', color: 'var(--color-primary)' }}>{isinPopupSec.isin}</span>}
+            <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', background: 'var(--color-border)', borderRadius: 4, padding: '0.1rem 0.4rem' }}>{isinPopupSec.type}</span>
+            <span style={{ fontSize: '0.72rem', fontWeight: 600, color: isinPopupSec.currency !== 'EUR' ? '#d97706' : 'var(--color-text-muted)' }}>{isinPopupSec.currency || 'EUR'}</span>
+          </div>
+
+          {/* Price section */}
+          <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, padding: '0.75rem 1rem', marginBottom: '1rem' }}>
+            <p style={{ margin: '0 0 0.4rem', fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-text-muted)' }}>Aktueller Kurs</p>
+            {isinPriceLoading ? (
+              <p style={{ margin: 0, color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>Kurs wird abgerufen…</p>
+            ) : isinPrice !== null ? (
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.75rem', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '1.6rem', fontWeight: 800, letterSpacing: '-0.02em' }}>{fmt(isinPrice)}</span>
+                <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                  Stand {isinPriceDate}{isinPriceSource ? ` · ${isinPriceSource}` : ''}
+                </span>
+              </div>
+            ) : (
+              <p style={{ margin: 0, color: '#dc2626', fontSize: '0.82rem' }}>{isinPriceErr || 'Kein Kurs verfügbar.'}</p>
+            )}
+            {isinPriceErr && isinPrice !== null && (
+              <p style={{ margin: '0.3rem 0 0', fontSize: '0.72rem', color: '#d97706' }}>Hinweis: {isinPriceErr}</p>
+            )}
+            {!alphaKey && !leewayKey && (
+              <p style={{ margin: '0.4rem 0 0', fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>
+                Für Live-Kurse bitte API-Schlüssel (Alpha Vantage oder Leeway) konfigurieren.
+              </p>
+            )}
+          </div>
+
+          {/* News section */}
+          <div>
+            <p style={{ margin: '0 0 0.5rem', fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-text-muted)' }}>Aktuelle News</p>
+            {isinNewsLoading && (
+              <p style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>News werden geladen…</p>
+            )}
+            {!isinNewsLoading && isinNewsErr && (
+              <p style={{ color: '#dc2626', fontSize: '0.82rem', margin: 0 }}>{isinNewsErr}</p>
+            )}
+            {!isinNewsLoading && isinNews.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                {isinNews.map((item, i) => (
+                  <div key={i} style={{ borderLeft: '3px solid var(--color-primary)', paddingLeft: '0.65rem' }}>
+                    <a href={item.url} target="_blank" rel="noopener noreferrer"
+                      style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--color-text)', textDecoration: 'none', display: 'block', marginBottom: '0.15rem', lineHeight: 1.35 }}>
+                      {item.title}
+                    </a>
+                    {item.summary && (
+                      <p style={{ margin: '0 0 0.2rem', fontSize: '0.75rem', color: 'var(--color-text-muted)', lineHeight: 1.4 }}>{item.summary}</p>
+                    )}
+                    <span style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>
+                      {item.source}{item.date ? ` · ${item.date}` : ''}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {!isinNewsLoading && !isinNewsErr && isinNews.length === 0 && !isinPopupSec.symbol && (
+              <p style={{ color: 'var(--color-text-muted)', fontSize: '0.82rem', margin: 0 }}>Kein Symbol hinterlegt – News nicht abrufbar.</p>
+            )}
+          </div>
         </Modal>
       )}
 
