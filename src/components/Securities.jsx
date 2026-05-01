@@ -1228,6 +1228,46 @@ export default function Securities() {
             <span style={{ fontSize: '0.72rem', fontWeight: 600, color: isinPopupSec.currency !== 'EUR' ? '#d97706' : 'var(--color-text-muted)' }}>{isinPopupSec.currency || 'EUR'}</span>
           </div>
 
+          {/* Position summary */}
+          {(() => {
+            const secId = String(isinPopupSec.id)
+            let quantity = 0, cost = 0, income = 0
+            depotTransactions.filter(t => String(t.securityId) === secId).forEach(t => {
+              const qty = t.quantity || 0, price = t.price || 0, fees = t.fees || 0
+              if (t.type === 'buy')        { quantity += qty; cost += qty * price + fees }
+              else if (t.type === 'sell')  { quantity -= qty; cost -= qty * price - fees }
+              else if (INCOME_TX.has(t.type)) { income += qty * price - fees }
+            })
+            if (quantity <= 0.0001 && income === 0) return null
+            const curPrice  = getCurrentPrice(isinPopupSec.id)
+            const curValue  = curPrice !== null ? quantity * curPrice : null
+            const capGain   = curValue !== null ? curValue - cost : null
+            const total     = capGain !== null ? capGain + income : null
+            const totalPct  = cost > 0 && total !== null ? (total / cost) * 100 : null
+            const avgPrice  = quantity > 0 ? cost / quantity : 0
+
+            const tile = (label, value, color) => (
+              <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 8, padding: '0.55rem 0.75rem' }}>
+                <div style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.2rem' }}>{label}</div>
+                <div style={{ fontWeight: 700, fontSize: '0.95rem', color: color || 'var(--color-text)' }}>{value}</div>
+              </div>
+            )
+
+            return (
+              <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, padding: '0.75rem 1rem', marginBottom: '1rem' }}>
+                <p style={{ margin: '0 0 0.65rem', fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-text-muted)' }}>Meine Position</p>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '0.5rem' }}>
+                  {tile('Anzahl', quantity.toLocaleString('de-DE', { maximumFractionDigits: 4 }))}
+                  {tile('Ø Einstand', fmt(avgPrice))}
+                  {tile('Depotwert', curValue !== null ? fmt(curValue) : '–', curValue !== null && curValue >= cost ? '#16a34a' : '#dc2626')}
+                  {tile('Kursgewinn', capGain !== null ? `${capGain >= 0 ? '+' : ''}${fmt(capGain)}` : '–', capGain !== null ? (capGain >= 0 ? '#16a34a' : '#dc2626') : undefined)}
+                  {tile('Erträge', income > 0 ? `+${fmt(income)}` : '–', income > 0 ? '#2563eb' : undefined)}
+                  {tile('Gesamt', total !== null ? `${total >= 0 ? '+' : ''}${fmt(total)}${totalPct !== null ? ` (${totalPct >= 0 ? '+' : ''}${totalPct.toFixed(1)} %)` : ''}` : '–', total !== null ? (total >= 0 ? '#16a34a' : '#dc2626') : undefined)}
+                </div>
+              </div>
+            )
+          })()}
+
           {/* Price section */}
           <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, padding: '0.75rem 1rem', marginBottom: '1rem' }}>
             <p style={{ margin: '0 0 0.4rem', fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-text-muted)' }}>Aktueller Kurs</p>
