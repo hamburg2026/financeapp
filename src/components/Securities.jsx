@@ -105,10 +105,6 @@ export default function Securities() {
   const [editSecType,   setEditSecType]   = useState('Aktie')
   const [editSecCur,    setEditSecCur]    = useState('EUR')
 
-  // ── Price form (shared date/value for inline add) ──
-  const [priceDate,    setPriceDate]    = useState(today)
-  const [priceValue,   setPriceValue]   = useState('')
-
   // ── Edit price ──
   const [editPriceKey,   setEditPriceKey]   = useState(null)
   const [editPriceDate,  setEditPriceDate]  = useState('')
@@ -132,14 +128,6 @@ export default function Securities() {
   // ── Expanded sections ──
   const [expandedPrices, setExpandedPrices] = useState(new Set())
   const [expandedTx,     setExpandedTx]     = useState(new Set())
-
-  // ── Add transaction form (shared) ──
-  const [txDate,    setTxDate]    = useState(today)
-  const [txDepotId, setTxDepotId] = useState('')
-  const [txType,    setTxType]    = useState('buy')
-  const [txQty,     setTxQty]     = useState('')
-  const [txPrice,   setTxPrice]   = useState('')
-  const [txFees,    setTxFees]    = useState('')
 
   // ── Edit transaction ──
   const [editTxId,      setEditTxId]      = useState(null)
@@ -224,13 +212,6 @@ export default function Securities() {
   }
 
   // ─── Price CRUD ──────────────────────────────────────────────────────────────
-  function addPriceInline(secId) {
-    const list = [...(prices[secId] || []), { date: priceDate, value: parseFloat(priceValue) }]
-      .sort((a, b) => new Date(b.date) - new Date(a.date))
-    setPrices({ ...prices, [secId]: list })
-    setPriceDate(today()); setPriceValue('')
-  }
-
   function startEditPrice(secId, idx) {
     const entry = prices[secId][idx]
     setEditPriceKey({ secId, idx })
@@ -266,27 +247,6 @@ export default function Securities() {
   }
 
   // ─── Depot Transaction CRUD ──────────────────────────────────────────────────
-  function addTxInline(secId) {
-    const depotId = txDepotId ? parseInt(txDepotId) : depots[0]?.id
-    if (!depotId) return
-    const isIncome = INCOME_TX.has(txType)
-    const qty   = isIncome ? 1 : parseFloat(txQty)
-    const price = parseFloat(txPrice)
-    if (!isIncome && (isNaN(qty) || qty <= 0)) return
-    if (isNaN(price) || price < 0) return
-    setDepotTransactions([...depotTransactions, {
-      id:         Date.now(),
-      depotId,
-      securityId: secId,
-      type:       txType,
-      quantity:   qty,
-      price,
-      fees:       parseFloat(txFees) || 0,
-      date:       txDate,
-    }])
-    setTxQty(''); setTxPrice(''); setTxFees(''); setTxDate(today())
-  }
-
   function startEditTx(t) {
     setEditTxId(t.id)
     setEditTxDate(t.date)
@@ -829,15 +789,6 @@ export default function Securities() {
                         </div>
                       )
                     })}
-                    {/* Add price inline */}
-                    <form
-                      onSubmit={e => { e.preventDefault(); addPriceInline(s.id) }}
-                      style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', padding: '0.35rem 0.75rem', paddingLeft: '2.2rem', borderTop: priceList.length ? '1px dashed var(--color-border)' : 'none' }}
-                    >
-                      <input type="date" value={priceDate} onChange={e => setPriceDate(e.target.value)} required style={{ fontSize: '0.78rem', padding: '0.18rem 0.35rem' }} />
-                      <input type="number" value={priceValue} onChange={e => setPriceValue(e.target.value)} placeholder="Kurs" step="0.0001" min="0" required style={{ width: 100, fontSize: '0.78rem', padding: '0.18rem 0.35rem' }} />
-                      <button type="submit" style={{ ...btnBase, fontSize: '0.68rem', background: 'var(--color-primary)', color: '#fff' }}>+ Kurs</button>
-                    </form>
                   </div>
                 )}
 
@@ -906,30 +857,6 @@ export default function Securities() {
                       )
                     })}
 
-                    {/* Add transaction inline */}
-                    {depots.length > 0 && (
-                      <form
-                        onSubmit={e => { e.preventDefault(); addTxInline(s.id) }}
-                        style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap', padding: '0.35rem 0.75rem', paddingLeft: '1.5rem', borderTop: secTxs.length ? '1px dashed var(--color-border)' : 'none' }}
-                      >
-                        <input type="date" value={txDate} onChange={e => setTxDate(e.target.value)} required style={{ fontSize: '0.78rem', padding: '0.18rem 0.35rem' }} />
-                        {depots.length > 1 && (
-                          <select value={txDepotId} onChange={e => setTxDepotId(e.target.value)} style={{ fontSize: '0.78rem', padding: '0.18rem 0.35rem' }}>
-                            <option value="">– Depot –</option>
-                            {depots.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                          </select>
-                        )}
-                        <select value={txType} onChange={e => setTxType(e.target.value)} style={{ fontSize: '0.78rem', padding: '0.18rem 0.35rem' }}>
-                          {Object.entries(TX_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                        </select>
-                        {!INCOME_TX.has(txType) && (
-                          <input type="number" value={txQty} onChange={e => setTxQty(e.target.value)} placeholder="Anzahl" step="0.0001" min="0.0001" required style={{ width: 75, fontSize: '0.78rem', padding: '0.18rem 0.35rem' }} />
-                        )}
-                        <input type="number" value={txPrice} onChange={e => setTxPrice(e.target.value)} placeholder={INCOME_TX.has(txType) ? 'Betrag' : 'Kurs/Stk.'} step="0.0001" min="0" required style={{ width: 90, fontSize: '0.78rem', padding: '0.18rem 0.35rem' }} />
-                        <input type="number" value={txFees} onChange={e => setTxFees(e.target.value)} placeholder="Gebühren" step="0.01" min="0" style={{ width: 75, fontSize: '0.78rem', padding: '0.18rem 0.35rem' }} />
-                        <button type="submit" style={{ ...btnBase, fontSize: '0.68rem', background: '#16a34a', color: '#fff' }}>+ Transaktion</button>
-                      </form>
-                    )}
                   </div>
                 )}
               </div>
