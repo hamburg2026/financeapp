@@ -42,6 +42,15 @@ function fmtDate(iso) {
   return `${d}.${m}.${y}`
 }
 
+const PERSON_COLOR_PALETTE = [
+  { border: '#f43f5e', badgeBg: '#ffe4e6', badgeColor: '#be123c' },
+  { border: '#3b82f6', badgeBg: '#dbeafe', badgeColor: '#1d4ed8' },
+  { border: '#16a34a', badgeBg: '#dcfce7', badgeColor: '#15803d' },
+  { border: '#d97706', badgeBg: '#fef3c7', badgeColor: '#b45309' },
+  { border: '#7c3aed', badgeBg: '#ede9fe', badgeColor: '#6d28d9' },
+  { border: '#0891b2', badgeBg: '#cffafe', badgeColor: '#0369a1' },
+]
+
 const btnSm = { border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: '0.72rem', padding: '0.2rem 0.45rem', lineHeight: 1.4 }
 const lbl = { fontSize: '0.78rem', color: 'var(--color-text-muted)', marginBottom: '0.3rem', display: 'block', fontWeight: 500 }
 
@@ -59,11 +68,11 @@ const DATE_DIMS = [
 
 function getDateRange(key) {
   const n = new Date()
-  const y = n.getFullYear(), m = n.getMonth()   // m is 0-indexed
+  const y = n.getFullYear(), m = n.getMonth()
   const p   = s  => String(s).padStart(2, '0')
-  const iso = (yr, mo, day) => `${yr}-${p(mo + 1)}-${p(day)}`  // mo is 0-indexed
+  const iso = (yr, mo, day) => `${yr}-${p(mo + 1)}-${p(day)}`
   const end = (yr, mo)      => new Date(yr, mo + 1, 0).getDate()
-  const q = Math.floor(m / 3)  // 0-indexed quarter
+  const q = Math.floor(m / 3)
   switch (key) {
     case 'thisMonth': return { from: iso(y, m, 1), to: iso(y, m, end(y, m)) }
     case 'lastMonth': {
@@ -540,8 +549,6 @@ export function TransactionModal({ accountId, accounts, transactions, categories
             </tbody>
           </table>
         </div>
-
-
       </div>
     </div>
   )
@@ -552,27 +559,106 @@ export function TransactionModal({ accountId, accounts, transactions, categories
 export default function BankAccounts() {
   const [accounts,     setAccounts]     = useLocalStorage('bankAccounts', [])
   const [transactions, setTransactions] = useLocalStorage('transactions', [])
+  const [persons,      setPersons]      = useLocalStorage('insurancePersons', ['Karin', 'Jürgen'])
+  const [banks,        setBanks]        = useLocalStorage('banks', [])
   const categories = JSON.parse(localStorage.getItem('categories')) || []
 
-  const [editAccId,         setEditAccId]         = useState(null)
-  const [editAccName,       setEditAccName]       = useState('')
-  const [editAccBalance,    setEditAccBalance]    = useState('')
-  const [editAccZinssatz,   setEditAccZinssatz]   = useState('')
-  const [editAccLaufzeit,   setEditAccLaufzeit]   = useState('')
-  const [txModal,           setTxModal]           = useState(null)
-  const [showAddModal,      setShowAddModal]       = useState(false)
-  const [accountName,       setAccountName]       = useState('')
-  const [accountBalance,    setAccountBalance]    = useState('')
-  const [accountZinssatz,   setAccountZinssatz]   = useState('')
-  const [accountLaufzeit,   setAccountLaufzeit]   = useState('')
+  const [groupBy,         setGroupBy]         = useState('none')
+  const [sortBy,          setSortBy]          = useState('name')
+  const [sortDir,         setSortDir]         = useState('asc')
+  const [collapsedGroups, setCollapsedGroups] = useState(new Set())
+
+  const [editAccId,       setEditAccId]       = useState(null)
+  const [editAccName,     setEditAccName]     = useState('')
+  const [editAccBalance,  setEditAccBalance]  = useState('')
+  const [editAccZinssatz, setEditAccZinssatz] = useState('')
+  const [editAccLaufzeit, setEditAccLaufzeit] = useState('')
+  const [editAccPerson,   setEditAccPerson]   = useState('')
+  const [editAccBank,     setEditAccBank]     = useState('')
+
+  const [txModal,          setTxModal]          = useState(null)
+  const [showAddModal,     setShowAddModal]     = useState(false)
+  const [accountName,      setAccountName]      = useState('')
+  const [accountBalance,   setAccountBalance]   = useState('')
+  const [accountZinssatz,  setAccountZinssatz]  = useState('')
+  const [accountLaufzeit,  setAccountLaufzeit]  = useState('')
+  const [accountPerson,    setAccountPerson]    = useState('')
+  const [accountBank,      setAccountBank]      = useState('')
+  const [newPersonInput,   setNewPersonInput]   = useState('')
+  const [newBankInput,     setNewBankInput]     = useState('')
+
+  function getPersonColor(personName) {
+    const idx = persons.indexOf(personName)
+    if (idx === -1) return null
+    return PERSON_COLOR_PALETTE[idx % PERSON_COLOR_PALETTE.length]
+  }
+
+  function sortedAccounts(list) {
+    return [...list].sort((a, b) => {
+      let va, vb
+      if      (sortBy === 'name')    { va = (a.name   || '').toLowerCase(); vb = (b.name   || '').toLowerCase() }
+      else if (sortBy === 'balance') { va = latestBalance(a);               vb = latestBalance(b) }
+      else if (sortBy === 'person')  { va = (a.person || '').toLowerCase(); vb = (b.person || '').toLowerCase() }
+      else if (sortBy === 'bank')    { va = (a.bank   || '').toLowerCase(); vb = (b.bank   || '').toLowerCase() }
+      else                           { va = (a.name   || '').toLowerCase(); vb = (b.name   || '').toLowerCase() }
+      if (va < vb) return sortDir === 'asc' ? -1 : 1
+      if (va > vb) return sortDir === 'asc' ?  1 : -1
+      return 0
+    })
+  }
+
+  function getGroups(list) {
+    const sorted = sortedAccounts(list)
+    if (groupBy === 'none') return [{ label: null, items: sorted }]
+    const map = new Map()
+    sorted.forEach(a => {
+      const key = groupBy === 'person' ? (a.person || '(Keine Person)') : (a.bank || '(Kein Institut)')
+      if (!map.has(key)) map.set(key, [])
+      map.get(key).push(a)
+    })
+    return [...map.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0], 'de'))
+      .map(([label, items]) => ({ label, items }))
+  }
+
+  function toggleGroup(label) {
+    setCollapsedGroups(prev => {
+      const next = new Set(prev)
+      next.has(label) ? next.delete(label) : next.add(label)
+      return next
+    })
+  }
+
+  function addPersonToList() {
+    const name = newPersonInput.trim()
+    if (!name) return
+    if (!persons.includes(name)) setPersons([...persons, name])
+    setAccountPerson(name)
+    setNewPersonInput('')
+  }
+
+  function addBankToList() {
+    const name = newBankInput.trim()
+    if (!name) return
+    if (!banks.includes(name)) setBanks([...banks, name])
+    setAccountBank(name)
+    setNewBankInput('')
+  }
+
+  function openAddModal() {
+    setAccountName(''); setAccountBalance(''); setAccountZinssatz(''); setAccountLaufzeit('')
+    setAccountPerson(''); setAccountBank(''); setNewPersonInput(''); setNewBankInput('')
+    setShowAddModal(true)
+  }
 
   function addAccount(e) {
     e.preventDefault()
     const acc = { id: Date.now(), name: accountName, balance: parseFloat(accountBalance) }
     if (accountZinssatz !== '') acc.zinssatz = parseFloat(accountZinssatz)
     if (accountLaufzeit)        acc.laufzeitBis = accountLaufzeit
+    if (accountPerson)          acc.person = accountPerson
+    if (accountBank)            acc.bank = accountBank
     setAccounts([...accounts, acc])
-    setAccountName(''); setAccountBalance(''); setAccountZinssatz(''); setAccountLaufzeit('')
     setShowAddModal(false)
   }
 
@@ -582,16 +668,18 @@ export default function BankAccounts() {
     setEditAccBalance(String(latestBalance(a)))
     setEditAccZinssatz(a.zinssatz != null ? String(a.zinssatz) : '')
     setEditAccLaufzeit(a.laufzeitBis || '')
+    setEditAccPerson(a.person || '')
+    setEditAccBank(a.bank || '')
   }
 
   function saveEditAcc() {
     setAccounts(accounts.map(a => {
       if (a.id !== editAccId) return a
       const updated = { ...a, name: editAccName, balance: parseFloat(editAccBalance) }
-      if (editAccZinssatz !== '') updated.zinssatz = parseFloat(editAccZinssatz)
-      else delete updated.zinssatz
-      if (editAccLaufzeit) updated.laufzeitBis = editAccLaufzeit
-      else delete updated.laufzeitBis
+      if (editAccZinssatz !== '') updated.zinssatz = parseFloat(editAccZinssatz); else delete updated.zinssatz
+      if (editAccLaufzeit)        updated.laufzeitBis = editAccLaufzeit;          else delete updated.laufzeitBis
+      if (editAccPerson)          updated.person = editAccPerson;                 else delete updated.person
+      if (editAccBank)            updated.bank = editAccBank;                     else delete updated.bank
       return updated
     }))
     setEditAccId(null)
@@ -599,17 +687,42 @@ export default function BankAccounts() {
 
   const txCount = id => transactions.filter(t => t.accountId === id).length
   const c = { padding: '0.35rem 0.6rem', fontSize: '0.82rem' }
+  const COLS = 10
 
   return (
     <div className="module">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-        <h2 style={{ margin: 0 }}>Bankkonten</h2>
-        <button onClick={() => { setAccountName(''); setAccountBalance(''); setShowAddModal(true) }} style={{ padding: '0.4rem 0.9rem', fontSize: '0.85rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+        <h2 style={{ margin: 0, marginRight: 'auto' }}>Bankkonten</h2>
+        {accounts.length > 1 && (
+          <>
+            <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>Gruppieren:</span>
+            <select value={groupBy} onChange={e => setGroupBy(e.target.value)}
+              style={{ fontSize: '0.78rem', padding: '0.22rem 0.4rem', border: '1px solid var(--color-border)', borderRadius: 5 }}>
+              <option value="none">– keine –</option>
+              <option value="person">Person</option>
+              <option value="bank">Kreditinstitut</option>
+            </select>
+            <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>Sortieren:</span>
+            <select value={sortBy} onChange={e => setSortBy(e.target.value)}
+              style={{ fontSize: '0.78rem', padding: '0.22rem 0.4rem', border: '1px solid var(--color-border)', borderRadius: 5 }}>
+              <option value="name">Name</option>
+              <option value="balance">Saldo</option>
+              <option value="person">Person</option>
+              <option value="bank">Kreditinstitut</option>
+            </select>
+            <button onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')}
+              title={sortDir === 'asc' ? 'Aufsteigend' : 'Absteigend'}
+              style={{ fontSize: '0.78rem', padding: '0.22rem 0.45rem', border: '1px solid var(--color-border)', borderRadius: 5, cursor: 'pointer', background: 'var(--color-surface)', lineHeight: 1 }}>
+              {sortDir === 'asc' ? '↑' : '↓'}
+            </button>
+          </>
+        )}
+        <button onClick={openAddModal} style={{ padding: '0.4rem 0.9rem', fontSize: '0.85rem' }}>
           + Konto
         </button>
       </div>
 
-      <div style={{ border: '1px solid var(--color-border)', borderRadius: 8, overflow: 'hidden', marginBottom: '1rem' }}>
+      <div style={{ border: '1px solid var(--color-border)', borderRadius: 8, overflowX: 'auto', marginBottom: '1rem' }}>
         {accounts.length === 0 ? (
           <p style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '2rem', fontSize: '0.875rem', margin: 0 }}>
             Noch keine Konten angelegt
@@ -619,6 +732,8 @@ export default function BankAccounts() {
             <thead>
               <tr style={{ background: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)' }}>
                 <th style={{ ...c, textAlign: 'left' }}>Konto</th>
+                <th style={{ ...c, textAlign: 'left' }}>Person</th>
+                <th style={{ ...c, textAlign: 'left' }}>Kreditinstitut</th>
                 <th style={{ ...c, textAlign: 'right' }}>Saldo</th>
                 <th style={{ ...c, textAlign: 'right', color: 'var(--color-text-muted)' }}>Zinssatz</th>
                 <th style={{ ...c, textAlign: 'right', color: 'var(--color-text-muted)' }}>Laufzeit bis</th>
@@ -628,48 +743,125 @@ export default function BankAccounts() {
                 <th style={c}></th>
               </tr>
             </thead>
-            <tbody>
-              {accounts.map(a => {
-                if (editAccId === a.id) return (
-                  <tr key={a.id} style={{ background: '#fefce8', borderBottom: '1px solid var(--color-border)' }}>
-                    <td style={c}><input value={editAccName} onChange={e => setEditAccName(e.target.value)} style={{ fontSize: '0.82rem', padding: '0.2rem 0.4rem', width: '100%' }} /></td>
-                    <td style={c}><input type="number" value={editAccBalance} onChange={e => setEditAccBalance(e.target.value)} step="0.01" style={{ fontSize: '0.82rem', padding: '0.2rem 0.4rem', width: 90 }} /></td>
-                    <td style={c}><input type="number" value={editAccZinssatz} onChange={e => setEditAccZinssatz(e.target.value)} step="0.01" min="0" placeholder="%" style={{ fontSize: '0.82rem', padding: '0.2rem 0.4rem', width: 60 }} /></td>
-                    <td style={c}><input type="date" value={editAccLaufzeit} onChange={e => setEditAccLaufzeit(e.target.value)} style={{ fontSize: '0.82rem', padding: '0.2rem 0.4rem' }} /></td>
-                    <td style={{ ...c, whiteSpace: 'nowrap' }} colSpan={4}>
-                      <button onClick={saveEditAcc} style={{ ...btnSm, background: 'var(--color-primary)', color: '#fff', marginRight: 4 }}>Speichern</button>
-                      <button onClick={() => setEditAccId(null)} style={{ ...btnSm, background: '#e5e7eb', color: '#374151' }}>Abbrechen</button>
-                    </td>
-                  </tr>
-                )
-                const bal = latestBalance(a)
-                const cnt = txCount(a.id)
-                const importDate = closestImportDate(a.id, transactions)
-                const zins = zinsertragJährlich(a)
-                return (
-                  <tr key={a.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                    <td style={{ ...c, fontWeight: 500 }}>{a.name}</td>
-                    <td style={{ ...c, textAlign: 'right', fontWeight: 700, color: bal >= 0 ? '#16a34a' : '#dc2626', fontVariantNumeric: 'tabular-nums' }}>{fmt(bal)}</td>
-                    <td style={{ ...c, textAlign: 'right', color: 'var(--color-text-muted)', fontSize: '0.78rem' }}>
-                      {a.zinssatz != null ? `${fmtPct(a.zinssatz)} %` : '–'}
-                    </td>
-                    <td style={{ ...c, textAlign: 'right', color: 'var(--color-text-muted)', fontSize: '0.78rem' }}>
-                      {fmtDate(a.laufzeitBis)}
-                    </td>
-                    <td style={{ ...c, textAlign: 'right', fontWeight: 600, color: '#16a34a', fontSize: '0.78rem', fontVariantNumeric: 'tabular-nums' }}>
-                      {zins != null ? fmt(zins) : '–'}
-                    </td>
-                    <td style={{ ...c, textAlign: 'right', color: 'var(--color-text-muted)', fontSize: '0.78rem' }}>{cnt > 0 ? cnt : '–'}</td>
-                    <td style={{ ...c, textAlign: 'right', color: 'var(--color-text-muted)', fontSize: '0.78rem' }}>{fmtDate(importDate)}</td>
-                    <td style={{ ...c, whiteSpace: 'nowrap', textAlign: 'right' }}>
-                      <button onClick={() => setTxModal(a.id)} style={{ ...btnSm, background: 'var(--color-primary)', color: '#fff', marginRight: 4 }}>Umsätze</button>
-                      <button onClick={() => startEditAcc(a)} style={{ ...btnSm, background: '#e5e7eb', color: '#374151', marginRight: 4 }}>✎</button>
-                      <button onClick={() => setAccounts(accounts.filter(x => x.id !== a.id))} style={{ ...btnSm, background: '#fee2e2', color: '#dc2626' }}>✕</button>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
+            {getGroups(accounts).map(({ label, items }) => {
+              const isGrouped = groupBy !== 'none' && label !== null
+              const isCollapsed = isGrouped && collapsedGroups.has(label)
+              const groupBalance = items.reduce((s, a) => s + latestBalance(a), 0)
+              const groupPersonColor = isGrouped && groupBy === 'person' && label !== '(Keine Person)'
+                ? getPersonColor(label) : null
+              return (
+                <tbody key={label ?? '__all'}>
+                  {isGrouped && (
+                    <tr
+                      onClick={() => toggleGroup(label)}
+                      style={{ background: 'var(--color-bg)', cursor: 'pointer', userSelect: 'none', borderBottom: '1px solid var(--color-border)' }}
+                    >
+                      <td colSpan={COLS} style={{
+                        ...c, fontWeight: 700,
+                        borderLeft: groupPersonColor ? `4px solid ${groupPersonColor.border}` : '4px solid var(--color-primary)',
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <span style={{ fontSize: '0.65rem', width: '0.8rem', flexShrink: 0 }}>
+                            {isCollapsed ? '▸' : '▾'}
+                          </span>
+                          {groupPersonColor ? (
+                            <span style={{ fontSize: '0.8rem', background: groupPersonColor.badgeBg, color: groupPersonColor.badgeColor, borderRadius: 4, padding: '0.1rem 0.45rem', fontWeight: 600 }}>
+                              {label}
+                            </span>
+                          ) : (
+                            <span style={{ fontWeight: 700 }}>{label}</span>
+                          )}
+                          <span style={{ flex: 1 }} />
+                          <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', fontWeight: 400 }}>
+                            {items.length} {items.length === 1 ? 'Konto' : 'Konten'}
+                          </span>
+                          <span style={{ fontWeight: 700, color: groupBalance >= 0 ? '#16a34a' : '#dc2626', fontSize: '0.83rem', fontVariantNumeric: 'tabular-nums' }}>
+                            {fmt(groupBalance)}
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  {!isCollapsed && items.map(a => {
+                    if (editAccId === a.id) return (
+                      <tr key={a.id} style={{ background: '#fefce8', borderBottom: '1px solid var(--color-border)' }}>
+                        <td style={c}>
+                          <input value={editAccName} onChange={e => setEditAccName(e.target.value)}
+                            style={{ fontSize: '0.82rem', padding: '0.2rem 0.4rem', width: '100%', minWidth: 90 }} />
+                        </td>
+                        <td style={c}>
+                          <select value={editAccPerson} onChange={e => setEditAccPerson(e.target.value)}
+                            style={{ fontSize: '0.82rem', padding: '0.2rem 0.3rem', maxWidth: 110 }}>
+                            <option value="">–</option>
+                            {persons.map(p => <option key={p} value={p}>{p}</option>)}
+                          </select>
+                        </td>
+                        <td style={c}>
+                          <select value={editAccBank} onChange={e => setEditAccBank(e.target.value)}
+                            style={{ fontSize: '0.82rem', padding: '0.2rem 0.3rem', maxWidth: 130 }}>
+                            <option value="">–</option>
+                            {banks.map(b => <option key={b} value={b}>{b}</option>)}
+                          </select>
+                        </td>
+                        <td style={c}>
+                          <input type="number" value={editAccBalance} onChange={e => setEditAccBalance(e.target.value)}
+                            step="0.01" style={{ fontSize: '0.82rem', padding: '0.2rem 0.4rem', width: 90 }} />
+                        </td>
+                        <td style={c}>
+                          <input type="number" value={editAccZinssatz} onChange={e => setEditAccZinssatz(e.target.value)}
+                            step="0.01" min="0" placeholder="%" style={{ fontSize: '0.82rem', padding: '0.2rem 0.4rem', width: 60 }} />
+                        </td>
+                        <td style={c}>
+                          <input type="date" value={editAccLaufzeit} onChange={e => setEditAccLaufzeit(e.target.value)}
+                            style={{ fontSize: '0.82rem', padding: '0.2rem 0.4rem' }} />
+                        </td>
+                        <td style={{ ...c, whiteSpace: 'nowrap' }} colSpan={4}>
+                          <button onClick={saveEditAcc} style={{ ...btnSm, background: 'var(--color-primary)', color: '#fff', marginRight: 4 }}>Speichern</button>
+                          <button onClick={() => setEditAccId(null)} style={{ ...btnSm, background: '#e5e7eb', color: '#374151' }}>Abbrechen</button>
+                        </td>
+                      </tr>
+                    )
+                    const bal = latestBalance(a)
+                    const cnt = txCount(a.id)
+                    const importDate = closestImportDate(a.id, transactions)
+                    const zins = zinsertragJährlich(a)
+                    const pColor = getPersonColor(a.person)
+                    return (
+                      <tr key={a.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                        <td style={{ ...c, fontWeight: 500 }}>{a.name}</td>
+                        <td style={c}>
+                          {a.person && pColor ? (
+                            <span style={{ fontSize: '0.75rem', background: pColor.badgeBg, color: pColor.badgeColor, borderRadius: 4, padding: '0.1rem 0.4rem', fontWeight: 600 }}>
+                              {a.person}
+                            </span>
+                          ) : (
+                            <span style={{ color: 'var(--color-text-muted)', fontSize: '0.78rem' }}>{a.person || '–'}</span>
+                          )}
+                        </td>
+                        <td style={{ ...c, color: 'var(--color-text-muted)', fontSize: '0.78rem' }}>{a.bank || '–'}</td>
+                        <td style={{ ...c, textAlign: 'right', fontWeight: 700, color: bal >= 0 ? '#16a34a' : '#dc2626', fontVariantNumeric: 'tabular-nums' }}>{fmt(bal)}</td>
+                        <td style={{ ...c, textAlign: 'right', color: 'var(--color-text-muted)', fontSize: '0.78rem' }}>
+                          {a.zinssatz != null ? `${fmtPct(a.zinssatz)} %` : '–'}
+                        </td>
+                        <td style={{ ...c, textAlign: 'right', color: 'var(--color-text-muted)', fontSize: '0.78rem' }}>
+                          {fmtDate(a.laufzeitBis)}
+                        </td>
+                        <td style={{ ...c, textAlign: 'right', fontWeight: 600, color: '#16a34a', fontSize: '0.78rem', fontVariantNumeric: 'tabular-nums' }}>
+                          {zins != null ? fmt(zins) : '–'}
+                        </td>
+                        <td style={{ ...c, textAlign: 'right', color: 'var(--color-text-muted)', fontSize: '0.78rem' }}>{cnt > 0 ? cnt : '–'}</td>
+                        <td style={{ ...c, textAlign: 'right', color: 'var(--color-text-muted)', fontSize: '0.78rem' }}>{fmtDate(importDate)}</td>
+                        <td style={{ ...c, whiteSpace: 'nowrap', textAlign: 'right' }}>
+                          <button onClick={() => setTxModal(a.id)} style={{ ...btnSm, background: 'var(--color-primary)', color: '#fff', marginRight: 4 }}>Umsätze</button>
+                          <button onClick={() => startEditAcc(a)} style={{ ...btnSm, background: '#e5e7eb', color: '#374151', marginRight: 4 }}>✎</button>
+                          <button onClick={() => setAccounts(accounts.filter(x => x.id !== a.id))} style={{ ...btnSm, background: '#fee2e2', color: '#dc2626' }}>✕</button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              )
+            })}
           </table>
         )}
       </div>
@@ -695,29 +887,68 @@ export default function BankAccounts() {
       )}
 
       {showAddModal && (
-        <Modal title="Konto hinzufügen" onClose={() => setShowAddModal(false)} maxWidth={440}>
+        <Modal title="Konto hinzufügen" onClose={() => setShowAddModal(false)} maxWidth={460}>
           <form onSubmit={addAccount} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
             <div>
               <label style={lbl}>Kontoname *</label>
-              <input value={accountName} onChange={e => setAccountName(e.target.value)} placeholder="z. B. Girokonto" required style={{ width: '100%' }} />
+              <input value={accountName} onChange={e => setAccountName(e.target.value)}
+                placeholder="z. B. Girokonto" required style={{ width: '100%' }} />
             </div>
             <div>
               <label style={lbl}>Anfangsstand (€) *</label>
-              <input type="number" value={accountBalance} onChange={e => setAccountBalance(e.target.value)} placeholder="0.00" step="0.01" required style={{ width: '100%' }} />
+              <input type="number" value={accountBalance} onChange={e => setAccountBalance(e.target.value)}
+                placeholder="0.00" step="0.01" required style={{ width: '100%' }} />
+            </div>
+            <div>
+              <label style={lbl}>Person</label>
+              <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                <select value={accountPerson} onChange={e => setAccountPerson(e.target.value)}
+                  style={{ flex: 1, fontSize: '0.9rem', padding: '0.38rem 0.5rem' }}>
+                  <option value="">– keine –</option>
+                  {persons.map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
+                <input value={newPersonInput} onChange={e => setNewPersonInput(e.target.value)}
+                  placeholder="Neue Person…"
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addPersonToList() } }}
+                  style={{ width: 110, fontSize: '0.85rem', padding: '0.3rem 0.4rem', border: '1px solid var(--color-border)', borderRadius: 5 }} />
+                <button type="button" onClick={addPersonToList}
+                  style={{ ...btnSm, background: 'var(--color-primary)', color: '#fff', padding: '0.35rem 0.55rem', fontSize: '0.82rem' }}>+</button>
+              </div>
+            </div>
+            <div>
+              <label style={lbl}>Kreditinstitut</label>
+              <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                <select value={accountBank} onChange={e => setAccountBank(e.target.value)}
+                  style={{ flex: 1, fontSize: '0.9rem', padding: '0.38rem 0.5rem' }}>
+                  <option value="">– keins –</option>
+                  {banks.map(b => <option key={b} value={b}>{b}</option>)}
+                </select>
+                <input value={newBankInput} onChange={e => setNewBankInput(e.target.value)}
+                  placeholder="Neues Institut…"
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addBankToList() } }}
+                  style={{ width: 110, fontSize: '0.85rem', padding: '0.3rem 0.4rem', border: '1px solid var(--color-border)', borderRadius: 5 }} />
+                <button type="button" onClick={addBankToList}
+                  style={{ ...btnSm, background: 'var(--color-primary)', color: '#fff', padding: '0.35rem 0.55rem', fontSize: '0.82rem' }}>+</button>
+              </div>
             </div>
             <div style={{ display: 'flex', gap: '0.75rem' }}>
               <div style={{ flex: 1 }}>
                 <label style={lbl}>Zinssatz (% p.a.)</label>
-                <input type="number" value={accountZinssatz} onChange={e => setAccountZinssatz(e.target.value)} placeholder="z. B. 3.50" step="0.01" min="0" style={{ width: '100%' }} />
+                <input type="number" value={accountZinssatz} onChange={e => setAccountZinssatz(e.target.value)}
+                  placeholder="z. B. 3.50" step="0.01" min="0" style={{ width: '100%' }} />
               </div>
               <div style={{ flex: 1 }}>
                 <label style={lbl}>Laufzeit bis</label>
-                <input type="date" value={accountLaufzeit} onChange={e => setAccountLaufzeit(e.target.value)} style={{ width: '100%' }} />
+                <input type="date" value={accountLaufzeit} onChange={e => setAccountLaufzeit(e.target.value)}
+                  style={{ width: '100%' }} />
               </div>
             </div>
             <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
               <button type="submit" style={{ flex: 1 }}>Konto hinzufügen</button>
-              <button type="button" onClick={() => setShowAddModal(false)} style={{ background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: 8, padding: '0.6rem 1rem', cursor: 'pointer' }}>Abbrechen</button>
+              <button type="button" onClick={() => setShowAddModal(false)}
+                style={{ background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: 8, padding: '0.6rem 1rem', cursor: 'pointer' }}>
+                Abbrechen
+              </button>
             </div>
           </form>
         </Modal>

@@ -21,17 +21,17 @@ const pnlStyle = (n) => ({ color: n >= 0 ? '#16a34a' : '#dc2626', fontWeight: 60
 const BACKUP_KEYS = [
   'bankAccounts', 'transactions', 'categories', 'recurringPayments',
   'depots', 'depotTransactions', 'securityPrices', 'securities', 'fxRates',
-  'insuranceContracts', 'realEstate', 'companyShares', 'subscriptions',
+  'insuranceContracts', 'insurancePersons', 'realEstate', 'companyShares', 'subscriptions',
   'serviceEntries', 'serviceTypes',
-  'liquidityLevels',
+  'banks', 'liquidityLevels',
 ]
 
 const BACKUP_SECTIONS = [
-  { label: 'Bankkonten & Umsätze',  keys: ['bankAccounts', 'transactions'] },
+  { label: 'Bankkonten & Umsätze',  keys: ['bankAccounts', 'transactions', 'banks'] },
   { label: 'Kategorien',            keys: ['categories'] },
   { label: 'Daueraufträge',         keys: ['recurringPayments'] },
   { label: 'Wertpapiere & Depots',  keys: ['securities', 'securityPrices', 'depots', 'depotTransactions', 'fxRates'] },
-  { label: 'Versicherungen',        keys: ['insuranceContracts'] },
+  { label: 'Versicherungen',        keys: ['insuranceContracts', 'insurancePersons'] },
   { label: 'Abonnements',           keys: ['subscriptions'] },
   { label: 'Immobilien',            keys: ['realEstate'] },
   { label: 'Firmenbeteiligungen',   keys: ['companyShares'] },
