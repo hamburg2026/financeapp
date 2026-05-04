@@ -735,9 +735,26 @@ export default function Dashboard({ onNavigate }) {
       {/* ── Bankkonten ── */}
       {accounts.length > 0 && (
         <Section title="Bankkonten">
-          {accounts.map(a => (
-            <MiniRow key={a.id} label={a.name} value={fmt(a.balance)} />
-          ))}
+          {accounts.map(a => {
+            const bal = latestBankBalance(a)
+            const zins = (a.zinssatz != null && a.zinssatz > 0) ? bal * a.zinssatz / 100 : null
+            const hintParts = []
+            if (a.zinssatz != null) hintParts.push(`${a.zinssatz.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} % p.a.`)
+            if (a.laufzeitBis) hintParts.push(`bis ${new Date(a.laufzeitBis + 'T00:00:00').toLocaleDateString('de-DE')}`)
+            if (zins != null) hintParts.push(`Zinsertrag: ${fmt(zins)}/Jahr`)
+            return (
+              <MiniRow key={a.id} label={a.name} value={fmt(bal)} hint={hintParts.length ? hintParts.join(' · ') : null} />
+            )
+          })}
+          {(() => {
+            const totalZins = accounts.reduce((s, a) => {
+              if (a.zinssatz == null || a.zinssatz === 0) return s
+              return s + latestBankBalance(a) * a.zinssatz / 100
+            }, 0)
+            return totalZins > 0 ? (
+              <MiniRow label="Zinsertrag gesamt p.a." value={fmt(totalZins)} hint="alle verzinsten Konten" muted />
+            ) : null
+          })()}
           {accounts.length > 1 && (
             <MiniRow label="Gesamt" value={fmt(totalBank)} muted />
           )}
