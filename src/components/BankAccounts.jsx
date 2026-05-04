@@ -104,6 +104,15 @@ export function TransactionModal({ accountId, accounts, transactions, categories
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [bulkCat,     setBulkCat]     = useState('')
 
+  const [addMode,    setAddMode]    = useState(false)
+  const [addAccId,   setAddAccId]   = useState(accountId ? String(accountId) : (accounts[0]?.id ? String(accounts[0].id) : ''))
+  const [addDate,    setAddDate]    = useState(today())
+  const [addDesc,    setAddDesc]    = useState('')
+  const [addRecip,   setAddRecip]   = useState('')
+  const [addAmt,     setAddAmt]     = useState('')
+  const [addSign,    setAddSign]    = useState(-1)
+  const [addCat,     setAddCat]     = useState('')
+
   const catType  = name => categories.find(c => c.name === name)?.type || null
   const accLabel = id   => accounts.find(a => a.id === id)?.name || '–'
 
@@ -198,6 +207,28 @@ export function TransactionModal({ accountId, accounts, transactions, categories
     setSelectedIds(new Set())
   }
 
+  function openAddMode() {
+    setAddAccId(accountId ? String(accountId) : (accounts[0]?.id ? String(accounts[0].id) : ''))
+    setAddDate(today())
+    setAddDesc('')
+    setAddRecip('')
+    setAddAmt('')
+    setAddSign(-1)
+    setAddCat('')
+    setAddMode(true)
+  }
+
+  function saveAdd() {
+    const amt    = addSign * (Math.abs(parseFloat(addAmt)) || 0)
+    const accId  = parseInt(addAccId)
+    onUpdateAccounts(accounts.map(a => a.id === accId ? { ...a, balance: a.balance + amt } : a))
+    onUpdateTransactions([...transactions, {
+      id: Date.now(), accountId: accId, date: addDate,
+      description: addDesc, recipient: addRecip, amount: amt, category: addCat,
+    }])
+    setAddMode(false)
+  }
+
   const title = accountId ? `Umsätze – ${accLabel(accountId)}` : 'Alle Umsätze'
   const c = { padding: '0.28rem 0.5rem', fontSize: '0.79rem', verticalAlign: 'middle' }
   const fl = { fontSize: '0.69rem', color: 'var(--color-text-muted)', fontWeight: 600, marginBottom: 2 }
@@ -226,7 +257,10 @@ export function TransactionModal({ accountId, accounts, transactions, categories
               <span style={{ marginLeft: 6 }}>Saldo: <b style={{ color: (totalIn + totalOut) >= 0 ? '#2563eb' : '#9f1239' }}>{fmt(totalIn + totalOut)}</b></span>
             </div>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.3rem', lineHeight: 1, color: 'var(--color-text-muted)', padding: '0.2rem 0.5rem' }}>✕</button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <button onClick={openAddMode} style={{ ...btnSm, background: 'var(--color-primary)', color: '#fff', padding: '0.3rem 0.8rem', fontSize: '0.8rem' }}>+ Umsatz</button>
+            <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.3rem', lineHeight: 1, color: 'var(--color-text-muted)', padding: '0.2rem 0.5rem' }}>✕</button>
+          </div>
         </div>
 
         {/* Date dimension pills */}
@@ -324,6 +358,61 @@ export function TransactionModal({ accountId, accounts, transactions, categories
               Auswahl aufheben
             </button>
           </div>
+        )}
+
+        {/* Add transaction modal */}
+        {addMode && (
+          <Modal title="Umsatz anlegen" onClose={() => setAddMode(false)} maxWidth={480}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              {accounts.length > 1 && (
+                <div>
+                  <label style={lbl}>Konto</label>
+                  <select value={addAccId} onChange={e => setAddAccId(e.target.value)} style={{ width: '100%', fontSize: '0.9rem', padding: '0.4rem 0.5rem' }}>
+                    {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                  </select>
+                </div>
+              )}
+              <div>
+                <label style={lbl}>Datum</label>
+                <input type="date" value={addDate} onChange={e => setAddDate(e.target.value)} style={{ width: '100%', fontSize: '0.9rem', padding: '0.4rem 0.5rem' }} />
+              </div>
+              <div>
+                <label style={lbl}>Empfänger</label>
+                <input value={addRecip} onChange={e => setAddRecip(e.target.value)} style={{ width: '100%', fontSize: '0.9rem', padding: '0.4rem 0.5rem' }} />
+              </div>
+              <div>
+                <label style={lbl}>Buchungstext</label>
+                <textarea value={addDesc} onChange={e => setAddDesc(e.target.value)} rows={3}
+                  style={{ width: '100%', fontSize: '0.9rem', padding: '0.4rem 0.5rem', resize: 'vertical', boxSizing: 'border-box' }} />
+              </div>
+              <div>
+                <label style={lbl}>Betrag (€)</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <button onClick={() => setAddSign(s => -s)} style={{
+                    padding: '0.4rem 0.8rem', border: 'none', borderRadius: 6, cursor: 'pointer',
+                    fontWeight: 700, fontSize: '1.1rem', lineHeight: 1, flexShrink: 0,
+                    background: addSign < 0 ? '#fee2e2' : '#dcfce7',
+                    color: addSign < 0 ? '#dc2626' : '#16a34a',
+                  }}>{addSign < 0 ? '−' : '+'}</button>
+                  <input type="number" value={addAmt} onChange={e => setAddAmt(e.target.value)} step="0.01" min="0"
+                    style={{ flex: 1, fontSize: '0.9rem', padding: '0.4rem 0.5rem' }} />
+                </div>
+              </div>
+              <div>
+                <label style={lbl}>Kategorie</label>
+                <CategorySelect value={addCat} onChange={e => setAddCat(e.target.value)}
+                  categories={categories} valueKey="name" placeholder="– keine –"
+                  style={{ width: '100%', fontSize: '0.9rem', padding: '0.4rem 0.5rem' }} />
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
+                <button onClick={saveAdd} disabled={!addAmt || !addAccId}
+                  style={{ flex: 1, padding: '0.6rem', background: addAmt && addAccId ? 'var(--color-primary)' : '#e5e7eb', color: addAmt && addAccId ? '#fff' : '#9ca3af', border: 'none', borderRadius: 8, fontWeight: 700, cursor: addAmt && addAccId ? 'pointer' : 'default' }}>
+                  Anlegen
+                </button>
+                <button onClick={() => setAddMode(false)} style={{ padding: '0.6rem 1rem', background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: 8, cursor: 'pointer' }}>Abbrechen</button>
+              </div>
+            </div>
+          </Modal>
         )}
 
         {/* Edit transaction modal */}
