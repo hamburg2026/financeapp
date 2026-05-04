@@ -687,7 +687,7 @@ export default function BankAccounts() {
 
   const txCount = id => transactions.filter(t => t.accountId === id).length
   const c = { padding: '0.35rem 0.6rem', fontSize: '0.82rem' }
-  const COLS = 10
+  const COLS = 8
 
   return (
     <div className="module">
@@ -732,8 +732,6 @@ export default function BankAccounts() {
             <thead>
               <tr style={{ background: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)' }}>
                 <th style={{ ...c, textAlign: 'left' }}>Konto</th>
-                <th style={{ ...c, textAlign: 'left' }}>Person</th>
-                <th style={{ ...c, textAlign: 'left' }}>Kreditinstitut</th>
                 <th style={{ ...c, textAlign: 'right' }}>Saldo</th>
                 <th style={{ ...c, textAlign: 'right', color: 'var(--color-text-muted)' }}>Zinssatz</th>
                 <th style={{ ...c, textAlign: 'right', color: 'var(--color-text-muted)' }}>Laufzeit bis</th>
@@ -788,20 +786,18 @@ export default function BankAccounts() {
                         <td style={c}>
                           <input value={editAccName} onChange={e => setEditAccName(e.target.value)}
                             style={{ fontSize: '0.82rem', padding: '0.2rem 0.4rem', width: '100%', minWidth: 90 }} />
-                        </td>
-                        <td style={c}>
-                          <select value={editAccPerson} onChange={e => setEditAccPerson(e.target.value)}
-                            style={{ fontSize: '0.82rem', padding: '0.2rem 0.3rem', maxWidth: 110 }}>
-                            <option value="">–</option>
-                            {persons.map(p => <option key={p} value={p}>{p}</option>)}
-                          </select>
-                        </td>
-                        <td style={c}>
-                          <select value={editAccBank} onChange={e => setEditAccBank(e.target.value)}
-                            style={{ fontSize: '0.82rem', padding: '0.2rem 0.3rem', maxWidth: 130 }}>
-                            <option value="">–</option>
-                            {banks.map(b => <option key={b} value={b}>{b}</option>)}
-                          </select>
+                          <div style={{ display: 'flex', gap: '0.3rem', marginTop: '0.25rem', flexWrap: 'wrap' }}>
+                            <select value={editAccPerson} onChange={e => setEditAccPerson(e.target.value)}
+                              style={{ fontSize: '0.75rem', padding: '0.15rem 0.25rem' }}>
+                              <option value="">Person –</option>
+                              {persons.map(p => <option key={p} value={p}>{p}</option>)}
+                            </select>
+                            <select value={editAccBank} onChange={e => setEditAccBank(e.target.value)}
+                              style={{ fontSize: '0.75rem', padding: '0.15rem 0.25rem' }}>
+                              <option value="">Institut –</option>
+                              {banks.map(b => <option key={b} value={b}>{b}</option>)}
+                            </select>
+                          </div>
                         </td>
                         <td style={c}>
                           <input type="number" value={editAccBalance} onChange={e => setEditAccBalance(e.target.value)}
@@ -828,17 +824,19 @@ export default function BankAccounts() {
                     const pColor = getPersonColor(a.person)
                     return (
                       <tr key={a.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                        <td style={{ ...c, fontWeight: 500 }}>{a.name}</td>
-                        <td style={c}>
-                          {a.person && pColor ? (
-                            <span style={{ fontSize: '0.75rem', background: pColor.badgeBg, color: pColor.badgeColor, borderRadius: 4, padding: '0.1rem 0.4rem', fontWeight: 600 }}>
-                              {a.person}
-                            </span>
-                          ) : (
-                            <span style={{ color: 'var(--color-text-muted)', fontSize: '0.78rem' }}>{a.person || '–'}</span>
+                        <td style={{ ...c, fontWeight: 500 }}>
+                          <div>{a.name}</div>
+                          {(a.person || a.bank) && (
+                            <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center', marginTop: '0.18rem', flexWrap: 'wrap' }}>
+                              {a.person && (pColor ? (
+                                <span style={{ fontSize: '0.68rem', background: pColor.badgeBg, color: pColor.badgeColor, borderRadius: 3, padding: '0.05rem 0.35rem', fontWeight: 600 }}>{a.person}</span>
+                              ) : (
+                                <span style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>{a.person}</span>
+                              ))}
+                              {a.bank && <span style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>{a.bank}</span>}
+                            </div>
                           )}
                         </td>
-                        <td style={{ ...c, color: 'var(--color-text-muted)', fontSize: '0.78rem' }}>{a.bank || '–'}</td>
                         <td style={{ ...c, textAlign: 'right', fontWeight: 700, color: bal >= 0 ? '#16a34a' : '#dc2626', fontVariantNumeric: 'tabular-nums' }}>{fmt(bal)}</td>
                         <td style={{ ...c, textAlign: 'right', color: 'var(--color-text-muted)', fontSize: '0.78rem' }}>
                           {a.zinssatz != null ? `${fmtPct(a.zinssatz)} %` : '–'}

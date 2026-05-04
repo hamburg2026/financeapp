@@ -89,7 +89,7 @@ function ValueHistory({ label = 'Werthistorie', history = [], onChange }) {
         <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', marginTop: '0.5rem', flexWrap: 'wrap' }}>
           <DateInput value={newDate} onChange={setNewDate} />
           <input type="number" value={newVal} onChange={e => setNewVal(e.target.value)}
-            placeholder="Wert (€)" step="0.01" min="0"
+            placeholder="Wert (€)" step="0.01"
             style={{ fontSize: '0.83rem', padding: '0.33rem 0.5rem', width: 120, border: '1px solid var(--color-border)', borderRadius: 5 }} />
           <button onClick={add} style={{ ...btnSm, background: 'var(--color-primary)', color: '#fff', padding: '0.3rem 0.6rem' }}>Speichern</button>
           <button onClick={() => setAdding(false)} style={{ ...btnSm, background: '#e5e7eb', color: '#374151', padding: '0.3rem 0.6rem' }}>Abbrechen</button>
@@ -241,7 +241,7 @@ export default function RealEstate() {
               </div>
               <div>
                 <label style={labelStyle}>Aktueller Zeitwert (€) *</label>
-                <input type="number" {...field('current')} placeholder="z. B. 420000" step="0.01" min="0" required style={{ ...inputStyle, width: '100%' }} />
+                <input type="number" {...field('current')} placeholder="z. B. 420000" step="0.01" required style={{ ...inputStyle, width: '100%' }} />
               </div>
             </div>
             <div>
