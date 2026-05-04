@@ -27,6 +27,15 @@ function closestImportDate(accountId, transactions) {
   }, null)
 }
 
+function zinsertragJährlich(a) {
+  if (a.zinssatz == null || a.zinssatz === 0) return null
+  return latestBalance(a) * a.zinssatz / 100
+}
+
+function fmtPct(n) {
+  return n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
 function fmtDate(iso) {
   if (!iso) return '–'
   const [y, m, d] = iso.split('-')
@@ -545,27 +554,46 @@ export default function BankAccounts() {
   const [transactions, setTransactions] = useLocalStorage('transactions', [])
   const categories = JSON.parse(localStorage.getItem('categories')) || []
 
-  const [editAccId,      setEditAccId]      = useState(null)
-  const [editAccName,    setEditAccName]    = useState('')
-  const [editAccBalance, setEditAccBalance] = useState('')
-  const [txModal,        setTxModal]        = useState(null)
-  const [showAddModal,   setShowAddModal]   = useState(false)
-  const [accountName,    setAccountName]    = useState('')
-  const [accountBalance, setAccountBalance] = useState('')
+  const [editAccId,         setEditAccId]         = useState(null)
+  const [editAccName,       setEditAccName]       = useState('')
+  const [editAccBalance,    setEditAccBalance]    = useState('')
+  const [editAccZinssatz,   setEditAccZinssatz]   = useState('')
+  const [editAccLaufzeit,   setEditAccLaufzeit]   = useState('')
+  const [txModal,           setTxModal]           = useState(null)
+  const [showAddModal,      setShowAddModal]       = useState(false)
+  const [accountName,       setAccountName]       = useState('')
+  const [accountBalance,    setAccountBalance]    = useState('')
+  const [accountZinssatz,   setAccountZinssatz]   = useState('')
+  const [accountLaufzeit,   setAccountLaufzeit]   = useState('')
 
   function addAccount(e) {
     e.preventDefault()
-    setAccounts([...accounts, { id: Date.now(), name: accountName, balance: parseFloat(accountBalance) }])
-    setAccountName(''); setAccountBalance('')
+    const acc = { id: Date.now(), name: accountName, balance: parseFloat(accountBalance) }
+    if (accountZinssatz !== '') acc.zinssatz = parseFloat(accountZinssatz)
+    if (accountLaufzeit)        acc.laufzeitBis = accountLaufzeit
+    setAccounts([...accounts, acc])
+    setAccountName(''); setAccountBalance(''); setAccountZinssatz(''); setAccountLaufzeit('')
     setShowAddModal(false)
   }
 
   function startEditAcc(a) {
-    setEditAccId(a.id); setEditAccName(a.name); setEditAccBalance(String(latestBalance(a)))
+    setEditAccId(a.id)
+    setEditAccName(a.name)
+    setEditAccBalance(String(latestBalance(a)))
+    setEditAccZinssatz(a.zinssatz != null ? String(a.zinssatz) : '')
+    setEditAccLaufzeit(a.laufzeitBis || '')
   }
 
   function saveEditAcc() {
-    setAccounts(accounts.map(a => a.id === editAccId ? { ...a, name: editAccName, balance: parseFloat(editAccBalance) } : a))
+    setAccounts(accounts.map(a => {
+      if (a.id !== editAccId) return a
+      const updated = { ...a, name: editAccName, balance: parseFloat(editAccBalance) }
+      if (editAccZinssatz !== '') updated.zinssatz = parseFloat(editAccZinssatz)
+      else delete updated.zinssatz
+      if (editAccLaufzeit) updated.laufzeitBis = editAccLaufzeit
+      else delete updated.laufzeitBis
+      return updated
+    }))
     setEditAccId(null)
   }
 
@@ -592,6 +620,9 @@ export default function BankAccounts() {
               <tr style={{ background: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)' }}>
                 <th style={{ ...c, textAlign: 'left' }}>Konto</th>
                 <th style={{ ...c, textAlign: 'right' }}>Saldo</th>
+                <th style={{ ...c, textAlign: 'right', color: 'var(--color-text-muted)' }}>Zinssatz</th>
+                <th style={{ ...c, textAlign: 'right', color: 'var(--color-text-muted)' }}>Laufzeit bis</th>
+                <th style={{ ...c, textAlign: 'right', color: '#16a34a' }}>Zins p.a.</th>
                 <th style={{ ...c, textAlign: 'right', color: 'var(--color-text-muted)' }}>Umsätze</th>
                 <th style={{ ...c, textAlign: 'right', color: 'var(--color-text-muted)' }}>Importstand</th>
                 <th style={c}></th>
@@ -602,8 +633,10 @@ export default function BankAccounts() {
                 if (editAccId === a.id) return (
                   <tr key={a.id} style={{ background: '#fefce8', borderBottom: '1px solid var(--color-border)' }}>
                     <td style={c}><input value={editAccName} onChange={e => setEditAccName(e.target.value)} style={{ fontSize: '0.82rem', padding: '0.2rem 0.4rem', width: '100%' }} /></td>
-                    <td style={c} colSpan={3}><input type="number" value={editAccBalance} onChange={e => setEditAccBalance(e.target.value)} step="0.01" style={{ fontSize: '0.82rem', padding: '0.2rem 0.4rem', width: 120 }} /></td>
-                    <td style={{ ...c, whiteSpace: 'nowrap' }}>
+                    <td style={c}><input type="number" value={editAccBalance} onChange={e => setEditAccBalance(e.target.value)} step="0.01" style={{ fontSize: '0.82rem', padding: '0.2rem 0.4rem', width: 90 }} /></td>
+                    <td style={c}><input type="number" value={editAccZinssatz} onChange={e => setEditAccZinssatz(e.target.value)} step="0.01" min="0" placeholder="%" style={{ fontSize: '0.82rem', padding: '0.2rem 0.4rem', width: 60 }} /></td>
+                    <td style={c}><input type="date" value={editAccLaufzeit} onChange={e => setEditAccLaufzeit(e.target.value)} style={{ fontSize: '0.82rem', padding: '0.2rem 0.4rem' }} /></td>
+                    <td style={{ ...c, whiteSpace: 'nowrap' }} colSpan={4}>
                       <button onClick={saveEditAcc} style={{ ...btnSm, background: 'var(--color-primary)', color: '#fff', marginRight: 4 }}>Speichern</button>
                       <button onClick={() => setEditAccId(null)} style={{ ...btnSm, background: '#e5e7eb', color: '#374151' }}>Abbrechen</button>
                     </td>
@@ -612,10 +645,20 @@ export default function BankAccounts() {
                 const bal = latestBalance(a)
                 const cnt = txCount(a.id)
                 const importDate = closestImportDate(a.id, transactions)
+                const zins = zinsertragJährlich(a)
                 return (
                   <tr key={a.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
                     <td style={{ ...c, fontWeight: 500 }}>{a.name}</td>
                     <td style={{ ...c, textAlign: 'right', fontWeight: 700, color: bal >= 0 ? '#16a34a' : '#dc2626', fontVariantNumeric: 'tabular-nums' }}>{fmt(bal)}</td>
+                    <td style={{ ...c, textAlign: 'right', color: 'var(--color-text-muted)', fontSize: '0.78rem' }}>
+                      {a.zinssatz != null ? `${fmtPct(a.zinssatz)} %` : '–'}
+                    </td>
+                    <td style={{ ...c, textAlign: 'right', color: 'var(--color-text-muted)', fontSize: '0.78rem' }}>
+                      {fmtDate(a.laufzeitBis)}
+                    </td>
+                    <td style={{ ...c, textAlign: 'right', fontWeight: 600, color: '#16a34a', fontSize: '0.78rem', fontVariantNumeric: 'tabular-nums' }}>
+                      {zins != null ? fmt(zins) : '–'}
+                    </td>
                     <td style={{ ...c, textAlign: 'right', color: 'var(--color-text-muted)', fontSize: '0.78rem' }}>{cnt > 0 ? cnt : '–'}</td>
                     <td style={{ ...c, textAlign: 'right', color: 'var(--color-text-muted)', fontSize: '0.78rem' }}>{fmtDate(importDate)}</td>
                     <td style={{ ...c, whiteSpace: 'nowrap', textAlign: 'right' }}>
@@ -630,6 +673,20 @@ export default function BankAccounts() {
           </table>
         )}
       </div>
+
+      {(() => {
+        const totalZins = accounts.reduce((s, a) => {
+          const z = zinsertragJährlich(a)
+          return z != null ? s + z : s
+        }, 0)
+        if (totalZins <= 0) return null
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.5rem', marginBottom: '0.6rem', fontSize: '0.82rem' }}>
+            <span style={{ color: 'var(--color-text-muted)' }}>Gesamter Zinsertrag p.a.:</span>
+            <span style={{ fontWeight: 700, color: '#16a34a' }}>{fmt(totalZins)}</span>
+          </div>
+        )
+      })()}
 
       {accounts.length > 1 && (
         <button onClick={() => setTxModal('all')} style={{ ...btnSm, background: '#e5e7eb', color: '#374151', padding: '0.3rem 0.85rem', fontSize: '0.82rem' }}>
@@ -647,6 +704,16 @@ export default function BankAccounts() {
             <div>
               <label style={lbl}>Anfangsstand (€) *</label>
               <input type="number" value={accountBalance} onChange={e => setAccountBalance(e.target.value)} placeholder="0.00" step="0.01" required style={{ width: '100%' }} />
+            </div>
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <div style={{ flex: 1 }}>
+                <label style={lbl}>Zinssatz (% p.a.)</label>
+                <input type="number" value={accountZinssatz} onChange={e => setAccountZinssatz(e.target.value)} placeholder="z. B. 3.50" step="0.01" min="0" style={{ width: '100%' }} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={lbl}>Laufzeit bis</label>
+                <input type="date" value={accountLaufzeit} onChange={e => setAccountLaufzeit(e.target.value)} style={{ width: '100%' }} />
+              </div>
             </div>
             <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
               <button type="submit" style={{ flex: 1 }}>Konto hinzufügen</button>
