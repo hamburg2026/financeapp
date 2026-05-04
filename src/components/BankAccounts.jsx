@@ -763,11 +763,11 @@ export default function BankAccounts() {
                             {isCollapsed ? '▸' : '▾'}
                           </span>
                           {groupPersonColor ? (
-                            <span style={{ fontSize: '0.8rem', background: groupPersonColor.badgeBg, color: groupPersonColor.badgeColor, borderRadius: 4, padding: '0.1rem 0.45rem', fontWeight: 600 }}>
+                            <span style={{ fontSize: '0.95rem', background: groupPersonColor.badgeBg, color: groupPersonColor.badgeColor, borderRadius: 4, padding: '0.1rem 0.45rem', fontWeight: 600 }}>
                               {label}
                             </span>
                           ) : (
-                            <span style={{ fontWeight: 700 }}>{label}</span>
+                            <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>{label}</span>
                           )}
                           <span style={{ flex: 1 }} />
                           <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', fontWeight: 400 }}>
