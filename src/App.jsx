@@ -15,6 +15,7 @@ import PortfolioPerformance from './components/PortfolioPerformance'
 import PrintDialog from './components/PrintDialog'
 import PdfImport from './components/PdfImport'
 import ServiceCostCalculator from './components/ServiceCostCalculator'
+import DataBackup from './components/DataBackup'
 import { THEMES, applyTheme, loadTheme } from './theme'
 
 const PIN_KEY = 'app_pin_hash'
@@ -59,7 +60,11 @@ const NAV_GROUPS = [
   },
 ]
 
-const ALL_ITEMS = NAV_GROUPS.flatMap(g => g.items)
+const FOOTER_ITEMS = [
+  { id: 'dataBackup', label: 'Datensicherung', icon: '💾', component: DataBackup },
+]
+
+const ALL_ITEMS = [...NAV_GROUPS.flatMap(g => g.items), ...FOOTER_ITEMS]
 
 function PinScreen({ onUnlocked }) {
   const hasPin = !!localStorage.getItem(PIN_KEY)
@@ -226,6 +231,14 @@ export default function App() {
             <button className="print-btn" onClick={handleLock} style={{ marginTop: '0.4rem', opacity: 0.75 }}>
               <span className="nav-icon">🔒</span>
               Sperren
+            </button>
+            <button
+              className={`print-btn${currentView === 'dataBackup' ? ' active' : ''}`}
+              onClick={() => setCurrentView('dataBackup')}
+              style={{ marginTop: '0.4rem' }}
+            >
+              <span className="nav-icon">💾</span>
+              Datensicherung
             </button>
           </div>
         </aside>

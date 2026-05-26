@@ -134,7 +134,7 @@ const DGRID  = 'rgba(148,163,184,0.08)'
 const DLINE  = 'rgba(148,163,184,0.18)'
 const DTXT   = '#64748b'
 
-function FancyChart({ series }) {
+function FancyChart({ series, mode = 'abs', yMinOverride, yMaxOverride }) {
   const [hoverIdx, setHoverIdx] = useState(null)
   const svgRef = useRef(null)
 
@@ -162,8 +162,12 @@ function FancyChart({ series }) {
   const rawMin  = Math.min(...allVals)
   const rawMax  = Math.max(...allVals)
   const rng     = (rawMax - rawMin) || 1
-  const yMin    = rawMin - rng * 0.1
-  const yMax    = rawMax + rng * 0.1
+  const yMin    = yMinOverride !== undefined && yMinOverride !== '' ? Number(yMinOverride) : rawMin - rng * 0.1
+  const yMax    = yMaxOverride !== undefined && yMaxOverride !== '' ? Number(yMaxOverride) : rawMax + rng * 0.1
+
+  const fmtY = mode === 'pct'
+    ? v => `${v >= 0 ? '+' : ''}${v.toFixed(1)} %`
+    : fmtShort
 
   const xi  = i   => PAD.l + (n <= 1 ? innerW / 2 : (i / (n - 1)) * innerW)
   const xid = d   => xi(dateIdx[d] ?? 0)
@@ -231,7 +235,7 @@ function FancyChart({ series }) {
             <line x1={PAD.l} x2={PAD.l + innerW} y1={yv(v)} y2={yv(v)}
               stroke={i === 0 ? DLINE : DGRID} strokeWidth={i === 0 ? 1 : 0.75} />
             <text x={PAD.l - 10} y={yv(v) + 4} textAnchor="end" fontSize={11} fill={DTXT}>
-              {fmtShort(v)}
+              {fmtY(v)}
             </text>
           </g>
         ))}
@@ -334,7 +338,11 @@ function FancyChart({ series }) {
               <div key={si} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: 3, whiteSpace: 'nowrap' }}>
                 <span style={{ width: 8, height: 8, borderRadius: s.dashed ? 2 : '50%', background: c, flexShrink: 0 }} />
                 <span style={{ color: '#94a3b8', flex: 1, fontSize: '0.72rem' }}>{s.label}</span>
-                <span style={{ fontWeight: 700, color: '#f1f5f9' }}>{fmt(pt.value)}</span>
+                <span style={{ fontWeight: 700, color: '#f1f5f9' }}>
+                  {mode === 'pct'
+                    ? `${pt.value >= 0 ? '+' : ''}${pt.value.toFixed(2)} %`
+                    : fmt(pt.value)}
+                </span>
               </div>
             )
           })}
@@ -475,6 +483,9 @@ export default function PortfolioPerformance() {
   const [period,     setPeriod]     = useState('MAX')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo,   setCustomTo]   = useState(new Date().toISOString().slice(0, 10))
+  const [chartMode,  setChartMode]  = useState('abs')
+  const [scaleMin,   setScaleMin]   = useState('')
+  const [scaleMax,   setScaleMax]   = useState('')
 
   // Multi-select state
   const initDepots = new Set(depots.map(d => d.id))
@@ -501,6 +512,15 @@ export default function PortfolioPerformance() {
     border: '1px solid var(--color-primary)',
     color: active ? '#fff' : 'var(--color-primary)',
   })
+
+  function toPct(series) {
+    return series.map(s => {
+      if (s.points.length === 0) return s
+      const base = s.points[0].value
+      if (!base) return s
+      return { ...s, points: s.points.map(p => ({ date: p.date, value: (p.value - base) / Math.abs(base) * 100 })) }
+    })
+  }
 
   // ── Build depot series ─────────────────────────────────────────────────────
 
@@ -599,6 +619,37 @@ export default function PortfolioPerformance() {
         onCustomFrom={setCustomFrom} onCustomTo={setCustomTo}
       />
 
+      {/* Chart mode + scale controls */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center', marginBottom: '1rem' }}>
+        <div style={{ display: 'flex', gap: '0.25rem' }}>
+          {[{ key: 'abs', label: 'Absolut' }, { key: 'pct', label: 'Prozentual' }].map(m => (
+            <button key={m.key} type="button" onClick={() => { setChartMode(m.key); setScaleMin(''); setScaleMax('') }} style={{
+              padding: '0.25rem 0.65rem', fontSize: '0.78rem', borderRadius: 20, cursor: 'pointer',
+              fontWeight: chartMode === m.key ? 700 : 400,
+              background: chartMode === m.key ? 'var(--color-primary)' : 'var(--color-bg)',
+              color:      chartMode === m.key ? '#fff' : 'var(--color-text-muted)',
+              border:     chartMode === m.key ? '1px solid var(--color-primary)' : '1px solid var(--color-border)',
+            }}>{m.label}</button>
+          ))}
+        </div>
+        <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', marginLeft: '0.25rem' }}>Skala:</span>
+        <input
+          type="number" placeholder="Min" value={scaleMin} onChange={e => setScaleMin(e.target.value)}
+          style={{ width: 80, fontSize: '0.78rem', padding: '0.22rem 0.4rem', border: '1px solid var(--color-border)', borderRadius: 5 }}
+        />
+        <span style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>–</span>
+        <input
+          type="number" placeholder="Max" value={scaleMax} onChange={e => setScaleMax(e.target.value)}
+          style={{ width: 80, fontSize: '0.78rem', padding: '0.22rem 0.4rem', border: '1px solid var(--color-border)', borderRadius: 5 }}
+        />
+        {(scaleMin !== '' || scaleMax !== '') && (
+          <button type="button" onClick={() => { setScaleMin(''); setScaleMax('') }} style={{
+            fontSize: '0.75rem', padding: '0.18rem 0.5rem', borderRadius: 5, cursor: 'pointer',
+            border: '1px solid var(--color-border)', background: 'transparent', color: 'var(--color-text-muted)',
+          }}>Auto</button>
+        )}
+      </div>
+
       {/* ══ Depots tab ══════════════════════════════════════════════════════ */}
       {tab === 'depots' && (
         depots.length === 0 ? (
@@ -615,7 +666,7 @@ export default function PortfolioPerformance() {
               label="Depots auswählen"
             />
 
-            <FancyChart series={depotSeries} />
+            <FancyChart series={chartMode === 'pct' ? toPct(depotSeries) : depotSeries} mode={chartMode} yMinOverride={scaleMin} yMaxOverride={scaleMax} />
             {depotSeries.length > 0 && <Legend series={depotSeries} />}
 
             {totalCurVal > 0 && (
@@ -658,7 +709,7 @@ export default function PortfolioPerformance() {
               label="Versicherungen auswählen"
             />
 
-            <FancyChart series={insSeries} />
+            <FancyChart series={chartMode === 'pct' ? toPct(insSeries) : insSeries} mode={chartMode} yMinOverride={scaleMin} yMaxOverride={scaleMax} />
             {insSeries.length > 0 && <Legend series={insSeries} />}
 
             {totalInsVal > 0 && (
@@ -686,7 +737,7 @@ export default function PortfolioPerformance() {
               label="Wertpapiere auswählen"
             />
 
-            <FancyChart series={secSeries} />
+            <FancyChart series={chartMode === 'pct' ? toPct(secSeries) : secSeries} mode={chartMode} yMinOverride={scaleMin} yMaxOverride={scaleMax} />
             {secSeries.length > 0 && <Legend series={secSeries} />}
 
             {selSecSingle && lastPt && (
