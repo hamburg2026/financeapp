@@ -403,6 +403,7 @@ export default function Securities() {
         const pct      = p.cost > 0 ? (pnl / p.cost) * 100 : null
         return { secId, sec, quantity: p.quantity, cost: p.cost, curValue, pnl, pct, income: p.income }
       })
+      .sort((a, b) => (a.sec?.name || a.secId).localeCompare(b.sec?.name || b.secId, 'de'))
   }
 
   // ─── API: Security price (Leeway) ───────────────────────────────────────────
@@ -695,7 +696,7 @@ export default function Securities() {
       {/* ── Securities list ── */}
       {securities.length > 0 && (
         <div style={{ border: '1px solid var(--color-border)', borderRadius: 8, overflow: 'hidden', marginBottom: '0.5rem' }}>
-          {securities.map((s, si) => {
+          {[...securities].sort((a, b) => a.name.localeCompare(b.name, 'de')).map((s, si) => {
             const price      = getCurrentPrice(s.id)
             const pricesOpen = expandedPrices.has(s.id)
             const priceList  = (prices[s.id] || []).slice().sort((a, b) => new Date(b.date) - new Date(a.date))
