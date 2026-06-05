@@ -134,6 +134,7 @@ export default function Dashboard({ onNavigate }) {
         const pct      = p.cost > 0 ? (pnl / p.cost) * 100 : null
         return { secId, name: sec?.name || secId, qty: p.qty, cost: p.cost, curValue, pnl, pct }
       })
+      .sort((a, b) => a.name.localeCompare(b.name, 'de'))
     const totalValue = positions.reduce((s, p) => s + p.curValue, 0)
     const totalCost  = positions.reduce((s, p) => s + p.cost,     0)
     const totalPnl   = positions.reduce((s, p) => s + p.pnl,      0)
