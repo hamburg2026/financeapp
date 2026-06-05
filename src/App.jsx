@@ -33,7 +33,6 @@ const NAV_GROUPS = [
     items: [
       { id: 'bankAccounts',       label: 'Bankkonten',           icon: '🏦', component: BankAccounts },
       { id: 'securities',         label: 'Wertpapiere & Depots', icon: '📈', component: Securities },
-      { id: 'subscriptions',      label: 'Abonnements',          icon: '📱', component: Subscriptions },
       { id: 'realEstate',         label: 'Immobilien',           icon: '🏠', component: RealEstate },
       { id: 'companyShares',      label: 'Firmenbeteiligungen',  icon: '🏢', component: CompanyShares },
       { id: 'insuranceContracts', label: 'Versicherungen',       icon: '🛡️', component: InsuranceContracts },
@@ -45,6 +44,7 @@ const NAV_GROUPS = [
       { id: 'categories',        label: 'Kategorien',           icon: '🏷️', component: Categories },
       { id: 'pdfImport',         label: 'PDF-Import',           icon: '📥', component: PdfImport },
       { id: 'recurringPayments', label: 'Daueraufträge',        icon: '🔄', component: RecurringPayments },
+      { id: 'subscriptions',     label: 'Abonnements',          icon: '📱', component: Subscriptions },
       { id: 'serviceCosts',      label: 'Dienstleistungskosten', icon: '🧹', component: ServiceCostCalculator },
     ],
   },
