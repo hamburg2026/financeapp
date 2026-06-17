@@ -866,6 +866,11 @@ export default function Securities() {
                               <span style={{ fontWeight: 700, minWidth: 70, textAlign: 'right', color: isIncome ? '#2563eb' : t.type === 'sell' ? '#dc2626' : '#16a34a' }}>
                                 {isIncome ? '+' : t.type === 'sell' ? '' : ''}{fmt(total)}
                               </span>
+                              {t.fromBankTx && (
+                                <span title="Aus Konto-Umsatz generiert" style={{ fontSize: '0.68rem', color: '#2563eb', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 4, padding: '0.05rem 0.3rem', flexShrink: 0, whiteSpace: 'nowrap' }}>
+                                  🏦 Konto
+                                </span>
+                              )}
                               <button onClick={() => startEditTx(t)} style={{ ...btnBase, fontSize: '0.68rem', background: '#e5e7eb', color: '#374151' }}>✎</button>
                               <button onClick={() => removeTx(t.id)} style={{ ...btnBase, fontSize: '0.68rem', background: '#fee2e2', color: '#dc2626' }}>✕</button>
                             </>
