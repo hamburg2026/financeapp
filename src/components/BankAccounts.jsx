@@ -93,7 +93,8 @@ function getDateRange(key) {
 // ── Transaction modal ──────────────────────────────────────────────────
 
 export function TransactionModal({ accountId, accounts, transactions, categories, onClose, onUpdateAccounts, onUpdateTransactions,
-  initialDateDim = 'thisMonth', initialCategory = '' }) {
+  initialDateDim = 'thisMonth', initialCategory = '',
+  securities = [], depots = [], depotTransactions = [], onUpdateDepotTransactions }) {
   const init = getDateRange(initialDateDim)
   const [dateDim,  setDateDim]  = useState(initialDateDim)
   const [dateFrom, setDateFrom] = useState(init.from)
@@ -130,6 +131,8 @@ export function TransactionModal({ accountId, accounts, transactions, categories
   const [addAmt,     setAddAmt]     = useState('')
   const [addSign,    setAddSign]    = useState(-1)
   const [addCat,     setAddCat]     = useState('')
+
+  const [secTxModal, setSecTxModal] = useState(null)
 
   const catType  = name => categories.find(c => c.name === name)?.type || null
   const accLabel = id   => accounts.find(a => a.id === id)?.name || '–'
@@ -225,6 +228,49 @@ export function TransactionModal({ accountId, accounts, transactions, categories
     setSelectedIds(new Set())
   }
 
+  function openSecTxModal(bankTx) {
+    if (!securities.length || !depots.length) {
+      alert('Bitte zuerst Wertpapiere und Depots in „Wertpapiere & Depots" anlegen.')
+      return
+    }
+    const sortedSecs = [...securities].sort((a, b) => a.name.localeCompare(b.name, 'de'))
+    const absAmt = Math.abs(bankTx.amount)
+    const defaultType = bankTx.amount < 0 ? 'buy' : 'dividend'
+    const defaultQty = '1'
+    setSecTxModal({
+      bankTx,
+      secId:   String(sortedSecs[0].id),
+      depotId: String(depots[0].id),
+      txType:  defaultType,
+      date:    bankTx.date,
+      qty:     defaultQty,
+      price:   absAmt.toFixed(4),
+      fees:    '0',
+    })
+  }
+
+  function confirmSecTx() {
+    if (!secTxModal) return
+    const { bankTx, secId, depotId, txType, date, qty, price, fees } = secTxModal
+    const isIncome  = txType === 'dividend' || txType === 'interest'
+    const quantity  = isIncome ? 1 : (parseFloat(qty) || 1)
+    const priceVal  = parseFloat(price) || 0
+    const feesVal   = parseFloat(fees)  || 0
+    const newTx = {
+      id:         Date.now(),
+      depotId:    parseInt(depotId),
+      securityId: parseInt(secId),
+      type:       txType,
+      quantity,
+      price:      priceVal,
+      fees:       feesVal,
+      date,
+    }
+    if (onUpdateDepotTransactions) onUpdateDepotTransactions([...depotTransactions, newTx])
+    onUpdateTransactions(transactions.map(t => t.id === bankTx.id ? { ...t, depotTxId: newTx.id } : t))
+    setSecTxModal(null)
+  }
+
   function openAddMode() {
     setAddAccId(accountId ? String(accountId) : (accounts[0]?.id ? String(accounts[0].id) : ''))
     setAddDate(today())
@@ -252,6 +298,7 @@ export function TransactionModal({ accountId, accounts, transactions, categories
   const fl = { fontSize: '0.69rem', color: 'var(--color-text-muted)', fontWeight: 600, marginBottom: 2 }
 
   return (
+    <>
     <div
       style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000,
         display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
@@ -540,6 +587,11 @@ export function TransactionModal({ accountId, accounts, transactions, categories
                     <td style={{ ...c, fontWeight: 700, color: t.amount >= 0 ? '#16a34a' : '#dc2626', whiteSpace: 'nowrap', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{fmt(t.amount)}</td>
                     <td style={{ ...c, color: 'var(--color-text-muted)', fontSize: '0.75rem' }}>{t.category || '–'}</td>
                     <td style={{ ...c, whiteSpace: 'nowrap' }}>
+                      {t.depotTxId && depotTransactions.some(dt => dt.id === t.depotTxId)
+                        ? <span title="Mit Wertpapiertransaktion verknüpft" style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#16a34a', boxShadow: '0 0 6px #16a34a', marginRight: 5, verticalAlign: 'middle', flexShrink: 0 }} />
+                        : <span style={{ display: 'inline-block', width: 8, height: 8, marginRight: 5 }} />
+                      }
+                      <button onClick={() => openSecTxModal(t)} title="Als Wertpapiertransaktion anlegen" style={{ ...btnSm, background: '#dcfce7', color: '#166534', marginRight: 3 }}>📈</button>
                       <button onClick={() => startEdit(t)} style={{ ...btnSm, background: '#e5e7eb', color: '#374151', marginRight: 3 }}>✎</button>
                       <button onClick={() => deleteTx(t.id)} style={{ ...btnSm, background: '#fee2e2', color: '#dc2626' }}>✕</button>
                     </td>
@@ -551,17 +603,129 @@ export function TransactionModal({ accountId, accounts, transactions, categories
         </div>
       </div>
     </div>
+
+    {/* ── Wertpapier-Konvertierungsmodal ── */}
+    {secTxModal && (
+      <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: '1rem' }}>
+        <div style={{ background: 'var(--color-surface)', borderRadius: 12, padding: '1.5rem', maxWidth: 440, width: '100%', boxShadow: '0 20px 60px rgba(0,0,0,0.35)' }}>
+          <h3 style={{ margin: '0 0 0.6rem', fontSize: '1.05rem' }}>Als Wertpapiertransaktion anlegen</h3>
+          <p style={{ margin: '0 0 1rem', fontSize: '0.82rem', color: 'var(--color-text-muted)', lineHeight: 1.4 }}>
+            <strong style={{ color: secTxModal.bankTx.amount >= 0 ? '#16a34a' : '#dc2626' }}>{fmt(secTxModal.bankTx.amount)}</strong>
+            {' '}am {secTxModal.bankTx.date}
+            {secTxModal.bankTx.description ? <span> · {secTxModal.bankTx.description.slice(0, 60)}</span> : null}
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+            <div>
+              <label style={lbl}>Wertpapier</label>
+              <select value={secTxModal.secId}
+                onChange={e => setSecTxModal(m => ({ ...m, secId: e.target.value }))}
+                style={{ width: '100%', fontSize: '0.9rem', padding: '0.4rem 0.5rem' }}>
+                {[...securities].sort((a, b) => a.name.localeCompare(b.name, 'de')).map(s => (
+                  <option key={s.id} value={String(s.id)}>{s.name}{s.symbol ? ` (${s.symbol})` : ''}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label style={lbl}>Depot</label>
+              <select value={secTxModal.depotId}
+                onChange={e => setSecTxModal(m => ({ ...m, depotId: e.target.value }))}
+                style={{ width: '100%', fontSize: '0.9rem', padding: '0.4rem 0.5rem' }}>
+                {depots.map(d => <option key={d.id} value={String(d.id)}>{d.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={lbl}>Art</label>
+              <select value={secTxModal.txType}
+                onChange={e => {
+                  const type = e.target.value
+                  const isIncome = type === 'dividend' || type === 'interest'
+                  const absAmt = Math.abs(secTxModal.bankTx.amount)
+                  const fees = parseFloat(secTxModal.fees) || 0
+                  setSecTxModal(m => ({
+                    ...m, txType: type,
+                    qty:   isIncome ? '1' : m.qty,
+                    price: isIncome
+                      ? absAmt.toFixed(2)
+                      : ((absAmt - fees) / (parseFloat(m.qty) || 1)).toFixed(4),
+                  }))
+                }}
+                style={{ width: '100%', fontSize: '0.9rem', padding: '0.4rem 0.5rem' }}>
+                <option value="buy">Kauf</option>
+                <option value="sell">Verkauf</option>
+                <option value="dividend">Dividende</option>
+                <option value="interest">Zinsen</option>
+              </select>
+            </div>
+            <div>
+              <label style={lbl}>Datum</label>
+              <input type="date" value={secTxModal.date}
+                onChange={e => setSecTxModal(m => ({ ...m, date: e.target.value }))}
+                style={{ width: '100%', fontSize: '0.9rem', padding: '0.4rem 0.5rem' }} />
+            </div>
+            {(secTxModal.txType === 'buy' || secTxModal.txType === 'sell') && (
+              <div>
+                <label style={lbl}>Anzahl (Stück)</label>
+                <input type="number" value={secTxModal.qty} min="0.0001" step="any"
+                  onChange={e => {
+                    const q = e.target.value
+                    const absAmt = Math.abs(secTxModal.bankTx.amount)
+                    const fees = parseFloat(secTxModal.fees) || 0
+                    const price = parseFloat(q) > 0 ? ((absAmt - fees) / parseFloat(q)).toFixed(4) : secTxModal.price
+                    setSecTxModal(m => ({ ...m, qty: q, price }))
+                  }}
+                  style={{ width: '100%', fontSize: '0.9rem', padding: '0.4rem 0.5rem' }} />
+              </div>
+            )}
+            <div>
+              <label style={lbl}>{secTxModal.txType === 'buy' || secTxModal.txType === 'sell' ? 'Kurs (€)' : 'Betrag (€)'}</label>
+              <input type="number" value={secTxModal.price} min="0" step="any"
+                onChange={e => setSecTxModal(m => ({ ...m, price: e.target.value }))}
+                style={{ width: '100%', fontSize: '0.9rem', padding: '0.4rem 0.5rem' }} />
+            </div>
+            <div>
+              <label style={lbl}>Gebühren (€)</label>
+              <input type="number" value={secTxModal.fees} min="0" step="any"
+                onChange={e => {
+                  const fees = e.target.value
+                  const isTrade = secTxModal.txType === 'buy' || secTxModal.txType === 'sell'
+                  if (isTrade) {
+                    const absAmt = Math.abs(secTxModal.bankTx.amount)
+                    const q = parseFloat(secTxModal.qty) || 1
+                    const price = ((absAmt - (parseFloat(fees) || 0)) / q).toFixed(4)
+                    setSecTxModal(m => ({ ...m, fees, price }))
+                  } else {
+                    setSecTxModal(m => ({ ...m, fees }))
+                  }
+                }}
+                style={{ width: '100%', fontSize: '0.9rem', padding: '0.4rem 0.5rem' }} />
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
+              <button onClick={confirmSecTx} style={{ flex: 1, padding: '0.6rem', background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, cursor: 'pointer', fontSize: '0.9rem' }}>
+                Transaktion anlegen
+              </button>
+              <button onClick={() => setSecTxModal(null)} style={{ padding: '0.6rem 1rem', background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: '0.9rem' }}>
+                Abbrechen
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   )
 }
 
 // ── Main component ─────────────────────────────────────────────────────
 
 export default function BankAccounts() {
-  const [accounts,     setAccounts]     = useLocalStorage('bankAccounts', [])
-  const [transactions, setTransactions] = useLocalStorage('transactions', [])
-  const [persons,      setPersons]      = useLocalStorage('insurancePersons', ['Karin', 'Jürgen'])
-  const [banks,        setBanks]        = useLocalStorage('banks', [])
+  const [accounts,          setAccounts]          = useLocalStorage('bankAccounts', [])
+  const [transactions,      setTransactions]      = useLocalStorage('transactions', [])
+  const [persons,           setPersons]           = useLocalStorage('insurancePersons', ['Karin', 'Jürgen'])
+  const [banks,             setBanks]             = useLocalStorage('banks', [])
+  const [depotTransactions, setDepotTransactions] = useLocalStorage('depotTransactions', [])
   const categories = JSON.parse(localStorage.getItem('categories')) || []
+  const securities = JSON.parse(localStorage.getItem('securities'))  || []
+  const depots     = JSON.parse(localStorage.getItem('depots'))      || []
 
   const [groupBy,         setGroupBy]         = useState('none')
   const [sortBy,          setSortBy]          = useState('name')
@@ -961,6 +1125,10 @@ export default function BankAccounts() {
           onClose={() => setTxModal(null)}
           onUpdateAccounts={setAccounts}
           onUpdateTransactions={setTransactions}
+          securities={securities}
+          depots={depots}
+          depotTransactions={depotTransactions}
+          onUpdateDepotTransactions={setDepotTransactions}
         />
       )}
     </div>
