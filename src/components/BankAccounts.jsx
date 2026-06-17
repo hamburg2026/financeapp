@@ -265,6 +265,7 @@ export function TransactionModal({ accountId, accounts, transactions, categories
       price:      priceVal,
       fees:       feesVal,
       date,
+      fromBankTx: true,
     }
     if (onUpdateDepotTransactions) onUpdateDepotTransactions([...depotTransactions, newTx])
     onUpdateTransactions(transactions.map(t => t.id === bankTx.id ? { ...t, depotTxId: newTx.id } : t))
