@@ -758,6 +758,9 @@ export default function Securities() {
                       <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', background: 'var(--color-border)', borderRadius: 4, padding: '0.05rem 0.35rem' }}>{s.type}</span>
                       <span style={{ fontSize: '0.72rem', fontWeight: 600, color: s.currency !== 'EUR' ? '#d97706' : 'var(--color-text-muted)' }}>{s.currency || 'EUR'}</span>
                       <span style={{ fontWeight: 700, fontSize: '0.87rem', minWidth: 70, textAlign: 'right' }}>{price !== null ? fmt(price) : '–'}</span>
+                      {priceList[0]?.date && (
+                        <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>{priceList[0].date}</span>
+                      )}
                       {leewayKey && (
                         <button
                           onClick={() => handleFetchLeewayPrice(s)}
