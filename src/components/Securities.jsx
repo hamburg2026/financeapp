@@ -149,6 +149,38 @@ async function fetchLeewayPrice(symbol, apiToken) {
   }
 }
 
+// ── Yahoo Finance (kostenlos, kein API-Key) ──
+// Symbolformat: US-Aktien = "AAPL", Deutsche Aktien = "DTE.DE", ETFs = "VWCE.DE"
+async function fetchYahooPrice(symbol) {
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d`
+  let res
+  try {
+    res = await fetch(url, { headers: { Accept: 'application/json' } })
+  } catch {
+    // CORS-Fehler – über Proxy erneut versuchen
+    const proxy = `https://corsproxy.io/?url=${encodeURIComponent(url)}`
+    res = await fetch(proxy)
+  }
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  const data = await res.json()
+  const result = data?.chart?.result?.[0]
+  if (!result) throw new Error(`Keine Daten für „${symbol}" gefunden. Tipp: Deutsche Aktien = „DTE.DE", ETFs = „VWCE.DE"`)
+  const timestamps = result.timestamp || []
+  const closes = result.indicators?.adjclose?.[0]?.adjclose || result.indicators?.quote?.[0]?.close || []
+  if (!timestamps.length || !closes.length) throw new Error('Kursdaten leer.')
+  // letzten gültigen Kurs ermitteln
+  let latestPrice = null, latestDate = ''
+  for (let i = timestamps.length - 1; i >= 0; i--) {
+    if (closes[i] != null) {
+      latestPrice = closes[i]
+      latestDate = new Date(timestamps[i] * 1000).toISOString().slice(0, 10)
+      break
+    }
+  }
+  if (latestPrice == null) throw new Error('Kein gültiger Schlusskurs in den Daten.')
+  return { price: latestPrice, date: latestDate }
+}
+
 // ── Frankfurter.app FX (kostenlos, CORS-fähig) ──
 async function fetchFrankfurterFx(pair) {
   const res = await fetch(`https://api.frankfurter.app/latest?base=${encodeURIComponent(pair)}&symbols=EUR`)
@@ -221,6 +253,8 @@ export default function Securities() {
   // ── API fetch state ──
   const [fetchingLeeway, setFetchingLeeway] = useState({})
   const [fetchLeewayErr, setFetchLeewayErr] = useState({})
+  const [fetchingYahoo,  setFetchingYahoo]  = useState({})
+  const [fetchYahooErr,  setFetchYahooErr]  = useState({})
   const [fetchingFx,     setFetchingFx]     = useState({})
   const [fetchFxErr,     setFetchFxErr]     = useState({})
 
@@ -428,6 +462,27 @@ export default function Securities() {
       setFetchLeewayErr(e => ({ ...e, [sec.id]: `Leeway-Fehler: ${err.message}` }))
     } finally {
       setFetchingLeeway(s => ({ ...s, [sec.id]: false }))
+    }
+  }
+
+  // ─── API: Security price (Yahoo Finance) ────────────────────────────────────
+  async function handleFetchYahooPrice(sec) {
+    if (!sec.symbol) {
+      setFetchYahooErr(e => ({ ...e, [sec.id]: 'Kein Ticker/Symbol hinterlegt.' }))
+      return
+    }
+    setFetchingYahoo(s => ({ ...s, [sec.id]: true }))
+    setFetchYahooErr(e => ({ ...e, [sec.id]: null }))
+    try {
+      const { price, date } = await fetchYahooPrice(sec.symbol)
+      const list = [...(prices[sec.id] || []), { date, value: price }]
+        .sort((a, b) => new Date(b.date) - new Date(a.date))
+      setPrices(prev => ({ ...prev, [sec.id]: list }))
+      setExpandedPrices(prev => { const n = new Set(prev); n.add(sec.id); return n })
+    } catch (err) {
+      setFetchYahooErr(e => ({ ...e, [sec.id]: `Yahoo-Fehler: ${err.message}` }))
+    } finally {
+      setFetchingYahoo(s => ({ ...s, [sec.id]: false }))
     }
   }
 
@@ -707,6 +762,8 @@ export default function Securities() {
             const isLast     = si === securities.length - 1
             const isLeewayFetching = fetchingLeeway[s.id]
             const leewayFetchErr  = fetchLeewayErr[s.id]
+            const isYahooFetching  = fetchingYahoo[s.id]
+            const yahooFetchErr    = fetchYahooErr[s.id]
             const isinVal         = s.isin?.trim()
 
             return (
@@ -761,6 +818,14 @@ export default function Securities() {
                       {priceList[0]?.date && (
                         <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>{priceList[0].date}</span>
                       )}
+                      <button
+                        onClick={() => handleFetchYahooPrice(s)}
+                        disabled={isYahooFetching}
+                        style={{ ...btnBase, background: '#dcfce7', color: '#15803d', minWidth: 72 }}
+                        title={`Kurs für ${s.symbol} von Yahoo Finance abrufen (kein API-Key nötig). Symbol z. B. AAPL, DTE.DE, VWCE.DE`}
+                      >
+                        {isYahooFetching ? '…' : '↓ Yahoo'}
+                      </button>
                       {leewayKey && (
                         <button
                           onClick={() => handleFetchLeewayPrice(s)}
@@ -776,6 +841,11 @@ export default function Securities() {
                       <button onClick={() => startEditSec(s)} style={{ ...btnBase, background: '#e5e7eb', color: '#374151' }} title="Bearbeiten">✎</button>
                       <button onClick={() => removeSecurity(s.id)} style={{ ...btnBase, background: '#fee2e2', color: '#dc2626' }} title="Löschen">✕</button>
                     </div>
+                    {yahooFetchErr && (
+                      <div style={{ fontSize: '0.72rem', color: '#15803d', padding: '0.2rem 0.75rem 0.3rem 2.2rem' }}>
+                        {yahooFetchErr}
+                      </div>
+                    )}
                     {leewayFetchErr && (
                       <div style={{ fontSize: '0.72rem', color: '#7c3aed', padding: '0.2rem 0.75rem 0.3rem 2.2rem' }}>
                         {leewayFetchErr}
@@ -892,6 +962,16 @@ export default function Securities() {
 
       {/* ── API-Konfiguration (Kursdaten) ── */}
       <p style={sectionHead}>API-Konfiguration (Kursdaten)</p>
+
+      {/* Yahoo Finance */}
+      <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '0.75rem 1rem', marginBottom: '1rem', fontSize: '0.82rem' }}>
+        <p style={{ margin: '0 0 0.3rem', fontWeight: 600, fontSize: '0.78rem', color: '#166534' }}>Yahoo Finance <span style={{ fontWeight: 400, color: '#15803d' }}>– kein API-Key erforderlich</span></p>
+        <p style={{ margin: '0', color: '#166534', lineHeight: 1.5 }}>
+          Der <strong>↓ Yahoo</strong>-Button bei jedem Wertpapier ruft den aktuellen Kurs von Yahoo Finance ab.
+          Symbolformat: US-Aktien <code>AAPL</code>, Deutsche Aktien <code>DTE.DE</code>, ETFs <code>VWCE.DE</code>, Krypto <code>BTC-EUR</code>.
+          Bei CORS-Problemen wird automatisch ein Proxy verwendet.
+        </p>
+      </div>
 
       {/* Leeway */}
       <div style={{ background: leewayKey ? '#faf5ff' : '#fef9c3', border: `1px solid ${leewayKey ? '#ddd6fe' : '#fde68a'}`, borderRadius: 8, padding: '0.75rem 1rem', marginBottom: '1rem', fontSize: '0.82rem' }}>
