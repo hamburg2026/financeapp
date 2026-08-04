@@ -96,7 +96,10 @@ export default function ServiceCostCalculator() {
     setEntries(isNew ? [...entries, entry] : entries.map(e => e.id === entry.id ? entry : e))
     setModal(null)
   }
-  function deleteEntry(id) { setEntries(entries.filter(e => e.id !== id)) }
+  function deleteEntry(id) {
+    if (!window.confirm('Eintrag löschen?')) return
+    setEntries(entries.filter(e => e.id !== id))
+  }
 
   function openAddType(fromEntry = false) {
     setTypeForm({ ...EMPTY_TYPE, _fromEntry: fromEntry })
@@ -120,7 +123,11 @@ export default function ServiceCostCalculator() {
       setModal(null)
     }
   }
-  function deleteType(id) { setServiceTypes(serviceTypes.filter(t => t.id !== id)) }
+  function deleteType(id) {
+    const t = serviceTypes.find(x => x.id === id)
+    if (!window.confirm(`Dienstleistungsart „${t?.name || ''}" löschen?`)) return
+    setServiceTypes(serviceTypes.filter(t => t.id !== id))
+  }
 
   function getTypeName(typeId) { return serviceTypes.find(t => t.id === typeId)?.name || '–' }
   function getTypeUnit(typeId) { return serviceTypes.find(t => t.id === typeId)?.unit || '' }

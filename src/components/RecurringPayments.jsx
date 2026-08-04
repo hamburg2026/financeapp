@@ -60,7 +60,11 @@ export default function RecurringPayments() {
     closeModal()
   }
 
-  function removeRecurring(id) { setRecurrings(recurrings.filter(r => r.id !== id)) }
+  function removeRecurring(id) {
+    const r = recurrings.find(x => x.id === id)
+    if (!window.confirm(`Dauerauftrag „${r?.name || ''}" löschen?`)) return
+    setRecurrings(recurrings.filter(r => r.id !== id))
+  }
 
   function getCategoryLabel(catId) {
     if (!catId) return '–'

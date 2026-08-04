@@ -203,6 +203,7 @@ export function TransactionModal({ accountId, accounts, transactions, categories
   function deleteTx(id) {
     const tx = transactions.find(t => t.id === id)
     if (!tx) return
+    if (!window.confirm('Umsatz löschen?')) return
     onUpdateAccounts(accounts.map(a => a.id === tx.accountId ? { ...a, balance: a.balance - tx.amount } : a))
     onUpdateTransactions(transactions.filter(t => t.id !== id))
   }
@@ -1017,7 +1018,7 @@ export default function BankAccounts() {
                         <td style={{ ...c, whiteSpace: 'nowrap', textAlign: 'right' }}>
                           <button onClick={() => setTxModal(a.id)} style={{ ...btnSm, background: 'var(--color-primary)', color: '#fff', marginRight: 4 }}>Umsätze</button>
                           <button onClick={() => startEditAcc(a)} style={{ ...btnSm, background: '#e5e7eb', color: '#374151', marginRight: 4 }}>✎</button>
-                          <button onClick={() => setAccounts(accounts.filter(x => x.id !== a.id))} style={{ ...btnSm, background: '#fee2e2', color: '#dc2626' }}>✕</button>
+                          <button onClick={() => { if (window.confirm(`Konto „${a.name}" löschen?`)) setAccounts(accounts.filter(x => x.id !== a.id)) }} style={{ ...btnSm, background: '#fee2e2', color: '#dc2626' }}>✕</button>
                         </td>
                       </tr>
                     )

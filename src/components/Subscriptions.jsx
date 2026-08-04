@@ -87,6 +87,7 @@ export default function Subscriptions() {
 
   function removeSubscription(id) {
     const sub = subscriptions.find(s => s.id === id)
+    if (!window.confirm(`Abonnement „${sub?.name || ''}" löschen?`)) return
     if (sub) syncRecurring(sub, false)
     setSubscriptions(subscriptions.filter(s => s.id !== id))
   }
