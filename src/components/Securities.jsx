@@ -127,28 +127,6 @@ const labelStyle = { fontSize: '0.7rem', color: 'var(--color-text-muted)', margi
 
 const today = () => new Date().toISOString().slice(0, 10)
 
-// ── Leeway – kostenloser API-Token unter leeway.tech ──
-// Symbolformat: Deutsche Aktien = "DTE.XETRA", US-Aktien = "AAPL.US", ETFs = "VWCE.XETRA"
-async function fetchLeewayPrice(symbol, apiToken) {
-  const to = new Date()
-  const from = new Date()
-  from.setDate(from.getDate() - 10)
-  const toStr = to.toISOString().slice(0, 10)
-  const fromStr = from.toISOString().slice(0, 10)
-  const url = `https://api.leeway.tech/api/v1/public/historicalquotes/${encodeURIComponent(symbol)}?apitoken=${encodeURIComponent(apiToken)}&from=${fromStr}&to=${toStr}`
-  const res = await fetch(url)
-  if (res.status === 429) throw new Error('Tageslimit überschritten. Bitte später erneut versuchen.')
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  const data = await res.json()
-  if (!Array.isArray(data) || data.length === 0) throw new Error(`Keine Kursdaten für „${symbol}" gefunden. Tipp: Symbolformat „DTE.XETRA" oder „AAPL.US"`)
-  const sorted = [...data].sort((a, b) => new Date(b.date) - new Date(a.date))
-  const latest = sorted[0]
-  return {
-    price: latest.adjusted_close ?? latest.close,
-    date:  latest.date,
-  }
-}
-
 // ── Yahoo Finance (kostenlos, kein API-Key) ──
 // Symbolformat: US-Aktien = "AAPL", Deutsche Aktien = "DTE.DE", ETFs = "VWCE.DE"
 async function fetchYahooPrice(symbol) {
@@ -195,13 +173,6 @@ export default function Securities() {
   const [securities,   setSecurities]   = useLocalStorage('securities', [])
   const [prices,       setPrices]       = useLocalStorage('securityPrices', {})
   const [fxRates,      setFxRates]      = useLocalStorage('fxRates', {})
-  const [leewayKey,    setLeewayKeyState] = useState(() => localStorage.getItem('leeway_token') || '')
-
-  function saveLeewayKey(val) {
-    localStorage.setItem('leeway_token', val)
-    setLeewayKeyState(val)
-  }
-
   // ── Add security form ──
   const [secName,   setSecName]   = useState('')
   const [secSymbol, setSecSymbol] = useState('')
@@ -251,8 +222,6 @@ export default function Securities() {
   const [editTxFees,    setEditTxFees]    = useState('')
 
   // ── API fetch state ──
-  const [fetchingLeeway, setFetchingLeeway] = useState({})
-  const [fetchLeewayErr, setFetchLeewayErr] = useState({})
   const [fetchingYahoo,  setFetchingYahoo]  = useState({})
   const [fetchYahooErr,  setFetchYahooErr]  = useState({})
   const [fetchingFx,     setFetchingFx]     = useState({})
@@ -440,31 +409,6 @@ export default function Securities() {
       .sort((a, b) => (a.sec?.name || a.secId).localeCompare(b.sec?.name || b.secId, 'de'))
   }
 
-  // ─── API: Security price (Leeway) ───────────────────────────────────────────
-  async function handleFetchLeewayPrice(sec) {
-    if (!sec.symbol) {
-      setFetchLeewayErr(e => ({ ...e, [sec.id]: 'Kein Ticker/Symbol hinterlegt.' }))
-      return
-    }
-    if (!leewayKey) {
-      setFetchLeewayErr(e => ({ ...e, [sec.id]: 'Bitte zuerst den Leeway API-Token hinterlegen (siehe unten).' }))
-      return
-    }
-    setFetchingLeeway(s => ({ ...s, [sec.id]: true }))
-    setFetchLeewayErr(e => ({ ...e, [sec.id]: null }))
-    try {
-      const { price, date } = await fetchLeewayPrice(sec.symbol, leewayKey)
-      const list = [...(prices[sec.id] || []), { date, value: price }]
-        .sort((a, b) => new Date(b.date) - new Date(a.date))
-      setPrices(prev => ({ ...prev, [sec.id]: list }))
-      setExpandedPrices(prev => { const n = new Set(prev); n.add(sec.id); return n })
-    } catch (err) {
-      setFetchLeewayErr(e => ({ ...e, [sec.id]: `Leeway-Fehler: ${err.message}` }))
-    } finally {
-      setFetchingLeeway(s => ({ ...s, [sec.id]: false }))
-    }
-  }
-
   // ─── API: Security price (Yahoo Finance) ────────────────────────────────────
   async function handleFetchYahooPrice(sec) {
     if (!sec.symbol) {
@@ -570,27 +514,24 @@ export default function Securities() {
     setIsinNewsErr('')
 
     // ── Kurs abrufen ──
-    if (sec.symbol && leewayKey) {
+    if (sec.symbol) {
       setIsinPriceLoading(true)
       try {
-        let result
-        result = await fetchLeewayPrice(sec.symbol, leewayKey)
-        setIsinPriceSource('Leeway')
+        const result = await fetchYahooPrice(sec.symbol)
+        setIsinPriceSource('Yahoo Finance')
         setIsinPrice(result.price)
         setIsinPriceDate(result.date)
       } catch (err) {
         setIsinPriceErr(err.message)
-        // Lokalen Kurs als Fallback zeigen
         const local = getCurrentPrice(sec.id)
         if (local !== null) { setIsinPrice(local); setIsinPriceSource('lokal') }
       } finally {
         setIsinPriceLoading(false)
       }
     } else {
-      // Nur lokaler Kurs verfügbar
       const local = getCurrentPrice(sec.id)
       if (local !== null) { setIsinPrice(local); setIsinPriceSource('lokal') }
-      else setIsinPriceErr('Kein API-Schlüssel konfiguriert und kein lokaler Kurs vorhanden.')
+      else setIsinPriceErr('Kein Symbol hinterlegt und kein lokaler Kurs vorhanden.')
     }
 
     // ── News abrufen ──
@@ -760,8 +701,6 @@ export default function Securities() {
                                  .slice().sort((a, b) => new Date(b.date) - new Date(a.date))
             const isEditing  = editSecId === s.id
             const isLast     = si === securities.length - 1
-            const isLeewayFetching = fetchingLeeway[s.id]
-            const leewayFetchErr  = fetchLeewayErr[s.id]
             const isYahooFetching  = fetchingYahoo[s.id]
             const yahooFetchErr    = fetchYahooErr[s.id]
             const isinVal         = s.isin?.trim()
@@ -826,16 +765,6 @@ export default function Securities() {
                       >
                         {isYahooFetching ? '…' : '↓ Yahoo'}
                       </button>
-                      {leewayKey && (
-                        <button
-                          onClick={() => handleFetchLeewayPrice(s)}
-                          disabled={isLeewayFetching}
-                          style={{ ...btnBase, background: '#ede9fe', color: '#6d28d9', minWidth: 72 }}
-                          title={`Kurs für ${s.symbol} von Leeway abrufen`}
-                        >
-                          {isLeewayFetching ? '…' : '↓ Leeway'}
-                        </button>
-                      )}
                       <button onClick={() => openAddPrice(s.id)} style={{ ...btnBase, background: '#e0f2fe', color: '#0369a1' }} title="Neuer Kurs">+ Kurs</button>
                       <button onClick={() => openAddTxModal(s.id)} disabled={depots.length === 0} style={{ ...btnBase, background: '#dcfce7', color: '#166534', cursor: depots.length === 0 ? 'not-allowed' : 'pointer' }} title={depots.length === 0 ? 'Zuerst ein Depot anlegen' : 'Neue Transaktion'}>+ Tx</button>
                       <button onClick={() => startEditSec(s)} style={{ ...btnBase, background: '#e5e7eb', color: '#374151' }} title="Bearbeiten">✎</button>
@@ -844,11 +773,6 @@ export default function Securities() {
                     {yahooFetchErr && (
                       <div style={{ fontSize: '0.72rem', color: '#15803d', padding: '0.2rem 0.75rem 0.3rem 2.2rem' }}>
                         {yahooFetchErr}
-                      </div>
-                    )}
-                    {leewayFetchErr && (
-                      <div style={{ fontSize: '0.72rem', color: '#7c3aed', padding: '0.2rem 0.75rem 0.3rem 2.2rem' }}>
-                        {leewayFetchErr}
                       </div>
                     )}
                   </div>
@@ -971,35 +895,6 @@ export default function Securities() {
           Symbolformat: US-Aktien <code>AAPL</code>, Deutsche Aktien <code>DTE.DE</code>, ETFs <code>VWCE.DE</code>, Krypto <code>BTC-EUR</code>.
           Bei CORS-Problemen wird automatisch ein Proxy verwendet.
         </p>
-      </div>
-
-      {/* Leeway */}
-      <div style={{ background: leewayKey ? '#faf5ff' : '#fef9c3', border: `1px solid ${leewayKey ? '#ddd6fe' : '#fde68a'}`, borderRadius: 8, padding: '0.75rem 1rem', marginBottom: '1rem', fontSize: '0.82rem' }}>
-        <p style={{ margin: '0 0 0.4rem', fontWeight: 600, fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>Leeway</p>
-        {!leewayKey && (
-          <p style={{ margin: '0 0 0.5rem', color: '#92400e' }}>
-            Kostenloser API-Token unter{' '}
-            <a href="https://leeway.tech" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-primary)' }}>
-              leeway.tech
-            </a>{' '}
-            (keine Kreditkarte). Limit: 100.000 Abfragen/Tag.
-          </p>
-        )}
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          <input
-            type="text"
-            value={leewayKey}
-            onChange={e => saveLeewayKey(e.target.value)}
-            placeholder="Leeway API-Token"
-            style={{ flex: 1, minWidth: 200, fontSize: '0.82rem', padding: '0.3rem 0.5rem', fontFamily: 'monospace' }}
-          />
-          {leewayKey && <span style={{ color: '#7c3aed', fontSize: '0.78rem', fontWeight: 600 }}>✓ Gespeichert</span>}
-        </div>
-        {leewayKey && (
-          <p style={{ margin: '0.4rem 0 0', color: '#5b21b6', fontSize: '0.75rem' }}>
-            Symbolformat: Deutsche Aktien = <code>DTE.XETRA</code>, US-Aktien = <code>AAPL.US</code>, ETFs = <code>VWCE.XETRA</code>
-          </p>
-        )}
       </div>
 
       {/* ── Devisenkurse: Liste ── */}
