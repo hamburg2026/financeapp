@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { lsGet } from '../lsGet'
 
 const fmt = (n) =>
   new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(n)
@@ -69,7 +70,7 @@ const TILE_NAV = {
 export default function Dashboard({ onNavigate }) {
   const [showLiqConfig, setShowLiqConfig] = useState(false)
   const [liquidityLevels, setLiquidityLevelsState] = useState(
-    () => JSON.parse(localStorage.getItem('liquidityLevels')) || {}
+    () => lsGet('liquidityLevels', {})
   )
 
   function setLiquidityLevel(key, level) {
@@ -83,15 +84,15 @@ export default function Dashboard({ onNavigate }) {
     setLiquidityLevelsState(next)
   }
 
-  const accounts     = JSON.parse(localStorage.getItem('bankAccounts'))       || []
-  const depots       = JSON.parse(localStorage.getItem('depots'))             || []
-  const depotTrans   = JSON.parse(localStorage.getItem('depotTransactions'))  || []
-  const prices       = JSON.parse(localStorage.getItem('securityPrices'))     || {}
-  const securities   = JSON.parse(localStorage.getItem('securities'))         || []
-  const insurance    = JSON.parse(localStorage.getItem('insuranceContracts')) || []
-  const realEstate   = JSON.parse(localStorage.getItem('realEstate'))         || []
-  const shares       = JSON.parse(localStorage.getItem('companyShares'))      || []
-  const subscriptions = JSON.parse(localStorage.getItem('subscriptions'))     || []
+  const accounts     = lsGet('bankAccounts', [])
+  const depots       = lsGet('depots', [])
+  const depotTrans   = lsGet('depotTransactions', [])
+  const prices       = lsGet('securityPrices', {})
+  const securities   = lsGet('securities', [])
+  const insurance    = lsGet('insuranceContracts', [])
+  const realEstate   = lsGet('realEstate', [])
+  const shares       = lsGet('companyShares', [])
+  const subscriptions = lsGet('subscriptions', [])
 
   // ── Bankkonten ──
   function latestBankBalance(a) {

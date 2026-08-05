@@ -1,10 +1,17 @@
 import { useState } from 'react'
+import { lsGet } from '../lsGet'
 import { fmt } from '../fmt'
 import CategorySelect from './CategorySelect'
 import Modal from './Modal'
 
 function useLocalStorage(key, initial) {
-  const [value, setValue] = useState(() => JSON.parse(localStorage.getItem(key)) || initial)
+  const [value, setValue] = useState(() => {
+    try {
+      const stored = localStorage.getItem(key)
+      if (stored == null || stored === 'undefined') return initial
+      return JSON.parse(stored) ?? initial
+    } catch { return initial }
+  })
   const set = (newVal) => { localStorage.setItem(key, JSON.stringify(newVal)); setValue(newVal) }
   return [value, set]
 }
@@ -13,7 +20,7 @@ const FREQ_LABELS = { monthly: 'Monatlich', quarterly: 'Vierteljährlich', halfy
 const lbl = { fontSize: '0.78rem', color: 'var(--color-text-muted)', marginBottom: '0.3rem', display: 'block', fontWeight: 500 }
 
 function syncRecurring(sub, isActive) {
-  const recurrings = JSON.parse(localStorage.getItem('recurringPayments')) || []
+  const recurrings = lsGet('recurringPayments', [])
   if (!isActive) {
     localStorage.setItem('recurringPayments', JSON.stringify(recurrings.filter(r => r.subscriptionId !== sub.id)))
     return
@@ -38,7 +45,7 @@ const EMPTY = { name: '', cost: '', frequency: 'monthly', cancel: '', cancelDate
 
 export default function Subscriptions() {
   const [subscriptions, setSubscriptions] = useLocalStorage('subscriptions', [])
-  const categories = JSON.parse(localStorage.getItem('categories')) || []
+  const categories = lsGet('categories', [])
 
   const [modal, setModal] = useState(null) // null | 'add' | subId
   const [form, setForm] = useState(EMPTY)

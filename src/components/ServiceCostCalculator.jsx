@@ -4,12 +4,11 @@ import Modal from './Modal'
 
 function useLocalStorage(key, initial) {
   const [value, setValue] = useState(() => {
-    const stored = localStorage.getItem(key)
-    if (stored === null) {
-      localStorage.setItem(key, JSON.stringify(initial))
-      return initial
-    }
-    return JSON.parse(stored)
+    try {
+      const stored = localStorage.getItem(key)
+      if (stored == null || stored === 'undefined') return initial
+      return JSON.parse(stored) ?? initial
+    } catch { return initial }
   })
   const set = (newVal) => { localStorage.setItem(key, JSON.stringify(newVal)); setValue(newVal) }
   return [value, set]

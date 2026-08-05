@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { lsGet } from '../lsGet'
 import { fmt } from '../fmt'
 
 const PALETTE = [
@@ -233,10 +234,10 @@ function generateRecurringTxs(recurrings, categories, from, to) {
 
 // ── Main component ─────────────────────────────────────────────────────
 export default function TransactionAnalytics() {
-  const transactions      = useMemo(() => JSON.parse(localStorage.getItem('transactions')) || [], [])
-  const recurringPayments = useMemo(() => JSON.parse(localStorage.getItem('recurringPayments')) || [], [])
-  const accounts          = useMemo(() => JSON.parse(localStorage.getItem('bankAccounts')) || [], [])
-  const categories        = useMemo(() => JSON.parse(localStorage.getItem('categories')) || [], [])
+  const transactions      = useMemo(() => lsGet('transactions', []), [])
+  const recurringPayments = useMemo(() => lsGet('recurringPayments', []), [])
+  const accounts          = useMemo(() => lsGet('bankAccounts', []), [])
+  const categories        = useMemo(() => lsGet('categories', []), [])
 
   const [source,        setSource]        = useState('transactions')
   const [groupBy,       setGroupBy]       = useState('month')

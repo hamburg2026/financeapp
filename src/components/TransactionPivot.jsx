@@ -1,4 +1,5 @@
 import { useState, useMemo, Fragment } from 'react'
+import { lsGet } from '../lsGet'
 import { fmt } from '../fmt'
 
 const DATE_DIMS = [
@@ -70,9 +71,9 @@ function generatePeriods(from, to, groupBy) {
 }
 
 export default function TransactionPivot() {
-  const transactions = useMemo(() => JSON.parse(localStorage.getItem('transactions'))    || [], [])
-  const categories   = useMemo(() => JSON.parse(localStorage.getItem('categories'))      || [], [])
-  const accounts     = useMemo(() => JSON.parse(localStorage.getItem('bankAccounts'))    || [], [])
+  const transactions = useMemo(() => lsGet('transactions', []), [])
+  const categories   = useMemo(() => lsGet('categories', []), [])
+  const accounts     = useMemo(() => lsGet('bankAccounts', []), [])
 
   const init = getDateRange('thisYear')
   const [dateDim,     setDateDim]     = useState('thisYear')

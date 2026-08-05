@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react'
+import { lsGet } from '../lsGet'
 import { fmt } from '../fmt'
 import CategorySelect from './CategorySelect'
 import * as pdfjsLib from 'pdfjs-dist'
@@ -8,8 +9,14 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl
 
 // ── LocalStorage helper ────────────────────────────────────────────────
 function useLocalStorage(key, initial) {
-  const [value, setValue] = useState(() => JSON.parse(localStorage.getItem(key)) || initial)
-  const set = (v) => { localStorage.setItem(key, JSON.stringify(v)); setValue(v) }
+  const [value, setValue] = useState(() => {
+    try {
+      const stored = localStorage.getItem(key)
+      if (stored == null || stored === 'undefined') return initial
+      return JSON.parse(stored) ?? initial
+    } catch { return initial }
+  })
+  const set = (newVal) => { localStorage.setItem(key, JSON.stringify(newVal)); setValue(newVal) }
   return [value, set]
 }
 
@@ -354,12 +361,12 @@ function isDuplicate(newTx, existing) {
 export default function PdfImport({ onNavigate }) {
   const [accounts, setAccounts] = useLocalStorage('bankAccounts', [])
   const [transactions, setTransactions] = useLocalStorage('transactions', [])
-  const categories = JSON.parse(localStorage.getItem('categories')) || []
+  const categories = lsGet('categories', [])
 
   const [step, setStep] = useState('select') // select | preview | done
   const [bankType, setBankType] = useState('lufthansa')
   const [selectedAccountId, setSelectedAccountId] = useState(() => {
-    const accs = JSON.parse(localStorage.getItem('bankAccounts')) || []
+    const accs = lsGet('bankAccounts', [])
     return accs[0]?.id ? String(accs[0].id) : ''
   })
   const [files, setFiles] = useState([])

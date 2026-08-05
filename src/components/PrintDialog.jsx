@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { lsGet } from '../lsGet'
 import { fmt, fmtNum } from '../fmt'
 import { DEFAULT_SERVICE_TYPES } from './ServiceCostCalculator'
 
@@ -420,19 +421,19 @@ export default function PrintDialog({ onClose }) {
   const [svcFilterFrom, setSvcFilterFrom] = useState('')
   const [svcFilterTo,   setSvcFilterTo]   = useState('')
 
-  const accounts          = JSON.parse(localStorage.getItem('bankAccounts'))       || []
-  const insurances        = JSON.parse(localStorage.getItem('insuranceContracts'))  || []
-  const securities        = JSON.parse(localStorage.getItem('securities'))          || []
-  const prices            = JSON.parse(localStorage.getItem('securityPrices'))      || {}
-  const depots            = JSON.parse(localStorage.getItem('depots'))              || []
-  const depotTransactions = JSON.parse(localStorage.getItem('depotTransactions'))   || []
-  const realEstate        = JSON.parse(localStorage.getItem('realEstate'))          || []
-  const companyShares     = JSON.parse(localStorage.getItem('companyShares'))       || []
-  const subscriptions     = JSON.parse(localStorage.getItem('subscriptions'))       || []
-  const recurrings        = JSON.parse(localStorage.getItem('recurringPayments'))   || []
-  const categories        = JSON.parse(localStorage.getItem('categories'))          || []
-  const serviceEntries    = JSON.parse(localStorage.getItem('serviceEntries'))                           || []
-  const serviceTypes      = JSON.parse(localStorage.getItem('serviceTypes'))                           || DEFAULT_SERVICE_TYPES
+  const accounts          = lsGet('bankAccounts', [])
+  const insurances        = lsGet('insuranceContracts', [])
+  const securities        = lsGet('securities', [])
+  const prices            = lsGet('securityPrices', {})
+  const depots            = lsGet('depots', [])
+  const depotTransactions = lsGet('depotTransactions', [])
+  const realEstate        = lsGet('realEstate', [])
+  const companyShares     = lsGet('companyShares', [])
+  const subscriptions     = lsGet('subscriptions', [])
+  const recurrings        = lsGet('recurringPayments', [])
+  const categories        = lsGet('categories', [])
+  const serviceEntries    = lsGet('serviceEntries', [])
+  const serviceTypes      = lsGet('serviceTypes', DEFAULT_SERVICE_TYPES)
 
   const anySelected = Object.values(selected).some(Boolean)
   const printDate   = new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })

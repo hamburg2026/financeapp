@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { lsGet } from '../lsGet'
 import { fmt } from '../fmt'
 
 const ASSETS = [
@@ -74,13 +75,13 @@ function DonutChart({ segments, size = 240, stroke = 42, centerValue, centerLabe
 }
 
 export default function WealthChart() {
-  const accounts   = JSON.parse(localStorage.getItem('bankAccounts'))       || []
-  const depots     = JSON.parse(localStorage.getItem('depots'))             || []
-  const depotTrans = JSON.parse(localStorage.getItem('depotTransactions'))  || []
-  const prices     = JSON.parse(localStorage.getItem('securityPrices'))     || {}
-  const insurance  = JSON.parse(localStorage.getItem('insuranceContracts')) || []
-  const realEstate = JSON.parse(localStorage.getItem('realEstate'))         || []
-  const shares     = JSON.parse(localStorage.getItem('companyShares'))      || []
+  const accounts   = lsGet('bankAccounts', [])
+  const depots     = lsGet('depots', [])
+  const depotTrans = lsGet('depotTransactions', [])
+  const prices     = lsGet('securityPrices', {})
+  const insurance  = lsGet('insuranceContracts', [])
+  const realEstate = lsGet('realEstate', [])
+  const shares     = lsGet('companyShares', [])
   const [animated, setAnimated] = useState(false)
 
   useEffect(() => {
