@@ -68,6 +68,12 @@ export default function Categories() {
   }
 
   function removeCategory(id) {
+    const cat = categories.find(c => c.id === id)
+    const hasChildren = categories.some(c => c.parent === id)
+    const msg = hasChildren
+      ? `Kategorie „${cat?.name}" und alle Unterkategorien löschen?`
+      : `Kategorie „${cat?.name}" löschen?`
+    if (!window.confirm(msg)) return
     const toRemove = new Set(getAllDescendantIds(id))
     setCategories(categories.filter(c => !toRemove.has(c.id)))
   }

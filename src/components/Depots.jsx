@@ -127,7 +127,10 @@ export default function Depots() {
     setEditTxId(null)
   }
 
-  function removeTx(id) { setTransactions(transactions.filter(t => t.id !== id)) }
+  function removeTx(id) {
+    if (!window.confirm('Transaktion löschen?')) return
+    setTransactions(transactions.filter(t => t.id !== id))
+  }
 
   // ─── Positions ───────────────────────────────────────────────────────────────
   function getPositions() {

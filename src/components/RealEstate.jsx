@@ -70,7 +70,10 @@ function ValueHistory({ label = 'Werthistorie', history = [], onChange }) {
     setNewVal('')
     setAdding(false)
   }
-  function remove(id) { onChange(history.filter(e => e.id !== id)) }
+  function remove(id) {
+    if (!window.confirm('Eintrag löschen?')) return
+    onChange(history.filter(e => e.id !== id))
+  }
   return (
     <div style={{ borderTop: '1px solid var(--color-border)', padding: '0.5rem 0.75rem', background: 'var(--color-bg)' }}>
       <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.4rem' }}>
@@ -143,7 +146,11 @@ export default function RealEstate() {
 
   function cancelForm() { setForm(EMPTY); setShowForm(false); setEditId(null) }
 
-  function removeProperty(id) { setProperties(properties.filter(p => p.id !== id)) }
+  function removeProperty(id) {
+    const p = properties.find(x => x.id === id)
+    if (!window.confirm(`Immobilie „${p?.name || ''}" löschen?`)) return
+    setProperties(properties.filter(p => p.id !== id))
+  }
 
   function toggleHistory(id) {
     setExpandedHistory(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next })

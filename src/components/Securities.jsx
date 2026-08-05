@@ -287,6 +287,8 @@ export default function Securities() {
   }
 
   function removeSecurity(id) {
+    const s = securities.find(x => x.id === id)
+    if (!window.confirm(`Wertpapier „${s?.name || ''}" löschen?`)) return
     const np = { ...prices }; delete np[id]
     setPrices(np)
     setSecurities(securities.filter(s => s.id !== id))
@@ -309,6 +311,7 @@ export default function Securities() {
   }
 
   function removePrice(secId, idx) {
+    if (!window.confirm('Kurs löschen?')) return
     const list = prices[secId].filter((_, i) => i !== idx)
     setPrices({ ...prices, [secId]: list })
   }
@@ -357,6 +360,7 @@ export default function Securities() {
   }
 
   function removeTx(id) {
+    if (!window.confirm('Transaktion löschen?')) return
     setDepotTransactions(depotTransactions.filter(t => t.id !== id))
   }
 
@@ -456,6 +460,7 @@ export default function Securities() {
   }
 
   function removeFxRate(pair, idx) {
+    if (!window.confirm(`Devisenkurs ${pair} löschen?`)) return
     const list = fxRates[pair].filter((_, i) => i !== idx)
     setFxRates({ ...fxRates, [pair]: list })
   }
@@ -1153,11 +1158,6 @@ export default function Securities() {
             )}
             {isinPriceErr && isinPrice !== null && (
               <p style={{ margin: '0.3rem 0 0', fontSize: '0.72rem', color: '#d97706' }}>Hinweis: {isinPriceErr}</p>
-            )}
-            {!leewayKey && (
-              <p style={{ margin: '0.4rem 0 0', fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>
-                Für Live-Kurse bitte Leeway API-Token konfigurieren.
-              </p>
             )}
           </div>
 

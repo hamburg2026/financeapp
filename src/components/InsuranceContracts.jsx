@@ -167,7 +167,10 @@ function ValueHistory({ history = [], onChange, annuity = false }) {
     setEditingId(null)
   }
 
-  function remove(id) { onChange(history.filter(e => e.id !== id)) }
+  function remove(id) {
+    if (!window.confirm('Eintrag löschen?')) return
+    onChange(history.filter(e => e.id !== id))
+  }
 
   const btn = { border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: '0.72rem', padding: '0.2rem 0.45rem' }
   const inpSt = { fontSize: '0.8rem', padding: '0.25rem 0.4rem', border: '1px solid var(--color-border)', borderRadius: 4 }
@@ -423,6 +426,8 @@ export default function InsuranceContracts() {
   }
 
   function removeContract(id) {
+    const c = contracts.find(x => x.id === id)
+    if (!window.confirm(`Versicherung „${c?.name || ''}" löschen?`)) return
     setContracts(contracts.filter(c => c.id !== id))
     removeRecurringPayment(id)
   }
