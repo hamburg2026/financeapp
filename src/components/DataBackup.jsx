@@ -53,7 +53,9 @@ async function exportBackup(password, keysToExport = BACKUP_KEYS) {
   const data = {}
   keysToExport.forEach(key => {
     const raw = localStorage.getItem(key)
-    if (raw) data[key] = JSON.parse(raw)
+    if (raw && raw !== 'undefined') {
+      try { data[key] = JSON.parse(raw) } catch { /* kaputten Eintrag überspringen */ }
+    }
   })
   const plaintext = new TextEncoder().encode(JSON.stringify({ version: 2, exportedAt: new Date().toISOString(), data }))
   let blob, filename
