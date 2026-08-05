@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, Component } from 'react'
 import Dashboard from './components/Dashboard'
 import BankAccounts from './components/BankAccounts'
 import Categories from './components/Categories'
@@ -17,6 +17,42 @@ import PdfImport from './components/PdfImport'
 import ServiceCostCalculator from './components/ServiceCostCalculator'
 import DataBackup from './components/DataBackup'
 import { THEMES, applyTheme, loadTheme } from './theme'
+
+class ErrorBoundary extends Component {
+  constructor(props) { super(props); this.state = { error: null } }
+  static getDerivedStateFromError(error) { return { error } }
+  reset() {
+    // Versuch: kaputte localStorage-Daten isolieren
+    this.setState({ error: null })
+  }
+  render() {
+    if (!this.state.error) return this.props.children
+    const msg = this.state.error?.message || String(this.state.error)
+    const stack = this.state.error?.stack || ''
+    return (
+      <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fff', padding: '2rem' }}>
+        <div style={{ maxWidth: 600, width: '100%', fontFamily: 'monospace' }}>
+          <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>⚠️</div>
+          <h2 style={{ margin: '0 0 0.5rem', fontFamily: 'sans-serif', color: '#dc2626' }}>Anwendungsfehler</h2>
+          <p style={{ margin: '0 0 1rem', fontFamily: 'sans-serif', color: '#374151', fontSize: '0.9rem' }}>
+            Bitte diesen Fehlertext kopieren und melden:
+          </p>
+          <pre style={{ background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: 8, padding: '1rem', fontSize: '0.75rem', whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: 300, overflow: 'auto', color: '#7f1d1d' }}>
+            {msg}{'\n\n'}{stack}
+          </pre>
+          <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
+            <button onClick={() => this.reset()} style={{ padding: '0.5rem 1rem', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontFamily: 'sans-serif' }}>
+              Neu versuchen
+            </button>
+            <button onClick={() => { sessionStorage.removeItem('pin_ok'); window.location.reload() }} style={{ padding: '0.5rem 1rem', background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: 6, cursor: 'pointer', fontFamily: 'sans-serif' }}>
+              Abmelden &amp; neu laden
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+}
 
 const PIN_KEY = 'app_pin_hash'
 
@@ -186,6 +222,7 @@ export default function App() {
   if (!unlocked) return <PinScreen onUnlocked={() => setUnlocked(true)} />
 
   return (
+    <ErrorBoundary>
     <>
       <div className="app-layout">
         <aside className="sidebar">
@@ -252,6 +289,7 @@ export default function App() {
 
       {showPrint && <PrintDialog onClose={() => setShowPrint(false)} />}
     </>
+    </ErrorBoundary>
   )
 }
 
