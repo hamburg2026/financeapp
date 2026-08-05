@@ -1,14 +1,18 @@
 import { useState } from 'react'
+import { lsGet } from '../lsGet'
 import { fmt } from '../fmt'
 import CategorySelect from './CategorySelect'
 import Modal from './Modal'
 
 function useLocalStorage(key, initial) {
-  const [value, setValue] = useState(() => JSON.parse(localStorage.getItem(key)) || initial)
-  const set = (newVal) => {
-    localStorage.setItem(key, JSON.stringify(newVal))
-    setValue(newVal)
-  }
+  const [value, setValue] = useState(() => {
+    try {
+      const stored = localStorage.getItem(key)
+      if (stored == null || stored === 'undefined') return initial
+      return JSON.parse(stored) ?? initial
+    } catch { return initial }
+  })
+  const set = (newVal) => { localStorage.setItem(key, JSON.stringify(newVal)); setValue(newVal) }
   return [value, set]
 }
 
@@ -27,7 +31,7 @@ const FREQ_SHORT = {
 }
 
 function syncRecurringPayment(contract) {
-  const stored = JSON.parse(localStorage.getItem('recurringPayments')) || []
+  const stored = lsGet('recurringPayments', [])
   const without = stored.filter(r => r.insuranceId !== contract.id)
   let next = without
   if (contract.active && contract.premium > 0) {
@@ -45,7 +49,7 @@ function syncRecurringPayment(contract) {
 }
 
 function removeRecurringPayment(contractId) {
-  const stored = JSON.parse(localStorage.getItem('recurringPayments')) || []
+  const stored = lsGet('recurringPayments', [])
   localStorage.setItem('recurringPayments', JSON.stringify(stored.filter(r => r.insuranceId !== contractId)))
 }
 

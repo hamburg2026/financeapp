@@ -1,10 +1,17 @@
 import { useState } from 'react'
+import { lsGet } from '../lsGet'
 import { fmt } from '../fmt'
 import CategorySelect from './CategorySelect'
 import Modal from './Modal'
 
 function useLocalStorage(key, initial) {
-  const [value, setValue] = useState(() => JSON.parse(localStorage.getItem(key)) || initial)
+  const [value, setValue] = useState(() => {
+    try {
+      const stored = localStorage.getItem(key)
+      if (stored == null || stored === 'undefined') return initial
+      return JSON.parse(stored) ?? initial
+    } catch { return initial }
+  })
   const set = v => { localStorage.setItem(key, JSON.stringify(v)); setValue(v) }
   return [value, set]
 }
@@ -725,9 +732,9 @@ export default function BankAccounts() {
   const [persons,           setPersons]           = useLocalStorage('insurancePersons', ['Karin', 'Jürgen'])
   const [banks,             setBanks]             = useLocalStorage('banks', [])
   const [depotTransactions, setDepotTransactions] = useLocalStorage('depotTransactions', [])
-  const categories = JSON.parse(localStorage.getItem('categories')) || []
-  const securities = JSON.parse(localStorage.getItem('securities'))  || []
-  const depots     = JSON.parse(localStorage.getItem('depots'))      || []
+  const categories = lsGet('categories', [])
+  const securities = lsGet('securities', [])
+  const depots     = lsGet('depots', [])
 
   const [groupBy,         setGroupBy]         = useState('none')
   const [sortBy,          setSortBy]          = useState('name')

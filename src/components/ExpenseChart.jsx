@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { lsGet } from '../lsGet'
 import { fmt } from '../fmt'
 
 const FREQ_FACTOR = {
@@ -59,8 +60,8 @@ function DonutChart({ segments, size = 200, strokeWidth = 38, centerLabel, cente
 export default function ExpenseChart() {
   const [period, setPeriod] = useState('month')
 
-  const recurrings = JSON.parse(localStorage.getItem('recurringPayments')) || []
-  const categories = JSON.parse(localStorage.getItem('categories'))        || []
+  const recurrings = lsGet('recurringPayments', [])
+  const categories = lsGet('categories', [])
 
   const factors = FREQ_FACTOR[period]
   const catById = Object.fromEntries(categories.map(c => [c.id, c]))

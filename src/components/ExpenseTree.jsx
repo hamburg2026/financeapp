@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { lsGet } from '../lsGet'
 import { fmt } from '../fmt'
 import CategorySelect from './CategorySelect'
 
@@ -408,10 +409,10 @@ export default function ExpenseTree() {
   const [pivotExpandedCats, setPivotExpandedCats] = useState(new Set())
   const [drilldown,         setDrilldown]         = useState(null)
 
-  const recurrings  = JSON.parse(localStorage.getItem('recurringPayments')) || []
-  const categories  = JSON.parse(localStorage.getItem('categories'))        || []
-  const [allTransactions, setAllTransactions] = useState(() => JSON.parse(localStorage.getItem('transactions')) || [])
-  const [allAccounts,     setAllAccounts]     = useState(() => JSON.parse(localStorage.getItem('bankAccounts')) || [])
+  const recurrings  = lsGet('recurringPayments', [])
+  const categories  = lsGet('categories', [])
+  const [allTransactions, setAllTransactions] = useState(() => lsGet('transactions', []))
+  const [allAccounts,     setAllAccounts]     = useState(() => lsGet('bankAccounts', []))
 
   function saveTransactions(txs) { localStorage.setItem('transactions', JSON.stringify(txs)); setAllTransactions(txs) }
   function saveAccounts(accs)    { localStorage.setItem('bankAccounts', JSON.stringify(accs)); setAllAccounts(accs) }

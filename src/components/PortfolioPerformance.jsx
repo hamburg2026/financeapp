@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react'
+import { lsGet } from '../lsGet'
 import { fmt } from '../fmt'
 
 // ─── Formatters ───────────────────────────────────────────────────────────────
@@ -472,11 +473,11 @@ function MultiSelect({ items, selected, onToggle, colorFn, label }) {
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function PortfolioPerformance() {
-  const depots       = JSON.parse(localStorage.getItem('depots'))            || []
-  const transactions = JSON.parse(localStorage.getItem('depotTransactions')) || []
-  const securities   = JSON.parse(localStorage.getItem('securities'))        || []
-  const prices       = JSON.parse(localStorage.getItem('securityPrices'))    || {}
-  const allInsurance = JSON.parse(localStorage.getItem('insuranceContracts')) || []
+  const depots       = lsGet('depots', [])
+  const transactions = lsGet('depotTransactions', [])
+  const securities   = lsGet('securities', [])
+  const prices       = lsGet('securityPrices', {})
+  const allInsurance = lsGet('insuranceContracts', [])
   const insWithHistory = allInsurance.filter(c => (c.valueHistory?.length || 0) >= 2)
 
   const [tab,        setTab]        = useState('depots')

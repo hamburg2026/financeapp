@@ -2,11 +2,14 @@ import { useState } from 'react'
 import { fmt } from '../fmt'
 
 function useLocalStorage(key, initial) {
-  const [value, setValue] = useState(() => JSON.parse(localStorage.getItem(key)) || initial)
-  const set = (newVal) => {
-    localStorage.setItem(key, JSON.stringify(newVal))
-    setValue(newVal)
-  }
+  const [value, setValue] = useState(() => {
+    try {
+      const stored = localStorage.getItem(key)
+      if (stored == null || stored === 'undefined') return initial
+      return JSON.parse(stored) ?? initial
+    } catch { return initial }
+  })
+  const set = (newVal) => { localStorage.setItem(key, JSON.stringify(newVal)); setValue(newVal) }
   return [value, set]
 }
 
@@ -21,8 +24,8 @@ const fieldCol = (width) => ({ display: 'flex', flexDirection: 'column', width }
 export default function Depots() {
   const [depots,       setDepots]       = useLocalStorage('depots', [])
   const [transactions, setTransactions] = useLocalStorage('depotTransactions', [])
-  const securities = JSON.parse(localStorage.getItem('securities')) || []
-  const prices     = JSON.parse(localStorage.getItem('securityPrices')) || {}
+  const securities = (() => { try { const s = localStorage.getItem('securities'); return (s && s !== 'undefined') ? JSON.parse(s) : [] } catch { return [] } })()
+  const prices     = (() => { try { const s = localStorage.getItem('securityPrices'); return (s && s !== 'undefined') ? JSON.parse(s) : {} } catch { return {} } })()
 
   const [tab,           setTab]           = useState('positions')
   const [depotName,     setDepotName]     = useState('')

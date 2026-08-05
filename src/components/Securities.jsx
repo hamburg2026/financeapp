@@ -106,11 +106,14 @@ function PriceChart({ priceList, currency }) {
 }
 
 function useLocalStorage(key, initial) {
-  const [value, setValue] = useState(() => JSON.parse(localStorage.getItem(key)) || initial)
-  const set = (newVal) => {
-    localStorage.setItem(key, JSON.stringify(newVal))
-    setValue(newVal)
-  }
+  const [value, setValue] = useState(() => {
+    try {
+      const stored = localStorage.getItem(key)
+      if (stored == null || stored === 'undefined') return initial
+      return JSON.parse(stored) ?? initial
+    } catch { return initial }
+  })
+  const set = (newVal) => { localStorage.setItem(key, JSON.stringify(newVal)); setValue(newVal) }
   return [value, set]
 }
 

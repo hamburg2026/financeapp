@@ -1,10 +1,17 @@
 import { useState } from 'react'
+import { lsGet } from '../lsGet'
 import { fmt } from '../fmt'
 import CategorySelect from './CategorySelect'
 import Modal from './Modal'
 
 function useLocalStorage(key, initial) {
-  const [value, setValue] = useState(() => JSON.parse(localStorage.getItem(key)) || initial)
+  const [value, setValue] = useState(() => {
+    try {
+      const stored = localStorage.getItem(key)
+      if (stored == null || stored === 'undefined') return initial
+      return JSON.parse(stored) ?? initial
+    } catch { return initial }
+  })
   const set = (newVal) => { localStorage.setItem(key, JSON.stringify(newVal)); setValue(newVal) }
   return [value, set]
 }
@@ -22,7 +29,7 @@ function getDescendants(catId, categories) {
 
 export default function RecurringPayments() {
   const [recurrings, setRecurrings] = useLocalStorage('recurringPayments', [])
-  const categories = JSON.parse(localStorage.getItem('categories')) || []
+  const categories = lsGet('categories', [])
 
   const [modal, setModal] = useState(null) // null | 'add' | recurringId
   const [form, setForm] = useState(EMPTY)
