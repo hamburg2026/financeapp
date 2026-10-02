@@ -48,7 +48,7 @@ private struct SubscriptionsDraft: Identifiable {
     }
 
     var isEditing: Bool { editId != nil }
-    var isValid: Bool { !name.isEmpty && cost != nil }
+    var isValid: Bool { !name.isEmpty && (cost ?? -1) >= 0 }
 }
 
 // MARK: - Hauptansicht
