@@ -4,6 +4,7 @@ import SwiftUI
 
 // MARK: - Wertpapier anlegen / bearbeiten
 
+@MainActor
 struct SecuritiesSecurityForm: View {
     @EnvironmentObject private var store: DataStore
     @Environment(\.dismiss) private var dismiss
@@ -99,6 +100,7 @@ struct SecuritiesSecurityForm: View {
 
 // MARK: - Kurs anlegen / bearbeiten
 
+@MainActor
 struct SecuritiesPriceForm: View {
     @EnvironmentObject private var store: DataStore
     @Environment(\.dismiss) private var dismiss
@@ -169,6 +171,7 @@ struct SecuritiesPriceForm: View {
 
 // MARK: - Devisenkurs anlegen / bearbeiten
 
+@MainActor
 struct SecuritiesFxForm: View {
     @EnvironmentObject private var store: DataStore
     @Environment(\.dismiss) private var dismiss
@@ -243,6 +246,7 @@ enum SecuritiesPriceMode: String, CaseIterable, Identifiable {
     var label: String { self == .price ? "Kurs" : "Einstand" }
 }
 
+@MainActor
 struct SecuritiesTxForm: View {
     @EnvironmentObject private var store: DataStore
     @Environment(\.dismiss) private var dismiss

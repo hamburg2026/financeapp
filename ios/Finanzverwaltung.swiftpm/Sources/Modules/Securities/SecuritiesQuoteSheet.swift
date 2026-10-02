@@ -3,6 +3,7 @@ import Charts
 
 // "Kurs & News"-Popup (ISIN-Klick in der Web-App).
 
+@MainActor
 struct SecuritiesQuoteSheet: View {
     @EnvironmentObject private var store: DataStore
     @Environment(\.dismiss) private var dismiss
