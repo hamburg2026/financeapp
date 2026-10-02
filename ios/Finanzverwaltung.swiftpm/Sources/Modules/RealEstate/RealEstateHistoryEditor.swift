@@ -15,8 +15,16 @@ struct RealEstateHistoryEditor: View {
     @Environment(\.appTheme) private var theme
     @State private var adding = false
     @State private var newDate: ISODate = ISODates.today()
-    @State private var newValue: Double?
-    @State private var pendingDelete: HistoryEntry?
+    @State private var newValue: Double? = nil
+    @State private var pendingDelete: HistoryEntry? = nil
+
+    init(label: String, history: [HistoryEntry], nonNegative: Bool = false,
+         onChange: @escaping ([HistoryEntry]) -> Void) {
+        self.label = label
+        self.history = history
+        self.nonNegative = nonNegative
+        self.onChange = onChange
+    }
 
     private var sorted: [HistoryEntry] { history.sortedNewestFirst }
 

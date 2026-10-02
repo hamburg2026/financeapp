@@ -15,21 +15,28 @@ struct DataBackupView: View {
     @State private var password = ""
     @State private var showPassword = false
     @State private var isExporting = false
-    @State private var exportDocument: DataBackupFileDocument?
+    @State private var exportDocument: DataBackupFileDocument? = nil
     @State private var exportFilename = ""
-    @State private var exportURL: URL?
+    @State private var exportURL: URL? = nil
     @State private var showExporter = false
 
     // Wiederherstellung
     @State private var showImporter = false
-    @State private var pendingRestore: DataBackupPendingFile?
+    @State private var pendingRestore: DataBackupPendingFile? = nil
 
     // Sonstiges
     @State private var showResetConfirm = false
-    @State private var alertMessage: String?
+    @State private var alertMessage: String? = nil
+    @State private var statusMessage: String? = nil
 
     var body: some View {
         Form {
+            if let statusMessage {
+                Section {
+                    Label(statusMessage, systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(Color.income)
+                }
+            }
             exportSectionPicker
             exportSection
             restoreSection
@@ -39,19 +46,6 @@ struct DataBackupView: View {
         }
         .navigationTitle("Datensicherung")
         .moduleBackground()
-        .fileExporter(isPresented: $showExporter, document: exportDocument, contentType: .json,
-                      defaultFilename: exportFilename) { result in
-            switch result {
-            case .success:
-                alertMessage = "Sicherung gespeichert."
-            case .failure(let error):
-                alertMessage = "Sicherung konnte nicht gespeichert werden: \(error.localizedDescription)"
-            }
-        }
-        .fileImporter(isPresented: $showImporter, allowedContentTypes: [.json, .data],
-                      allowsMultipleSelection: false) { result in
-            handleImport(result)
-        }
         .sheet(item: $pendingRestore) { file in
             DataBackupRestoreSheet(file: file) { snapshot, keys in
                 performRestore(snapshot, keys: keys)
@@ -112,7 +106,6 @@ struct DataBackupView: View {
                         SecureField("Passwort (optional)", text: $password)
                     }
                 }
-                .textContentType(.newPassword)
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.never)
                 Button {
@@ -131,6 +124,17 @@ struct DataBackupView: View {
                 }
             }
             .disabled(isExporting)
+            // Datei-Dialoge an unterschiedlichen Views (mehrere an derselben View stören sich)
+            .fileExporter(isPresented: $showExporter, document: exportDocument, contentType: .json,
+                          defaultFilename: exportFilename) { result in
+                switch result {
+                case .success:
+                    statusMessage = "Sicherung gespeichert."
+                case .failure(let error):
+                    if (error as? CocoaError)?.code == .userCancelled { return }
+                    alertMessage = "Sicherung konnte nicht gespeichert werden: \(error.localizedDescription)"
+                }
+            }
             if let url = exportURL {
                 ShareLink(item: url) {
                     Label("„\(url.lastPathComponent)“ teilen …", systemImage: "square.and.arrow.up.on.square")
@@ -160,6 +164,7 @@ struct DataBackupView: View {
         let encrypted = !pw.isEmpty
         let filename = "financeapp-sicherung-\(ISODates.today())" + (encrypted ? ".enc.json" : ".json")
         isExporting = true
+        statusMessage = nil
         Task {
             let result: Result<Data, Error> = await Task.detached(priority: .userInitiated) { () -> Result<Data, Error> in
                 if pw.isEmpty { return .success(plaintext) }
@@ -202,6 +207,10 @@ struct DataBackupView: View {
             } label: {
                 Label("Sicherung wiederherstellen", systemImage: "square.and.arrow.down")
             }
+            .fileImporter(isPresented: $showImporter, allowedContentTypes: [.json],
+                          allowsMultipleSelection: false) { result in
+                handleImport(result)
+            }
         } header: {
             Text("Wiederherstellen")
         } footer: {
@@ -243,7 +252,7 @@ struct DataBackupView: View {
         }
         store.restore(snapshot, keys: effective)
         pendingRestore = nil
-        alertMessage = "Sicherung wurde wiederhergestellt."
+        statusMessage = "Sicherung wurde wiederhergestellt."
     }
 
     // MARK: - Gespeicherte Daten
@@ -328,7 +337,7 @@ struct DataBackupView: View {
         s.liquidityLevels = [:]
         store.restore(s, keys: Set(BackupKey.allCases))
         exportURL = nil
-        alertMessage = "Alle Daten wurden gelöscht."
+        statusMessage = "Alle Daten wurden gelöscht."
     }
 }
 
@@ -421,15 +430,16 @@ private struct DataBackupStatRow: View {
 
 // MARK: - Wiederherstellen-Dialog
 
+@MainActor
 private struct DataBackupRestoreSheet: View {
     let file: DataBackupPendingFile
     let onRestore: (BackupSnapshot, Set<BackupKey>) -> Void
 
     @Environment(\.dismiss) private var dismiss
-    @State private var snapshot: BackupSnapshot?
-    @State private var exportedAt: String?
+    @State private var snapshot: BackupSnapshot? = nil
+    @State private var exportedAt: String? = nil
     @State private var restorePassword = ""
-    @State private var error: String?
+    @State private var error: String? = nil
     @State private var isDecrypting = false
     @State private var selected: Set<String> = []
     @State private var confirm = false
@@ -474,8 +484,8 @@ private struct DataBackupRestoreSheet: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Abbrechen") { dismiss() }
                 }
-                if snapshot != nil {
-                    ToolbarItem(placement: .confirmationAction) {
+                ToolbarItem(placement: .confirmationAction) {
+                    if snapshot != nil {
                         Button("Wiederherstellen (\(selected.count))") { confirm = true }
                             .disabled(selected.isEmpty)
                     }

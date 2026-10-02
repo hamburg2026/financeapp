@@ -9,8 +9,8 @@ struct CategoriesView: View {
     @Environment(\.appTheme) private var theme
 
     @State private var expanded: Set<EntityID> = []
-    @State private var editor: CategoriesEditorTarget?
-    @State private var pendingDelete: Category?
+    @State private var editor: CategoriesEditorTarget? = nil
+    @State private var pendingDelete: Category? = nil
 
     var body: some View {
         content

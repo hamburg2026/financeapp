@@ -12,15 +12,15 @@ struct ServiceCostsView: View {
     @State private var tab: ServiceCostsTab = .entries
 
     // Filter
-    @State private var filterType: EntityID?
+    @State private var filterType: EntityID? = nil
     @State private var filterFrom: ISODate = ""
     @State private var filterTo: ISODate = ""
-    @State private var filterStatus: ServiceStatus?
+    @State private var filterStatus: ServiceStatus? = nil
 
-    @State private var entryEditor: ServiceCostsEntryTarget?
-    @State private var typeEditor: ServiceCostsTypeTarget?
-    @State private var pendingEntryDelete: ServiceEntry?
-    @State private var pendingTypeDelete: ServiceType?
+    @State private var entryEditor: ServiceCostsEntryTarget? = nil
+    @State private var typeEditor: ServiceCostsTypeTarget? = nil
+    @State private var pendingEntryDelete: ServiceEntry? = nil
+    @State private var pendingTypeDelete: ServiceType? = nil
     @State private var selection = Set<EntityID>()
 
     var body: some View {
@@ -587,7 +587,7 @@ private struct ServiceCostsEntrySheet: View {
     @Environment(\.appTheme) private var theme
 
     @State private var target: ServiceCostsEntryTarget
-    @State private var newType: ServiceCostsTypeTarget?
+    @State private var newType: ServiceCostsTypeTarget? = nil
     let onSave: (ServiceCostsEntryTarget) -> Void
 
     init(target: ServiceCostsEntryTarget, onSave: @escaping (ServiceCostsEntryTarget) -> Void) {

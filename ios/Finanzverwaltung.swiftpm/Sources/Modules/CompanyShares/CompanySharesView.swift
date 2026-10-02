@@ -7,8 +7,8 @@ struct CompanySharesView: View {
     @EnvironmentObject private var store: DataStore
     @Environment(\.appTheme) private var theme
 
-    @State private var editor: CompanySharesEditorTarget?
-    @State private var pendingDelete: CompanyShare?
+    @State private var editor: CompanySharesEditorTarget? = nil
+    @State private var pendingDelete: CompanyShare? = nil
     @State private var expandedHistory: Set<EntityID> = []
 
     var body: some View {

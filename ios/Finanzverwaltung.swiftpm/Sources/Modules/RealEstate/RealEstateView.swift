@@ -7,8 +7,8 @@ struct RealEstateView: View {
     @EnvironmentObject private var store: DataStore
     @Environment(\.appTheme) private var theme
 
-    @State private var editor: RealEstateEditorTarget?
-    @State private var pendingDelete: RealEstateProperty?
+    @State private var editor: RealEstateEditorTarget? = nil
+    @State private var pendingDelete: RealEstateProperty? = nil
     @State private var expandedHistory: Set<EntityID> = []
 
     var body: some View {
