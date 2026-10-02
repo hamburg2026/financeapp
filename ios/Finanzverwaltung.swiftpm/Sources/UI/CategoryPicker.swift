@@ -18,6 +18,15 @@ struct CategoryPicker: View {
 
     @State private var showSheet = false
 
+    init(selection: Binding<EntityID?>, placeholder: String = "– Kategorie wählen –",
+         selectParents: Bool = false, typeFilter: CategoryType? = nil, excluding: EntityID? = nil) {
+        self._selection = selection
+        self.placeholder = placeholder
+        self.selectParents = selectParents
+        self.typeFilter = typeFilter
+        self.excluding = excluding
+    }
+
     var body: some View {
         Button {
             showSheet = true
@@ -65,6 +74,14 @@ struct CategoryNamePicker: View {
     var typeFilter: CategoryType? = nil
 
     @State private var showSheet = false
+
+    init(selection: Binding<String>, placeholder: String = "– keine –",
+         selectParents: Bool = false, typeFilter: CategoryType? = nil) {
+        self._selection = selection
+        self.placeholder = placeholder
+        self.selectParents = selectParents
+        self.typeFilter = typeFilter
+    }
 
     var body: some View {
         Button {
@@ -121,6 +138,17 @@ struct CategoryTreeSheet: View {
 
     @State private var expanded: Set<EntityID> = []
     @State private var search = ""
+
+    init(title: String, selectedID: EntityID?, selectParents: Bool, typeFilter: CategoryType?,
+         excluding: EntityID?, placeholder: String, onPick: @escaping (Category?) -> Void) {
+        self.title = title
+        self.selectedID = selectedID
+        self.selectParents = selectParents
+        self.typeFilter = typeFilter
+        self.excluding = excluding
+        self.placeholder = placeholder
+        self.onPick = onPick
+    }
 
     private var available: [Category] {
         var list = store.categories

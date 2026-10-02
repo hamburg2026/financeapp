@@ -197,9 +197,11 @@ struct BankAccountsTransactionsView: View {
     }
 
     private var filtersActive: Bool {
-        !filterCat.isEmpty || filterType != .all || !filterRecipient.isEmpty || !filterSearch.isEmpty
-            || !filterAmtMin.isEmpty || !filterAmtMax.isEmpty || (accountId == nil && filterAcc != nil)
-            || dateDim == .custom
+        let textFilters: Bool = !filterRecipient.isEmpty || !filterSearch.isEmpty
+        let amountFilters: Bool = !filterAmtMin.isEmpty || !filterAmtMax.isEmpty
+        let otherFilters: Bool = !filterCat.isEmpty || filterType != .all
+        let accFilter: Bool = accountId == nil && filterAcc != nil
+        return textFilters || amountFilters || otherFilters || accFilter || dateDim == .custom
     }
 
     // MARK: Body

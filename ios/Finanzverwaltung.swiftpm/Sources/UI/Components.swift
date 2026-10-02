@@ -263,6 +263,12 @@ struct PillPicker<T: Hashable>: View {
     let label: (T) -> String
     @Environment(\.appTheme) private var theme
 
+    init(options: [T], selection: Binding<T>, label: @escaping (T) -> String) {
+        self.options = options
+        self._selection = selection
+        self.label = label
+    }
+
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
