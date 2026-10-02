@@ -282,8 +282,8 @@ struct SecuritiesView: View {
         Section("Neues Depot") {
             HStack {
                 TextField("Depotname", text: $newDepotName)
-                    .onSubmit(addDepot)
-                Button("+ Depot anlegen", action: addDepot)
+                    .onSubmit { addDepot() }
+                Button("+ Depot anlegen") { addDepot() }
                     .buttonStyle(.borderedProminent)
                     .tint(theme.primary)
                     .disabled(newDepotName.trimmingCharacters(in: .whitespaces).isEmpty)

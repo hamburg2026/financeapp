@@ -69,7 +69,7 @@ enum SecuritiesNetwork {
         return s.addingPercentEncoding(withAllowedCharacters: allowed) ?? s
     }
 
-    private static func get(_ urlString: String, accept: String) async throws -> Data {
+    private static func fetchData(_ urlString: String, accept: String) async throws -> Data {
         guard let url = URL(string: urlString) else { throw SecuritiesNetworkError("Ungültige URL") }
         var req = URLRequest(url: url)
         req.timeoutInterval = 20
@@ -87,7 +87,7 @@ enum SecuritiesNetwork {
     /// Symbolformat: US-Aktien = "AAPL", Deutsche Aktien = "DTE.DE", ETFs = "VWCE.DE"
     static func fetchYahooPrice(symbol: String) async throws -> SecuritiesQuote {
         let url = "https://query1.finance.yahoo.com/v8/finance/chart/\(encode(symbol))?interval=1d&range=5d"
-        let data = try await get(url, accept: "application/json")
+        let data = try await fetchData(url, accept: "application/json")
         let decoded: YahooChartResponse
         do {
             decoded = try JSONDecoder().decode(YahooChartResponse.self, from: data)
@@ -117,7 +117,7 @@ enum SecuritiesNetwork {
     /// Devisenkurs von Frankfurter.app: EUR je 1 Einheit Fremdwährung.
     static func fetchFrankfurterFx(pair: String) async throws -> SecuritiesFxQuote {
         let url = "https://api.frankfurter.app/latest?base=\(encode(pair))&symbols=EUR"
-        let data = try await get(url, accept: "application/json")
+        let data = try await fetchData(url, accept: "application/json")
         let decoded = try? JSONDecoder().decode(FrankfurterResponse.self, from: data)
         guard let rate = decoded?.rates?["EUR"] else { throw SecuritiesNetworkError("Kurs nicht verfügbar") }
         let date = decoded?.date ?? ISODates.today()
@@ -127,7 +127,7 @@ enum SecuritiesNetwork {
     /// Yahoo-Finance-RSS-Feed direkt laden und parsen (max. 8 Einträge).
     static func fetchNews(symbol: String) async throws -> [SecuritiesNewsItem] {
         let url = "https://feeds.finance.yahoo.com/rss/2.0/headline?s=\(encode(symbol))&region=DE&lang=de-DE"
-        let data = try await get(url, accept: "application/rss+xml, application/xml, text/xml")
+        let data = try await fetchData(url, accept: "application/rss+xml, application/xml, text/xml")
         let parser = SecuritiesRSSParser()
         let items = parser.parse(data)
         if items.isEmpty { throw SecuritiesNetworkError("Keine News gefunden.") }
